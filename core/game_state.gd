@@ -41,6 +41,10 @@ static func default_settings() -> Dictionary:
 		"ambience": true,
 		"reduce_motion": false,
 		"theme": "auto",
+		"keep_screen_on": true,
+		# Last walk length picked on the walks screen; 0 = open-ended.
+		"walk_goal_seconds": 3600,
+		"walk_biome": "lake",
 	}
 
 

@@ -39,6 +39,11 @@ func today() -> int:
 	return Stats.local_day(now(), tz_bias())
 
 
+func set_setting(key: String, value) -> void:
+	state.settings[key] = value
+	_changed()
+
+
 func save() -> void:
 	var err := SaveSystem.write(state)
 	if err != OK:
@@ -83,8 +88,12 @@ func complete_project(id: String) -> void:
 
 # --- Walks -------------------------------------------------------------------
 
-func start_walk(project_id: String) -> void:
-	state.active = SessionClock.begin(project_id, now())
+func start_walk(project_id: String, goal_seconds: int = -1, biome_id: String = "") -> void:
+	if goal_seconds < 0:
+		goal_seconds = int(state.settings.get("walk_goal_seconds", 0))
+	if biome_id == "":
+		biome_id = str(state.settings.get("walk_biome", "lake"))
+	state.active = SessionClock.begin(project_id, now(), goal_seconds, biome_id)
 	_changed()
 
 

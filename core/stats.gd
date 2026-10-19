@@ -73,6 +73,16 @@ static func totals_by_project(sessions: Array) -> Dictionary:
 	return out
 
 
+## {project_id: seconds} for walks started in the week beginning `week_start_day`.
+static func project_totals_in_week(sessions: Array, week_start_day: int, bias_minutes: int) -> Dictionary:
+	var out := {}
+	for s in sessions:
+		var i := local_day(s.start_unix, bias_minutes) - week_start_day
+		if i >= 0 and i < 7:
+			out[s.project_id] = int(out.get(s.project_id, 0)) + s.focus_seconds
+	return out
+
+
 ## Consecutive days with at least `min_seconds` of walking, ending today.
 ## A day with nothing yet doesn't break the streak until it's over, so the
 ## count runs back from yesterday if today is still empty.

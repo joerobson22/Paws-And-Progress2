@@ -1,9 +1,12 @@
 {
-	"_doc": "Each biome is a stack of parallax layers drawn back to front. 'kind' picks a placeholder drawer (hills, trees, water, ground, reeds). 'parallax' is how fast the layer scrolls relative to the ground (1.0). 'y' and 'height' are fractions of the screen height. Real art will replace drawers with sprite chunks per layer.",
+	"_doc": "Each biome is a stack of parallax layers drawn back to front. 'kind' picks a placeholder drawer (hills, trees, water, ground, reeds). 'walk_phrase' finishes \"Walk the dog ...\"; 'swatch' colours its tile on the walks screen; 'ambience' names its looping sound. 'parallax' is how fast the layer scrolls relative to the ground (1.0). 'y' and 'height' are fractions of the screen height. Real art will replace drawers with sprite chunks per layer.",
 	"biomes": [
 		{
 			"id": "lake",
 			"name": "Lakeside",
+			"walk_phrase": "by the lake",
+			"swatch": "#7fb2c9",
+			"ambience": "lake",
 			"unlock_hours": 0,
 			"layers": [
 				{"kind": "hills", "parallax": 0.08, "y": 0.42, "height": 0.16, "colour": "#9fb4a8", "wavelength": 520, "seed": 1},

@@ -55,6 +55,11 @@ func rarity_colour(rarity_id: String) -> Color:
 	return Color.from_string(_rarities_by_id.get(rarity_id, {}).get("colour", "#888888"), Color.GRAY)
 
 
+## A darker shade of the rarity colour that reads as text on paper.
+func rarity_text_colour(rarity_id: String) -> Color:
+	return Color.from_string(_rarities_by_id.get(rarity_id, {}).get("text_colour", "#5e5e52"), Color.DIM_GRAY)
+
+
 func rarity_name(rarity_id: String) -> String:
 	return _rarities_by_id.get(rarity_id, {}).get("name", rarity_id.capitalize())
 
