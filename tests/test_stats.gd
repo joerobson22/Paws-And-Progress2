@@ -47,6 +47,15 @@ func test_totals_by_project() -> void:
 	eq(Stats.totals_by_project(s), {"a": 17, "b": 5})
 
 
+func test_project_totals_in_week() -> void:
+	var monday := Stats.local_day(MONDAY, 0)
+	var s := [_session(MONDAY, 600, "a"), _session(MONDAY + 3 * 86400, 900, "a"),
+		_session(MONDAY + 86400, 300, "b"), _session(MONDAY + 7 * 86400, 5000, "a")]
+	var t := Stats.project_totals_in_week(s, monday, 0)
+	eq(t.get("a", 0), 1500, "next week's walk left out")
+	eq(t.get("b", 0), 300)
+
+
 func test_format_duration() -> void:
 	eq(Stats.format_duration(59), "0m")
 	eq(Stats.format_duration(3600 * 11 + 23 * 60), "11h 23m")

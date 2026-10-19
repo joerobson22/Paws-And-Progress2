@@ -1,10 +1,10 @@
 {
 	"_doc": "One gift per rarity per animal. Epic and legendary gifts are wearable: 'slot' says where. Names carried over from v1 where the animal carried over; legendary gifts are placeholders for Joe to rename.",
 	"rarities": [
-		{"id": "common",    "name": "Common",    "colour": "#8a9a7b"},
-		{"id": "rare",      "name": "Rare",      "colour": "#3f7cbf"},
-		{"id": "epic",      "name": "Epic",      "colour": "#8e4fc2"},
-		{"id": "legendary", "name": "Legendary", "colour": "#d9902b"}
+		{"id": "common",    "name": "Common",    "colour": "#8c8c7e", "text_colour": "#5e5e52"},
+		{"id": "rare",      "name": "Rare",      "colour": "#2f7bc2", "text_colour": "#1f5e99"},
+		{"id": "epic",      "name": "Epic",      "colour": "#7e4fd6", "text_colour": "#5f35ae"},
+		{"id": "legendary", "name": "Legendary", "colour": "#e2a615", "text_colour": "#8a5f00"}
 	],
 	"gifts": [
 		{"id": "staffy_common",       "animal": "staffy",    "rarity": "common",    "name": "Tennis Ball",        "description": "Used for fetch. It's a bit slobbery..."},

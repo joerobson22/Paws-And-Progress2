@@ -17,11 +17,20 @@ const ON_FOREST_SOFT := Color("#bfd6c3")
 const APRICOT := Color("#ffb869")
 const ON_APRICOT := Color("#3a1f06")
 const DANGER := Color("#a8432e")
+const SAGE := Color("#e5efe2")
+const LINE := Color("#d8c8aa")
 
 const RADIUS := 16
 const WIDE_BREAKPOINT := 900.0
 
 static var _fonts: Dictionary = {}
+
+
+## Gochi Hand, the handwriting on noticeboard polaroids.
+static func hand_font() -> Font:
+	if not _fonts.has("hand"):
+		_fonts["hand"] = load("res://ui/fonts/GochiHand.ttf")
+	return _fonts["hand"]
 
 
 ## Nunito (body) or Fredoka (display) at a given weight, cached.
@@ -189,31 +198,130 @@ static func page(parent: Control, max_width: int = 820) -> VBoxContainer:
 
 	var margin := MarginContainer.new()
 	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var gutter := 32 if is_wide(parent) else 16
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 20)
+		margin.add_theme_constant_override("margin_" + side, gutter)
 	scroll.add_child(margin)
 
 	var column := vbox(16)
 	column.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	margin.add_child(column)
 	var fit := func():
-		column.custom_minimum_size.x = minf(max_width, parent.size.x - 40.0)
+		column.custom_minimum_size.x = minf(max_width, parent.size.x - 2.0 * gutter)
 	parent.resized.connect(fit)
 	fit.call_deferred()
 	return column
 
 
-static func header(title: String, on_back: Callable = Callable()) -> HBoxContainer:
+## Screen title, with a square back button and a line underneath if given.
+static func header(title: String, on_back: Callable = Callable(), subtitle: String = "") -> HBoxContainer:
 	var h := hbox(16)
 	if on_back.is_valid():
-		var back := quiet_button("Back", on_back)
-		back.custom_minimum_size.x = 96
+		var back := icon_button("back", "Back", on_back)
+		back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		h.add_child(back)
-	var l := label(title, 34, INK, true, 600)
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	h.add_child(l)
+	var titles := vbox(0)
+	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	titles.alignment = BoxContainer.ALIGNMENT_CENTER
+	var l := label(title, 32, INK, true, 600)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	titles.add_child(l)
+	if subtitle != "":
+		titles.add_child(label(subtitle, 14, INK_SOFT, false, 700))
+	h.add_child(titles)
 	return h
+
+
+## A square button holding just an icon, like the mockups' back and sound buttons.
+static func icon_button(icon: String, tip: String, on_press: Callable, fill: Color = PAPER,
+		colour: Color = INK, side: int = 44, radius: int = 14) -> Button:
+	var b := Button.new()
+	b.tooltip_text = tip
+	b.custom_minimum_size = Vector2(side, side)
+	b.icon = Icons.texture(icon, 20, colour)
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		var sb := box(fill if state == "normal" else fill.darkened(0.06 if state == "hover" else 0.12), Color.TRANSPARENT, radius)
+		sb.set_content_margin_all(0)
+		if fill == PAPER and state == "normal":
+			sb.shadow_color = Color(0.24, 0.16, 0.08, 0.15)
+			sb.shadow_size = 3
+			sb.shadow_offset = Vector2(0, 1)
+		b.add_theme_stylebox_override(state, sb)
+	b.pressed.connect(on_press)
+	return b
+
+
+## Puts a leading icon on a text button.
+static func with_icon(b: Button, icon: String, colour: Color, px: int = 16) -> Button:
+	b.icon = Icons.texture(icon, px, colour)
+	b.add_theme_constant_override("h_separation", 10)
+	return b
+
+
+## Round filter/segment pill: ink when selected, sand when not.
+static func pill_button(text: String, selected: bool, on_press: Callable, height: int = 40) -> Button:
+	var b := button(text, on_press, INK if selected else PILL, PAPER if selected else Color("#5c5246"))
+	b.custom_minimum_size = Vector2(0, height)
+	b.add_theme_font_size_override("font_size", 14)
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		var sb: StyleBoxFlat = b.get_theme_stylebox(state).duplicate()
+		sb.set_corner_radius_all(999)
+		sb.content_margin_top = 6
+		sb.content_margin_bottom = 6
+		sb.content_margin_left = 16
+		sb.content_margin_right = 16
+		b.add_theme_stylebox_override(state, sb)
+	return b
+
+
+## A small rounded tag, like "PROJECT" or a rarity name.
+static func tag(text: String, fill: Color, colour: Color, size: int = 12) -> PanelContainer:
+	var p := PanelContainer.new()
+	var b := box(fill, Color.TRANSPARENT, 999)
+	b.content_margin_left = 9
+	b.content_margin_right = 9
+	b.content_margin_top = 2
+	b.content_margin_bottom = 2
+	p.add_theme_stylebox_override("panel", b)
+	p.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var l := label(text, size, colour, false, 800)
+	p.add_child(l)
+	return p
+
+
+## A flat rounded panel with no shadow, for areas inside cards.
+static func panel(fill: Color, radius: int = 18, padding: int = 14) -> PanelContainer:
+	var p := PanelContainer.new()
+	var b := box(fill, Color.TRANSPARENT, radius)
+	b.set_content_margin_all(padding)
+	p.add_theme_stylebox_override("panel", b)
+	return p
+
+
+## Segmented bar of gift odds by rarity, with a legend underneath.
+static func odds_bar(pct: Dictionary, on_dark: bool = false) -> VBoxContainer:
+	var v := vbox(8)
+	var bar := hbox(2)
+	bar.custom_minimum_size.y = 12
+	var legend := HFlowContainer.new()
+	legend.add_theme_constant_override("h_separation", 14)
+	for r in GiftRoller.RARITIES:
+		var share := int(pct.get(r, 0))
+		if share <= 0:
+			continue
+		var seg := Panel.new()
+		var sb := box(Content.rarity_colour(r), Color.TRANSPARENT, 3)
+		seg.add_theme_stylebox_override("panel", sb)
+		seg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		seg.size_flags_stretch_ratio = maxf(share, 1.5)
+		bar.add_child(seg)
+		var text_colour := Content.rarity_colour(r).lightened(0.5) if on_dark else Content.rarity_text_colour(r)
+		legend.add_child(label("%s %d%%" % [Content.rarity_name(r), share], 13, text_colour, false, 800))
+	v.add_child(bar)
+	v.add_child(legend)
+	return v
 
 
 ## Draws an animal portrait inside a fixed-size box (for cards and lists).

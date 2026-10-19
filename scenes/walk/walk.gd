@@ -18,6 +18,7 @@ var _hint_label: Label
 var _odds_box: VBoxContainer
 var _pause_button: Button
 var _place_label: Label
+var _sound_button: Button
 var _last_second := -1
 var _period_check := 0.0
 
@@ -32,7 +33,7 @@ func _ready() -> void:
 		return
 
 	_scenery = Scenery.new()
-	_scenery.biome = Content.biome("lake")
+	_scenery.biome = Content.biome(clock.biome_id)
 	_scenery.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	# Start somewhere different each walk.
 	_scenery.scroll = App.rng.randf_range(0.0, 100000.0)
@@ -48,10 +49,15 @@ func _ready() -> void:
 	_actors.add_child(_animal)
 
 	_build_hud()
+	DisplayServer.screen_set_keep_on(App.state.settings.get("keep_screen_on", true))
 	resized.connect(_layout)
 	_layout()
 	_update_period()
 	_apply_paused(clock.is_paused())
+
+
+func _exit_tree() -> void:
+	DisplayServer.screen_set_keep_on(false)
 
 
 func _build_hud() -> void:
@@ -69,15 +75,28 @@ func _build_hud() -> void:
 
 	var top := UI.hbox(16)
 	col.add_child(top)
-	var who := _glass()
+	var who := _glass(999)
+	var who_row := UI.hbox(10)
+	var face := UI.animal_portrait(_project.animal_id, _project.colours, Vector2(40, 40), UI.SAGE)
+	var round := face.get_theme_stylebox("panel").duplicate()
+	round.set_corner_radius_all(999)
+	face.add_theme_stylebox_override("panel", round)
+	who_row.add_child(face)
 	var animal_name: String = Content.animal(_project.animal_id).get("name", "")
-	who.add_child(UI.label("%s  ·  with the %s" % [_project.name, animal_name.to_lower()], 15, UI.PAPER, false, 800))
+	var who_text := UI.label("%s  with the %s" % [_project.name, animal_name.to_lower()], 15, UI.PAPER, false, 800)
+	who_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	who_row.add_child(who_text)
+	who.add_child(who_row)
+	var wb: StyleBoxFlat = who.get_theme_stylebox("panel")
+	wb.content_margin_left = 6
+	wb.content_margin_top = 6
+	wb.content_margin_bottom = 6
 	who.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	top.add_child(who)
 	top.add_child(UI.spacer())
 
 	var odds := _glass()
-	odds.custom_minimum_size.x = 230
+	odds.custom_minimum_size.x = 240
 	odds.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	_odds_box = UI.vbox(6)
 	odds.add_child(_odds_box)
@@ -118,12 +137,16 @@ func _build_hud() -> void:
 	controls.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if wide else Control.SIZE_EXPAND_FILL
 	var row := UI.hbox(10)
 	controls.add_child(row)
+	_sound_button = UI.icon_button("sound", "Ambient sound", _toggle_ambience, UI.TRACK, UI.INK, 52, 16)
+	row.add_child(_sound_button)
 	_pause_button = UI.button("Pause", _toggle_pause, UI.INK, UI.PAPER)
 	_pause_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_pause_button.add_theme_constant_override("h_separation", 10)
 	row.add_child(_pause_button)
-	var home := UI.cta("Head home", _finish)
+	var home := UI.with_icon(UI.cta("Head home", _finish), "home", UI.ON_APRICOT, 18)
 	home.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(home)
+	_update_sound_button()
 	bottom.add_child(controls)
 	if wide:
 		var place := HBoxContainer.new()
@@ -139,9 +162,9 @@ func _build_hud() -> void:
 
 
 ## Translucent dark pill used for text over the scenery.
-func _glass() -> PanelContainer:
+func _glass(radius: int = 20) -> PanelContainer:
 	var p := PanelContainer.new()
-	var b := UI.box(Color(0.08, 0.12, 0.09, 0.42), Color(1, 1, 1, 0.18), 20)
+	var b := UI.box(Color(0.08, 0.12, 0.09, 0.42), Color(1, 1, 1, 0.18), radius)
 	b.border_width_left = 1
 	b.border_width_right = 1
 	b.border_width_top = 1
@@ -208,13 +231,14 @@ func _update_odds(elapsed: int) -> void:
 	if GiftRoller.weights_for(elapsed, table).is_empty():
 		_odds_box.add_child(UI.label("No gift yet", 14, UI.PAPER, false, 800))
 	else:
-		for r in GiftRoller.RARITIES:
-			if pct[r] > 0:
-				_odds_box.add_child(UI.label("%s  %d%%" % [Content.rarity_name(r), pct[r]], 14, Content.rarity_colour(r).lightened(0.45), false, 800))
+		_odds_box.add_child(UI.odds_bar(pct, true))
 
 	var next := _next_tier_seconds(elapsed)
 	var min_s := int(table.get("min_seconds", 600))
-	if elapsed < min_s:
+	var goal := App.state.active.goal_seconds
+	if goal > 0 and elapsed >= goal:
+		_hint_label.text = "You've walked your %s. Head home whenever you like" % Stats.format_duration(goal).replace(" 00m", "")
+	elif elapsed < min_s:
 		_hint_label.text = "A gift unlocks in %s" % _minutes(min_s - elapsed)
 	elif next > 0:
 		_hint_label.text = "Better odds in %s" % _minutes(next - elapsed)
@@ -238,8 +262,27 @@ func _update_period() -> void:
 	_period_check = 30.0
 	var hour := int(Time.get_datetime_dict_from_system()["hour"])
 	_scenery.period = Content.time_of_day(hour)
+	Audio.ambience(_ambience_name())
 	if _place_label:
 		_place_label.text = "%s · %s" % [_scenery.biome.get("name", ""), _scenery.period]
+
+
+## Water by the lake by day; the night ambience after dark anywhere.
+func _ambience_name() -> String:
+	if _scenery.period == "night":
+		return "night"
+	return str(_scenery.biome.get("ambience", "day"))
+
+
+func _toggle_ambience() -> void:
+	App.set_setting("ambience", not App.state.settings.get("ambience", true))
+	Audio.refresh(_ambience_name())
+	_update_sound_button()
+
+
+func _update_sound_button() -> void:
+	var on: bool = App.state.settings.get("ambience", true)
+	_sound_button.icon = Icons.texture("sound" if on else "mute", 20, UI.INK)
 
 
 func _toggle_pause() -> void:
@@ -252,6 +295,7 @@ func _toggle_pause() -> void:
 
 func _apply_paused(paused: bool) -> void:
 	_pause_button.text = "Resume" if paused else "Pause"
+	_pause_button.icon = Icons.texture("play" if paused else "pause", 16, UI.PAPER)
 	_walker.walking = not paused
 	_animal.walking = not paused
 	var walk_speed := float(Content.animal(_project.animal_id).get("walk_speed", 1.0))

@@ -48,7 +48,7 @@ func _run() -> void:
 		app.state.inventory[g["id"]] = 1
 	app.state.profile["cosmetics"]["hat"] = "bird_epic"
 
-	for screen in ["home", "walks", "project_editor", "shelf", "wardrobe", "board", "stats"]:
+	for screen in ["home", "walks", "project_editor", "shelf", "wardrobe", "board", "stats", "settings"]:
 		await _visit(screen, {})
 	await _visit("project_editor", {"id": app.state.projects[0].id})
 
