@@ -1,0 +1,17 @@
+{
+	"_doc": "Gift odds by walk length. A walk shorter than min_seconds gives no gift. The highest tier whose min_seconds the walk reaches is used. Legendary starts at 45 minutes. Pity: after pity_walks walks of at least pity_min_seconds without an epic or legendary, the next such walk is guaranteed at least epic.",
+	"min_seconds": 600,
+	"pity_walks": 8,
+	"pity_min_seconds": 1800,
+	"tiers": [
+		{"min_seconds": 600,   "weights": {"common": 90, "rare": 10, "epic": 0,  "legendary": 0}},
+		{"min_seconds": 1800,  "weights": {"common": 75, "rare": 23, "epic": 2,  "legendary": 0}},
+		{"min_seconds": 2700,  "weights": {"common": 70, "rare": 25, "epic": 4,  "legendary": 1}},
+		{"min_seconds": 3600,  "weights": {"common": 60, "rare": 32, "epic": 6,  "legendary": 2}},
+		{"min_seconds": 5400,  "weights": {"common": 50, "rare": 38, "epic": 9,  "legendary": 3}},
+		{"min_seconds": 7200,  "weights": {"common": 42, "rare": 42, "epic": 12, "legendary": 4}},
+		{"min_seconds": 10800, "weights": {"common": 30, "rare": 48, "epic": 16, "legendary": 6}},
+		{"min_seconds": 14400, "weights": {"common": 15, "rare": 55, "epic": 22, "legendary": 8}},
+		{"min_seconds": 18000, "weights": {"common": 0,  "rare": 62, "epic": 28, "legendary": 10}}
+	]
+}

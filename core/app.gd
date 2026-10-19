@@ -1,0 +1,157 @@
+extends Node
+## Autoload "App": owns the GameState, saves it, runs the walk lifecycle and
+## asks the main scene to change screens.
+
+signal navigate(screen: String, params: Dictionary)
+signal state_changed
+
+var state: GameState
+var rng := RandomNumberGenerator.new()
+## Set when this launch imported a v1 save, so the home screen can say so.
+var imported_from_v1 := false
+
+
+func _ready() -> void:
+	rng.randomize()
+	state = SaveSystem.read()
+	if state == null:
+		state = _first_launch_state()
+		save()
+
+
+func _notification(what: int) -> void:
+	# Mobile apps can be killed at any time once backgrounded, so save then.
+	match what:
+		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_CLOSE_REQUEST:
+			if state:
+				save()
+
+
+func now() -> int:
+	return int(Time.get_unix_time_from_system())
+
+
+func tz_bias() -> int:
+	return int(Time.get_time_zone_from_system().get("bias", 0))
+
+
+func today() -> int:
+	return Stats.local_day(now(), tz_bias())
+
+
+func save() -> void:
+	var err := SaveSystem.write(state)
+	if err != OK:
+		push_error("Save failed: %s" % error_string(err))
+
+
+func go(screen: String, params: Dictionary = {}) -> void:
+	navigate.emit(screen, params)
+
+
+# --- Projects ----------------------------------------------------------------
+
+func new_project_id() -> String:
+	return "p%d_%04x" % [now(), rng.randi() & 0xffff]
+
+
+func add_project(p: ProjectData) -> void:
+	if p.id == "":
+		p.id = new_project_id()
+	if p.created_unix == 0:
+		p.created_unix = now()
+	state.projects.append(p)
+	_changed()
+
+
+func update_project(_p: ProjectData) -> void:
+	# Projects are edited in place; this just persists and notifies.
+	_changed()
+
+
+func delete_project(id: String) -> void:
+	state.projects.assign(state.projects.filter(func(p): return p.id != id))
+	_changed()
+
+
+func complete_project(id: String) -> void:
+	var p := state.project(id)
+	if p and not p.is_complete():
+		p.completed_unix = now()
+		_changed()
+
+
+# --- Walks -------------------------------------------------------------------
+
+func start_walk(project_id: String) -> void:
+	state.active = SessionClock.begin(project_id, now())
+	_changed()
+
+
+func pause_walk() -> void:
+	if state.active:
+		state.active.pause(now())
+		_changed()
+
+
+func resume_walk() -> void:
+	if state.active:
+		state.active.resume(now())
+		_changed()
+
+
+## Ends the walk, logs it, rolls the gift and returns a summary for the
+## end-of-walk screen: {session: FocusSession, gift: Dictionary}.
+func finish_walk() -> Dictionary:
+	var clock := state.active
+	if clock == null:
+		return {}
+	var t := now()
+	var seconds := clock.elapsed(t)
+	var project := state.project(clock.project_id)
+	var animal_id := project.animal_id if project else ""
+
+	var pity := int(state.profile.get("walks_since_epic", 0))
+	var gift := GiftRoller.roll(seconds, animal_id, pity, Content.drop_table, Content.gifts, rng)
+	state.profile["walks_since_epic"] = GiftRoller.next_pity_count(pity, seconds, gift.get("rarity", ""), Content.drop_table)
+
+	var s := FocusSession.new()
+	s.id = "s%d_%04x" % [t, rng.randi() & 0xffff]
+	s.project_id = clock.project_id
+	s.animal_id = animal_id
+	s.start_unix = clock.start_unix
+	s.end_unix = t
+	s.focus_seconds = seconds
+	s.gift_id = gift.get("gift_id", "")
+	if s.gift_id != "":
+		state.inventory[s.gift_id] = int(state.inventory.get(s.gift_id, 0)) + 1
+	# Walks under a minute (mis-taps) aren't worth logging.
+	if seconds >= 60:
+		state.sessions.append(s)
+
+	state.active = null
+	_changed()
+	return {"session": s, "gift": gift}
+
+
+func cancel_walk() -> void:
+	state.active = null
+	_changed()
+
+
+# --- Internals ---------------------------------------------------------------
+
+func _changed() -> void:
+	save()
+	state_changed.emit()
+
+
+func _first_launch_state() -> GameState:
+	var v1_path := SaveSystem.v1_save_path()
+	if FileAccess.file_exists(v1_path):
+		var imported := SaveSystem.import_v1(FileAccess.get_file_as_string(v1_path), now())
+		imported_from_v1 = true
+		return imported
+	var s := GameState.new()
+	s.profile["created_unix"] = now()
+	return s

@@ -1,0 +1,52 @@
+extends TestCase
+
+# 2026-10-19 is a Monday.
+const MONDAY := 1792368000
+
+
+func _session(start: int, seconds: int, project := "p") -> FocusSession:
+	var s := FocusSession.new()
+	s.start_unix = start
+	s.focus_seconds = seconds
+	s.project_id = project
+	return s
+
+
+func test_monday_is_weekday_zero() -> void:
+	var day := Stats.local_day(MONDAY, 0)
+	eq(Stats.weekday(day), 0)
+	eq(Stats.week_start(day + 6), day)
+
+
+func test_daily_totals_respect_timezone() -> void:
+	# 23:30 UTC Sunday is already Monday in UTC+1.
+	var s := [_session(MONDAY - 1800, 600)]
+	var monday := Stats.local_day(MONDAY, 0)
+	eq(Stats.daily_totals(s, monday, 0)[0], 0, "UTC: Sunday, previous week")
+	eq(Stats.daily_totals(s, monday, 60)[0], 600, "UTC+1: Monday")
+
+
+func test_week_and_best_week() -> void:
+	var s := [_session(MONDAY, 1000), _session(MONDAY + 86400, 500), _session(MONDAY + 7 * 86400, 2000)]
+	eq(Stats.week_total(s, Stats.local_day(MONDAY, 0), 0), 1500)
+	eq(Stats.best_week_total(s, 0), 2000)
+	eq(Stats.longest_session(s), 2000)
+
+
+func test_streak() -> void:
+	var d := 86400
+	var s := [_session(MONDAY, 900), _session(MONDAY + d, 900), _session(MONDAY + 2 * d, 100), _session(MONDAY + 3 * d, 700), _session(MONDAY + 4 * d, 650)]
+	var today := Stats.local_day(MONDAY + 4 * d, 0)
+	eq(Stats.current_streak(s, today, 0), 2, "short day breaks it")
+	eq(Stats.current_streak(s, today + 1, 0), 2, "an empty today doesn't break it yet")
+	eq(Stats.current_streak(s, today + 2, 0), 0)
+
+
+func test_totals_by_project() -> void:
+	var s := [_session(0, 10, "a"), _session(0, 5, "b"), _session(0, 7, "a")]
+	eq(Stats.totals_by_project(s), {"a": 17, "b": 5})
+
+
+func test_format_duration() -> void:
+	eq(Stats.format_duration(59), "0m")
+	eq(Stats.format_duration(3600 * 11 + 23 * 60), "11h 23m")

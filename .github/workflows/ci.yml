@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  GODOT_VERSION: 4.5.1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot
+        run: |
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+
+      - name: Import project
+        run: ./godot --headless --path . --import
+
+      - name: Unit tests
+        run: ./godot --headless --path . -s tests/run_tests.gd
+
+      - name: Smoke run (every screen)
+        run: |
+          ./godot --headless --path . -s tests/smoke.gd 2>&1 | tee smoke.log
+          grep -q "SMOKE OK" smoke.log
+          ! grep -E "SCRIPT ERROR|Parse Error" smoke.log

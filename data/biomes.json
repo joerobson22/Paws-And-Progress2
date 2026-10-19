@@ -1,0 +1,24 @@
+{
+	"_doc": "Each biome is a stack of parallax layers drawn back to front. 'kind' picks a placeholder drawer (hills, trees, water, ground, reeds). 'parallax' is how fast the layer scrolls relative to the ground (1.0). 'y' and 'height' are fractions of the screen height. Real art will replace drawers with sprite chunks per layer.",
+	"biomes": [
+		{
+			"id": "lake",
+			"name": "Lakeside",
+			"unlock_hours": 0,
+			"layers": [
+				{"kind": "hills", "parallax": 0.08, "y": 0.42, "height": 0.16, "colour": "#9fb4a8", "wavelength": 520, "seed": 1},
+				{"kind": "hills", "parallax": 0.15, "y": 0.50, "height": 0.12, "colour": "#7f9c86", "wavelength": 360, "seed": 2},
+				{"kind": "trees", "parallax": 0.25, "y": 0.58, "height": 0.16, "colour": "#55765c", "spacing": 70,  "seed": 3},
+				{"kind": "water", "parallax": 0.35, "y": 0.60, "height": 0.12, "colour": "#7fb2c9", "seed": 4},
+				{"kind": "ground", "parallax": 1.0, "y": 0.72, "height": 0.28, "colour": "#8fae5e", "seed": 5},
+				{"kind": "reeds", "parallax": 1.4, "y": 0.96, "height": 0.08, "colour": "#6e8f45", "spacing": 46,  "seed": 6}
+			]
+		}
+	],
+	"times_of_day": {
+		"morning": {"from_hour": 6,  "sky_top": "#f6d7b0", "sky_bottom": "#fbeedd", "tint": "#fff4e6"},
+		"day":     {"from_hour": 11, "sky_top": "#8ec3e6", "sky_bottom": "#d7ecf6", "tint": "#ffffff"},
+		"evening": {"from_hour": 17, "sky_top": "#e79a6f", "sky_bottom": "#f6c99a", "tint": "#f2d6c4"},
+		"night":   {"from_hour": 21, "sky_top": "#1c2340", "sky_bottom": "#3a3f63", "tint": "#7a80a8"}
+	}
+}
