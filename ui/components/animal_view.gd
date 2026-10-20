@@ -16,6 +16,8 @@ const MOUTHS := {
 		animal_id = v
 		queue_redraw()
 @export var walking: bool = false
+## A livelier gait for fetching: quicker steps, bigger strides and bounce.
+var running := false
 ## Multiplier on top of the animal's own walk speed.
 @export var speed: float = 1.0
 
@@ -23,6 +25,13 @@ var colours: Array[Color] = []:
 	set(v):
 		colours = v
 		queue_redraw()
+## How far below the water it is, in its own pixels (0 on dry land), and the
+## water's colour: the part under the surface is hidden behind it.
+var submerged := 0.0:
+	set(v):
+		submerged = v
+		queue_redraw()
+var water_colour := Color("#7fb2c9")
 ## A gift id to carry in its mouth, or "".
 var held_gift := "":
 	set(v):
@@ -35,8 +44,12 @@ var _phase: float = 0.0
 func _process(delta: float) -> void:
 	if walking:
 		var walk_speed := float(Content.animal(animal_id).get("walk_speed", 1.0))
-		_phase += delta * TAU * (0.6 + walk_speed) * speed
+		_phase += delta * TAU * (0.6 + walk_speed) * speed * (2.4 if running else 1.0)
 		queue_redraw()
+
+
+func _stride() -> float:
+	return 2.2 if running else 1.0
 
 
 func _part(name: String, fallback: Color) -> Color:
@@ -67,6 +80,9 @@ func _draw() -> void:
 			_draw_bear()
 		_:
 			_draw_dog()
+	if submerged > 0.5:
+		draw_rect(Rect2(-90, -submerged, 190, submerged + 10), Color(water_colour, 0.92))
+		draw_line(Vector2(-60, -submerged), Vector2(80, -submerged), Color(1, 1, 1, 0.55), 2.0, true)
 	if held_gift != "":
 		_draw_held_gift(str(data.get("shape", "dog")))
 
@@ -97,7 +113,7 @@ func _ellipse(centre: Vector2, radius: Vector2, colour: Color, rotation: float =
 
 func _legs(xs: Array, top: float, length: float, width: float, colour: Color) -> void:
 	for i in xs.size():
-		var swing := sin(_phase + PI * (i % 2)) * 0.35 if walking else 0.0
+		var swing := sin(_phase + PI * (i % 2)) * 0.35 * _stride() if walking else 0.0
 		var base := Vector2(xs[i], top)
 		var foot := base + Vector2(0, length).rotated(swing)
 		draw_line(base, foot, colour, width, true)
@@ -108,7 +124,7 @@ func _draw_dog() -> void:
 	var legs := _part("Legs", Color.SADDLE_BROWN)
 	var body := _part("Body", Color.BURLYWOOD)
 	var pattern := _part("Pattern", Color.WHITE)
-	var bob := absf(sin(_phase)) * 2.0 if walking else 0.0
+	var bob := absf(sin(_phase)) * 2.0 * _stride() if walking else 0.0
 	_legs([-30, -18, 18, 30], -30 - bob, 30, 9, legs)
 	draw_line(Vector2(-40, -44 - bob), Vector2(-58, -62 - bob + sin(_phase * 2.0) * 4.0), body, 7, true)
 	_ellipse(Vector2(0, -42 - bob), Vector2(44, 19), body)
@@ -124,7 +140,7 @@ func _draw_bear() -> void:
 	var legs := _part("Legs", Color.SADDLE_BROWN)
 	var body := _part("Body", Color.SADDLE_BROWN)
 	var pattern := _part("Pattern", Color.TAN)
-	var bob := absf(sin(_phase)) * 2.0 if walking else 0.0
+	var bob := absf(sin(_phase)) * 2.0 * _stride() if walking else 0.0
 	_legs([-26, -14, 14, 26], -26 - bob, 26, 14, legs)
 	_ellipse(Vector2(0, -44 - bob), Vector2(42, 24), body)
 	_ellipse(Vector2(42, -60 - bob), Vector2(18, 16), body)
@@ -157,7 +173,7 @@ func _draw_rabbit() -> void:
 	var legs := _part("Legs", Color.TAN)
 	var body := _part("Body", Color.WHEAT)
 	var pattern := _part("Pattern", Color.WHITE)
-	var hop := absf(sin(_phase * 0.5)) * 14.0 if walking else 0.0
+	var hop := absf(sin(_phase * 0.5)) * 14.0 * _stride() if walking else 0.0
 	_ellipse(Vector2(-14, -12 - hop), Vector2(16, 10), legs)
 	_ellipse(Vector2(12, -8 - hop), Vector2(6, 8), legs)
 	_ellipse(Vector2(0, -28 - hop), Vector2(26, 20), body)
@@ -189,7 +205,7 @@ func _draw_bird() -> void:
 	var wings := _part("Wings", Color.STEEL_BLUE)
 	var body := _part("Body", Color.LIGHT_SKY_BLUE)
 	var pattern := _part("Pattern", Color.GOLD)
-	var hop := absf(sin(_phase * 0.7)) * 8.0 if walking else 0.0
+	var hop := absf(sin(_phase * 0.7)) * 8.0 * _stride() if walking else 0.0
 	draw_line(Vector2(-4, -12 - hop), Vector2(-6, 0), Color("#7a5236"), 2, true)
 	draw_line(Vector2(6, -12 - hop), Vector2(6, 0), Color("#7a5236"), 2, true)
 	_ellipse(Vector2(0, -28 - hop), Vector2(20, 16), body)

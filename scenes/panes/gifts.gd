@@ -1,9 +1,12 @@
 extends Pane
 ## Gifts, to the left of the focus screen. Your three favourites sit on the
 ## shelf near the top; underneath is every gift you've found, with how many
-## you've had. Press and hold a gift to pick it up, then drop it on the shelf;
-## hold a shelf gift to move it along, or drag it off to take it down. Tap any
-## gift for a closer look and to trade it in.
+## you've had, in the order picked from the "Filter by" menu. Press and hold
+## a gift to pick it up, then drop it on the shelf; hold a shelf gift to move
+## it along, or drag it off to take it down. Tap any gift for a closer look
+## and to trade it in.
+
+const SORTS := [["rarity", "Rarity"], ["name", "A–Z"], ["animal", "Animal"]]
 
 var _slots: Array[_Slot] = []
 var _shelf_card: Control
@@ -35,12 +38,19 @@ func build() -> void:
 		return
 
 	var head := UI.hbox(8)
-	head.add_child(UI.caption("Your collection"))
+	var cap := UI.caption("Your collection")
+	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(cap)
 	head.add_child(UI.spacer())
-	head.add_child(UI.label("Hold a gift to shelve it", 13, UI.INK_FAINT, false, 700))
+	var sort := Dropdown.new(SORTS, str(App.state.settings.get("gift_sort", "rarity")),
+		bool(App.state.settings.get("gift_sort_reversed", false)), "Filter by")
+	sort.chosen.connect(func(option: String, reversed: bool):
+		App.state.settings["gift_sort"] = option
+		App.set_setting("gift_sort_reversed", reversed))
+	head.add_child(sort)
 	col.add_child(head)
 	var grid := GridContainer.new()
-	grid.columns = clampi(int(col.custom_minimum_size.x / 104.0), 3, 7)
+	grid.columns = clampi(int(col.custom_minimum_size.x / 100.0), 3, 7)
 	grid.add_theme_constant_override("h_separation", 12)
 	grid.add_theme_constant_override("v_separation", 12)
 	for id in found:
@@ -52,25 +62,38 @@ func build() -> void:
 	col.add_child(grid)
 
 
-## Gifts found so far, grouped by animal, commonest first.
+## Gifts found so far, in the chosen order.
 func _found() -> Array:
+	var ids: Array = App.state.inventory.keys().filter(func(id): return not Content.gift(id).is_empty())
+	return sort_gifts(ids, str(App.state.settings.get("gift_sort", "rarity")), bool(App.state.settings.get("gift_sort_reversed", false)))
+
+
+## Rarity puts the rarest first; A–Z is by name; animal follows the cast,
+## commonest first within each. `reversed` flips the whole order.
+static func sort_gifts(ids: Array, by: String, reversed: bool) -> Array:
 	var order := {}
 	for i in Content.animals.size():
 		order[Content.animals[i]["id"]] = i
-	var ids: Array = App.state.inventory.keys().filter(func(id): return not Content.gift(id).is_empty())
-	ids.sort_custom(func(a, b):
-		var ga := Content.gift(a)
-		var gb := Content.gift(b)
-		if ga["animal"] != gb["animal"]:
-			return order.get(ga["animal"], 99) < order.get(gb["animal"], 99)
-		return GiftRoller.RARITIES.find(ga["rarity"]) < GiftRoller.RARITIES.find(gb["rarity"]))
-	return ids
+	var key := func(id: String) -> Array:
+		var g := Content.gift(id)
+		var rarity := GiftRoller.RARITIES.find(g["rarity"])
+		match by:
+			"name":
+				return [str(g["name"]).to_lower()]
+			"animal":
+				return [order.get(g["animal"], 99), rarity]
+			_:
+				return [-rarity, str(g["name"]).to_lower()]
+	var out := ids.duplicate()
+	out.sort_custom(func(a, b): return key.call(a) < key.call(b))
+	if reversed:
+		out.reverse()
+	return out
 
 
+## The shelf: no box round it, just a plank with three gifts standing on it.
 func _shelf() -> Control:
-	var card := UI.card(UI.SURFACE, 18)
 	var v := UI.vbox(0)
-	card.add_child(v)
 	var row := UI.hbox(10)
 	var shelf := App.state.shelf()
 	for i in shelf.size():
@@ -79,7 +102,7 @@ func _shelf() -> Control:
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var id: String = shelf[i]
 		if id != "" and App.state.gift_count(id) > 0:
-			var tile := GiftTile.new(id, App.state.gift_count(id), true, true)
+			var tile := GiftTile.new(id, App.state.gift_count(id), true)
 			tile.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			tile.tapped.connect(show_gift)
 			tile.lifted.connect(_lift.bind(i))
@@ -89,9 +112,9 @@ func _shelf() -> Control:
 		_slots.append(slot)
 	v.add_child(row)
 	var plank := _Plank.new()
-	plank.custom_minimum_size.y = 16
+	plank.custom_minimum_size.y = 18
 	v.add_child(plank)
-	return card
+	return v
 
 
 # --- Dragging ----------------------------------------------------------------
@@ -202,12 +225,12 @@ func show_gift(id: String, fresh: bool = false) -> void:
 				Motion.pop(art, 0.2, 0.5))
 
 	var meta := UI.hbox(8)
-	meta.add_child(UI.tag(Content.rarity_name(rarity).to_upper(), Content.rarity_colour(rarity), UI.SURFACE))
+	meta.add_child(UI.tag(Content.rarity_name(rarity).to_upper(), Content.rarity_colour(rarity), UI.ON_COLOUR))
 	var animal_name: String = Content.animal(g["animal"]).get("name", "")
 	meta.add_child(UI.label("from the %s" % animal_name.to_lower(), 14, UI.INK_SOFT, false, 700))
 	if fresh:
 		meta.add_child(UI.spacer())
-		meta.add_child(UI.tag("NEW", UI.INK, UI.SURFACE))
+		meta.add_child(UI.tag("NEW", UI.INK, UI.BG))
 	m.body.add_child(meta)
 	m.body.add_child(UI.para(g.get("description", ""), 16, UI.INK))
 	if g.has("slot"):

@@ -1,7 +1,8 @@
 extends SceneTree
 ## Smoke run: boots the real app, fills it with sample data and visits every
-## pane, popup and full-screen flow (including a real swipe and a full walk
-## with a gift), so script errors in UI code show up in CI.
+## pane, popup and full-screen flow (including a real swipe, a full walk with
+## a gift, throwing the gift for the pet to fetch, and dark mode), so script
+## errors in UI code show up in CI.
 ##   godot --headless --path . -s tests/smoke.gd
 ## Optional: --shots=<dir> saves a screenshot per step (needs a display).
 
@@ -39,6 +40,20 @@ func _run() -> void:
 	await _wait(20)
 	await _shot("focus")
 
+	# Every place draws cleanly, by day and night, along a stretch of walk.
+	for b in _content().biomes:
+		for period in ["day", "night"]:
+			var scenery: Control = _class("res://scenes/walk/scenery.gd").new()
+			scenery.biome = b
+			scenery.period = period
+			root.add_child(scenery)
+			scenery.size = main.size
+			for scroll in [1234.0, 40000.0, 91000.0]:
+				scenery.scroll = scroll
+				await process_frame
+			scenery.queue_free()
+	await process_frame
+
 	# A real swipe: dragging right from the middle brings in the gifts on the left.
 	await _drag(main.size * 0.5, main.size * Vector2(0.9, 0.5))
 	await _wait(30)
@@ -63,6 +78,29 @@ func _run() -> void:
 		await _drag(tile.get_global_rect().position + Vector2(14, 14), slot.get_global_rect().get_center(), 12, 0.5)
 		await _wait(30)
 		check(app.state.shelf()[1] == "staffy_rare", "dragging a gift onto the shelf (shelf is %s)" % [app.state.shelf()])
+
+	# The filter menu: picking an option sorts by it; picking it again reverses.
+	var sort: Node = _find(gifts_pane, func(n): return _is(n, "dropdown.gd"))
+	sort._open()
+	await _wait(15)
+	await _shot("gift_filter")
+	sort._choose("name")
+	await _wait(10)
+	check(app.state.settings.get("gift_sort") == "name" and not app.state.settings.get("gift_sort_reversed"), "filter by A-Z")
+	sort = _find(gifts_pane, func(n): return _is(n, "dropdown.gd"))
+	sort._choose("name")
+	await _wait(10)
+	check(app.state.settings.get("gift_sort_reversed") == true, "choosing A-Z again reverses it")
+	var shown := []
+	for t in _all(gifts_pane, func(n): return _is(n, "gift_tile.gd") and n.get_parent() is GridContainer):
+		shown.append(_content().gift(t.gift_id)["name"].to_lower())
+	var sorted := shown.duplicate()
+	sorted.sort()
+	sorted.reverse()
+	check(shown == sorted, "Z-A order on screen")
+	sort = _find(gifts_pane, func(n): return _is(n, "dropdown.gd"))
+	sort._choose("rarity")
+	await _wait(10)
 
 	# Trading in ten commons for a rare.
 	var rares: int = app.state.gift_count("staffy_rare")
@@ -102,6 +140,15 @@ func _run() -> void:
 	await _wait(25)
 	await _shot("customise")
 	_close_modal()
+	var profile_pane: Node = main._panes[Vector2i(0, -1)]
+	profile_pane.open_settings()
+	await _wait(25)
+	await _shot("settings")
+	_close_modal()
+	profile_pane.open_rewards()
+	await _wait(25)
+	await _shot("rewards")
+	_close_modal()
 
 	app.go("stats")
 	await _wait(50)
@@ -123,6 +170,16 @@ func _run() -> void:
 	await _wait(40)
 	await _shot("choose_focus")
 	var chooser: Node = main._flows.back().get_child(0)
+	var level: int = app.level()
+	check(level > 1 and level < 15, "sample player is part way up (level %d)" % level)
+	chooser._pick_place("beach")
+	await _wait(50)
+	check(app.state.settings.get("walk_biome") == "beach", "picking an unlocked place")
+	await _shot("choose_beach")
+	chooser._pick_place("moon")
+	await _wait(20)
+	check(app.state.settings.get("walk_biome") == "beach", "a locked place can't be picked")
+	await _shot("place_locked")
 	chooser._pets.go_to(2)
 	await _wait(25)
 	chooser._on_right()
@@ -133,7 +190,17 @@ func _run() -> void:
 	chooser._start_adopting()
 	await _wait(30)
 	await _shot("new_pet")
-	chooser._animals.go_to(4)
+	var locked := -1
+	for i in _content().animals.size():
+		if not app.is_unlocked("animal", _content().animals[i]["id"]):
+			locked = i
+			break
+	check(locked >= 0, "something's still locked at level %d" % level)
+	chooser._animals.go_to(locked)
+	await _wait(25)
+	check(chooser._right.disabled, "a locked animal can't be adopted")
+	await _shot("new_pet_locked")
+	chooser._animals.go_to(1)
 	await _wait(25)
 	chooser._name_edit.text = "Chemistry"
 	chooser._pet_edit.text = "Bramble"
@@ -166,11 +233,49 @@ func _run() -> void:
 	var result: Dictionary = main._flows[0].get_child(0).params
 	check(result["session"].focus_seconds >= 50 * 60, "walk length from timestamps")
 	check(result["gift"].get("rarity", "") in ["rare", "epic", "legendary"], "at least rare after 50 minutes")
+	var finish: Node = main._flows[0].get_child(0)
+	await _wait(40)
+	await _shot("finish_zoom")
+	await _wait(420)
+	check(finish._home.modulate.a > 0.9, "the home button fades in at the end")
+	check(finish._state == "ready", "the gift can be picked up")
 	await _shot("finish")
+
+	# Easter egg: hold the gift, flick it up into the distance, and wait for
+	# the fetch.
+	var gift_at: Vector2 = finish._gift_on_screen()
+	await _drag(gift_at, gift_at + Vector2(30, -150), 4, 0.3)
+	await _wait(20)
+	check(finish._state in ["flying", "fetching"], "a flick throws the gift (state %s)" % finish._state)
+	await _wait(30)
+	await _shot("fetch")
+	await _wait(400)
+	check(finish._state == "ready" and finish._animal.held_gift == result["gift"]["gift_id"], "the pet brings the gift back")
 
 	app.go("home")
 	await _wait(60)
 	check(main._flows.is_empty() and main._at == Vector2i.ZERO, "home closes the flow")
+
+	# Dark mode: the sun in the corner switches the whole app.
+	var toggle: Node = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "theme_toggle.gd"))
+	toggle._flip()
+	await _wait(60)
+	check(_class("res://ui/ui.gd").dark, "the toggle switches to dark mode")
+	check(app.state.settings.get("theme") == "dark", "dark mode is saved")
+	await _shot("focus_dark")
+	for pane in ["gifts", "stats", "profile"]:
+		app.go(pane)
+		await _wait(50)
+		await _shot(pane + "_dark")
+	main._panes[Vector2i(0, -1)].open_rewards()
+	await _wait(25)
+	await _shot("rewards_dark")
+	_close_modal()
+	app.go("focus")
+	await _wait(50)
+	_find(main._panes[Vector2i.ZERO], func(n): return _is(n, "theme_toggle.gd"))._flip()
+	await _wait(60)
+	check(not _class("res://ui/ui.gd").dark, "and back to light")
 
 	if _failed:
 		quit(1)
@@ -206,7 +311,7 @@ func _fill_sample_data() -> void:
 			var s := FocusSession.new()
 			s.project_id = p.id
 			s.start_unix = now - d * 86400 - i * 3600
-			s.focus_seconds = 900 + 600 * ((i + d) % 4)
+			s.focus_seconds = 600 + 300 * ((i + d) % 4)
 			s.gift_id = "%s_%s" % [animals[i], ["common", "common", "rare", "epic"][(i + d) % 4]]
 			app.state.sessions.append(s)
 	app.complete_project(app.state.projects[5].id)
@@ -263,6 +368,16 @@ func _drag(from: Vector2, to: Vector2, steps: int = 10, hold: float = 0.0) -> vo
 func _is(n: Node, script_file: String) -> bool:
 	var s: Script = n.get_script()
 	return s != null and s.resource_path.get_file() == script_file
+
+
+## Every node under `node` that `match` accepts, in tree order.
+func _all(node: Node, match: Callable) -> Array:
+	var out := []
+	for c in node.get_children():
+		if match.call(c):
+			out.append(c)
+		out.append_array(_all(c, match))
+	return out
 
 
 ## The first node under `node` (depth first) that `match` accepts.

@@ -196,7 +196,7 @@ func _update_period() -> void:
 	_period_check = 30.0
 	var hour := int(Time.get_datetime_dict_from_system()["hour"])
 	_scenery.period = Content.time_of_day(hour)
-	Audio.ambience("night" if _scenery.period == "night" else str(_scenery.biome.get("ambience", "day")))
+	Audio.ambience(_scenery.ambience())
 
 
 func _toggle_pause() -> void:
@@ -337,8 +337,13 @@ func _go_finish() -> void:
 	if _done:
 		return
 	_done = true
+	# The focus complete screen carries on from this exact scene.
 	var params_out := _result.duplicate()
-	params_out["from"] = _animal.get_global_transform_with_canvas() * Vector2(0, -40)
+	params_out["instant"] = true
+	params_out["scene"] = {
+		"biome": _scenery.biome.get("id", "lake"), "scroll": _scenery.scroll, "period": _scenery.period,
+		"walker": _walker.position, "animal": _animal.position, "unit": _unit(),
+	}
 	App.go("finish", params_out)
 
 

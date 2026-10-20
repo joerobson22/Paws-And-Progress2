@@ -1,10 +1,10 @@
 class_name GiftButton
 extends Button
-## The round button in the corner of a walk, with a tick on it. Grey until a
-## gift is earned, then it pops and turns green. From then on blue, purple and
-## gold circles grow from its middle at their own pace; when one fills the
-## whole button, that rarity is the least the walk will bring, and it pops
-## again with a sound. Pressing it ends the walk.
+## The round button in the corner of a walk: just colour, no icon. Grey
+## until a gift is earned, then it pops and turns green. From then on blue,
+## purple and gold circles grow from its middle at their own pace; when one
+## fills the whole button, that rarity is the least the walk will bring, and
+## it pops again with a sound. Pressing it ends the walk.
 
 const DIAMETER := 76.0
 
@@ -60,7 +60,5 @@ func _draw() -> void:
 			if f > 0.0:
 				draw_circle(c, r * f, Content.rarity_colour(rarity), true, -1.0, true)
 	draw_arc(c, r - 1.5, 0, TAU, 48, Color(1, 1, 1, 0.35), 3.0, true)
-	var px := int(r * 0.9)
-	draw_texture(Icons.texture("check", px, Color.WHITE, 3.0), c - Vector2(px, px) * 0.5)
 	if is_hovered() or has_focus():
 		draw_circle(c, r, Color(1, 1, 1, 0.08), true, -1.0, true)

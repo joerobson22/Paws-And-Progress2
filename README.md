@@ -9,10 +9,12 @@ macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
 
 <p>
   <img src="docs/screenshots/focus-phone.png" width="200" alt="The focus screen">
-  <img src="docs/screenshots/choose-focus-phone.png" width="200" alt="Choosing a pet to focus with">
-  <img src="docs/screenshots/walk-phone.png" width="200" alt="A walk, with the gift button filling up">
-  <img src="docs/screenshots/focus-complete-phone.png" width="200" alt="Focus complete, with the gift">
+  <img src="docs/screenshots/choose-focus-phone.png" width="200" alt="Choosing a pet and a place to walk">
+  <img src="docs/screenshots/walk-phone.png" width="200" alt="A walk on the beach, with the gift button filling up">
+  <img src="docs/screenshots/focus-complete-phone.png" width="200" alt="Focus complete: the gift and the XP bar">
 </p>
+
+<img src="docs/screenshots/places.png" width="820" alt="The seven places: lakeside, forest, jungle, tundra, desert, beach and the moon">
 
 ## How it's laid out
 
@@ -27,17 +29,21 @@ the arrow keys, or tap the little map at the bottom):
                   Stats
 ```
 
-- **Focus** (middle): the orb. Tap it and the choose focus screen grows out of
-  it: swipe through your pets, tap one to start a walk, adopt a new one with
-  the + (what it's for, the pet's name, its animal and three colours), or
-  complete or delete one.
+- **Focus** (middle): a greeting (from a long list in `data/greetings.json`)
+  above the orb, and the sun/moon switch for dark mode. Tap the orb and the
+  choose focus screen grows out of it, set in the place you'll walk: pick the
+  place from the row at the top, swipe through your pets, tap one to start a
+  walk, adopt a new one with the + (what it's for, the pet's name, its animal
+  and three colours), or complete or delete one.
 - **Gifts** (left): a shelf for your three favourites (press and hold a gift to
-  drag it up), every gift you've found, and trade-ins (10 commons for a rare,
+  drag it up), every gift you've found (filter by rarity, A–Z or animal; pick
+  the same one again to reverse it), and trade-ins (10 commons for a rare,
   5 rares for an epic, 3 epics for a legendary).
 - **Completed** (right): a panel per finished project; tap one to give it a
   GCSE, A-Level or university grade badge.
-- **Profile** (up): your character (tap to customise), account details and
-  settings.
+- **Profile** (up): your character (tap to customise) with your level along
+  the bottom (tap it for every reward), account details, and the settings
+  behind the gear in the top left.
 - **Stats** (down): this week's focus split by project, past weeks, your
   streak (one rest day allowed after three days in a row) and the friends
   leaderboard.
@@ -45,7 +51,17 @@ the arrow keys, or tap the little map at the bottom):
 On a walk, the button in the corner shows what gift you've earned: grey, then
 green at 10 minutes, then filling with blue, purple and gold as rarer gifts
 become guaranteed. When you finish, your pet dives into a bush and comes back
-with the gift.
+with the gift, the camera zooms in, and the XP you earned pours into your level
+bar.
+
+**Levels.** Every minute focused is 1 XP, plus a bonus for the walk's gift.
+Levelling up unlocks new animals and places (lakeside, forest, jungle, tundra,
+desert, beach and the moon), all set in `data/levels.json`. Locked ones are
+shown greyed out with a padlock and the level they open at. Like the stats,
+XP is worked out from the walk log, never kept as a running total.
+
+**Easter egg.** On the focus complete screen, press and hold the gift to take
+it, then flick it. Your pet will fetch it, wading in if it lands in the water.
 
 ## Running it
 
@@ -64,8 +80,11 @@ godot --headless --path . -s tests/run_tests.gd   # unit tests
 godot --headless --path . -s tests/smoke.gd       # drives the whole app with sample data
 ```
 
-The smoke run swipes between panes, drags a gift onto the shelf, trades one in,
-opens every popup, adopts a pet and walks for "50 minutes" through to the gift.
+The smoke run draws every place, swipes between panes, drags a gift onto the
+shelf, sorts and trades gifts, opens every popup, picks a place (and tries a
+locked one), adopts a pet, walks for "50 minutes" through to the gift and the
+XP bar, throws the gift for the pet to fetch, and switches to dark mode and
+back.
 CI runs all three on every push (`.github/workflows/ci.yml`). With a display,
 `-s tests/smoke.gd -- --shots=<dir>` saves a screenshot of each step.
 
@@ -81,10 +100,11 @@ core/            game logic, no UI
   save_system.gd   versioned JSON save, migrations, backup, v1 import
   session_clock.gd timestamp-based focus timer
   gift_roller.gd   gift odds, guaranteed rarities, pity timer, trade-ins
+  levels.gd        XP from the walk log, levels, and what each one unlocks
   stats.gd         weekly totals, records, streaks (from the session log)
   models/          ProjectData, FocusSession resources
-data/            all content: animals, gifts, drop table, biomes, cosmetics,
-                 grades, quotes
+data/            all content: animals, gifts, drop table, places (biomes),
+                 levels, cosmetics, grades, walk quotes, home greetings
 scenes/
   main.gd          the app shell: panes, swiping, minimap, flows, popups
   panes/           focus, gifts, completed, profile, stats (and their base, Pane)
@@ -104,7 +124,8 @@ tests/           headless unit tests and the smoke run
 
 - **Look:** screens never style things themselves. Colours, type, buttons,
   cards, tags, badges and portraits all come from `ui/ui.gd`, so a change there
-  shows up everywhere.
+  shows up everywhere. Its palette has a light and a dark set; switching
+  rebuilds what's on screen under a fading snapshot of the old colours.
 - **Motion:** every animation goes through `ui/motion.gd`, which uses one
   ease-in-out curve and a few shared durations (and halves them, without
   bounces, when "Reduce motion" is on).
@@ -121,7 +142,10 @@ tests/           headless unit tests and the smoke run
 - **Clothes:** `data/cosmetics.json`.
 - **Grades:** `data/grades.json`.
 - **Walk quotes:** `data/quotes.json`.
-- **Biome:** add a stack of layers to `data/biomes.json`.
+- **Place:** add a stack of layers to `data/biomes.json` (and an icon), and
+  give it a level in `data/levels.json`.
+- **Level rewards and XP:** `data/levels.json`.
+- **Home greetings:** `data/greetings.json`.
 
 ## Art and sound status
 
@@ -134,8 +158,10 @@ exist:
   properties.
 - Character: `ui/components/character_view.gd`, one look per cosmetic `style`.
 - Gifts: `ui/components/gift_art.gd` (every screen showing a gift uses it).
-- Scenery: `scenes/walk/scenery.gd` draws each biome layer in chunks.
-- Sounds: the bong, pops, rustle and chime are generated by `core/synth.gd`.
+- Scenery: `scenes/walk/scenery.gd` draws each place's layers in chunks, plus
+  the weather (snow and wind in the tundra, stars, fireflies).
+- Sounds: the bong, pops, rustle, chime, level-up, splash and wind are
+  generated by `core/synth.gd`.
   Drop an `.mp3` with the same name into `assets/sounds/` and it's used instead.
 
 ## Key decisions

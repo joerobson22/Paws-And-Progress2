@@ -30,4 +30,4 @@ jobs:
         run: |
           ./godot --headless --path . -s tests/smoke.gd 2>&1 | tee smoke.log
           grep -q "SMOKE OK" smoke.log
-          ! grep -E "SCRIPT ERROR|Parse Error" smoke.log
+          ! grep -E "SCRIPT ERROR|Parse Error|triangulation failed" smoke.log

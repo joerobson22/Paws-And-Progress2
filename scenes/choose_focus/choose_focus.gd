@@ -1,11 +1,14 @@
 extends Control
-## Choose what to focus on. Swipe left and right through your pets (the one
-## in the middle walks on the spot) and tap it to head out on a walk. At the
-## bottom, the red bin deletes that pet and the green tick completes its
-## project, each after a check. The + at the top switches to adopting a new
-## pet: say what it's for, give it a name, scroll up and down through the
-## animals and pick its three colours; the red cross cancels and the green +
-## adopts it.
+## Choose what to focus on, standing in the place you're about to walk.
+## The row of buttons at the top picks the place (locked ones are greyed out
+## with a padlock and the level that unlocks them). Swipe left and right
+## through your pets, which stand on the path (the one in the middle walks on
+## the spot), and tap one to head out. At the bottom, the red bin deletes that
+## pet and the green tick completes its project, each after a check. The +
+## at the top switches to adopting a new pet: say what it's for, give it a
+## name, scroll up and down through the animals (locked ones show the level
+## they unlock at) and pick its three colours; the red cross cancels and the
+## green + adopts it.
 ## params: {"from": where the opening circle grew from}
 
 const COLOUR_ROLES := ["Primary", "Secondary", "Tertiary"]
@@ -15,6 +18,10 @@ const SWATCHES := [
 	Color("#c9a46a"), Color("#e2c48f"), Color("#f2e6d8"), Color("#9c9c9c"), Color("#5a5a5a"),
 	Color("#b4533f"), Color("#d9822b"), Color("#e2c046"), Color("#7fae5a"), Color("#4f6f8f"),
 ]
+## How tall pets stand in the chooser.
+const PET_HEIGHT := 200.0
+## The scenery drifts by slowly behind the pets, in pixels a second.
+const DRIFT := 16.0
 
 ## The pet last in the middle, so the screen reopens where you left it.
 static var _remembered := ""
@@ -24,54 +31,84 @@ var params := {}
 var _projects: Array[ProjectData] = []
 var _adopting := false
 var _draft: ProjectData
-var _body := Control.new()
+var _scenery: Scenery
+var _shade := _Shade.new()
+var _pick := Control.new()
+var _adopt_layer := Control.new()
 var _pets: Carousel
-var _animals: Carousel
+var _places: Dictionary = {}  # place id -> its button
+var _place_name: Label
+var _words: VBoxContainer
 var _title: Label
 var _meta: Label
+var _animals: Carousel
+var _animal_title: Label
+var _animal_hint: Label
 var _name_edit: LineEdit
 var _pet_edit: LineEdit
 var _swatches: Array[Button] = []
+var _back: Button
 var _left: Button
 var _right: Button
-var _new: Button
+var _new: KnockoutButton
 
 
 func _ready() -> void:
-	var bg := ColorRect.new()
-	bg.color = UI.SAGE
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	_show_place(_place_id(), false)
+	add_child(_shade)
+	_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for layer in [_pick, _adopt_layer]:
+		layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(layer)
+	_adopt_layer.visible = false
 
 	var insets := UI.safe_insets(self)
-	var margin := MarginContainer.new()
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 16 + int(insets["left"]))
-	margin.add_theme_constant_override("margin_right", 20 + int(insets["right"]))
-	margin.add_theme_constant_override("margin_top", 14 + int(insets["top"]))
-	margin.add_theme_constant_override("margin_bottom", 24 + int(insets["bottom"]))
-	add_child(margin)
-	var col := UI.vbox(10)
-	margin.add_child(col)
+	var top := MarginContainer.new()
+	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	top.add_theme_constant_override("margin_left", 12 + int(insets["left"]))
+	top.add_theme_constant_override("margin_right", 18 + int(insets["right"]))
+	top.add_theme_constant_override("margin_top", 14 + int(insets["top"]))
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(top)
+	var row := UI.hbox()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(row)
+	_back = UI.back_button(go_back)
+	row.add_child(_back)
+	row.add_child(UI.spacer())
+	_new = KnockoutButton.new(48)
+	_new.tooltip_text = "New pet"
+	_new.pressed.connect(_start_adopting)
+	row.add_child(_new)
 
-	var top := UI.hbox()
-	top.add_child(UI.back_button(go_back))
-	top.add_child(UI.spacer())
-	_new = UI.square_button("plus", "New pet", _start_adopting, UI.SURFACE, UI.INK, 48, UI.SAGE)
-	top.add_child(_new)
-	col.add_child(top)
-
-	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(_body)
-
-	var bottom := UI.hbox()
+	var bottom := MarginContainer.new()
+	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	bottom.add_theme_constant_override("margin_left", 16 + int(insets["left"]))
+	bottom.add_theme_constant_override("margin_right", 16 + int(insets["right"]))
+	bottom.add_theme_constant_override("margin_bottom", 22 + int(insets["bottom"]))
+	bottom.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bottom)
+	var buttons := UI.hbox()
+	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom.add_child(buttons)
 	_left = UI.round_button("bin", "Delete pet", _on_left, UI.DANGER, Color.WHITE, 56)
 	_right = UI.round_button("check", "Complete project", _on_right, UI.SUCCESS, Color.WHITE, 56)
-	bottom.add_child(_left)
-	bottom.add_child(UI.spacer())
-	bottom.add_child(_right)
-	col.add_child(bottom)
-	_show_pets("", false)
+	buttons.add_child(_left)
+	buttons.add_child(UI.spacer())
+	buttons.add_child(_right)
+
+	_build_pick()
+	_style_top(false)
+	resized.connect(_layout)
+	_layout.call_deferred()
+	Audio.ambience(_scenery.ambience())
+
+
+func _process(delta: float) -> void:
+	if _scenery:
+		_scenery.scroll += delta * DRIFT * minf(size.x, size.y) / 720.0
 
 
 ## Back to the focus screen, from either mode.
@@ -79,71 +116,172 @@ func go_back() -> void:
 	App.go("home")
 
 
+# --- The place ---------------------------------------------------------------
+
+## The saved place, or lakeside if that's somehow locked.
+func _place_id() -> String:
+	var id := str(App.state.settings.get("walk_biome", "lake"))
+	return id if App.is_unlocked("place", id) and not Content.biome(id).is_empty() else "lake"
+
+
+## Puts the place's scenery behind everything, fading over the old one.
+func _show_place(id: String, animate: bool = true) -> void:
+	var old := _scenery
+	_scenery = Scenery.new()
+	_scenery.biome = Content.biome(id)
+	_scenery.period = Content.time_of_day(int(Time.get_datetime_dict_from_system()["hour"]))
+	_scenery.scroll = old.scroll if old else App.rng.randf_range(0.0, 50000.0)
+	_scenery.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_scenery)
+	move_child(_scenery, 1 if old else 0)
+	if old:
+		_scenery.modulate.a = 0.0
+		Motion.fade(_scenery, 1.0, Motion.SLOW).tween_callback(old.queue_free)
+		Audio.ambience(_scenery.ambience())
+
+
+func _pick_place(id: String) -> void:
+	var level := Levels.unlock_level("place", id, Content.levels)
+	if not App.is_unlocked("place", id):
+		Motion.shake(_places[id], 6.0)
+		Toast.show_text("%s unlocks at level %d" % [Content.biome(id).get("name", ""), level], "lock")
+		return
+	if id == _place_id():
+		return
+	App.set_setting("walk_biome", id)
+	_show_place(id)
+	_refresh_places()
+
+
+func _place_buttons() -> Control:
+	var panel := UI.panel(UI.GLASS, 22, 6)
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var row := UI.hbox(4)
+	panel.add_child(row)
+	_places.clear()
+	for b in Content.biomes:
+		var id: String = b["id"]
+		var cell := UI.vbox(0)
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(42, 42)
+		button.tooltip_text = b["name"]
+		button.pressed.connect(_pick_place.bind(id))
+		cell.add_child(button)
+		_places[id] = button
+		if not App.is_unlocked("place", id):
+			var lock := UI.icon_rect("lock", 12, Color.WHITE)
+			lock.position = Vector2(27, 1)
+			lock.size = Vector2(14, 14)
+			button.add_child(lock)
+			var lv := UI.label("Lv %d" % Levels.unlock_level("place", id, Content.levels), 10, UI.ON_DARK_SOFT, false, 800)
+			lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			button.tooltip_text = "%s · unlocks at level %d" % [b["name"], Levels.unlock_level("place", id, Content.levels)]
+			cell.add_child(lv)
+		row.add_child(cell)
+	_refresh_places()
+	return panel
+
+
+func _refresh_places() -> void:
+	var current := _place_id()
+	for id in _places:
+		var button: Button = _places[id]
+		var unlocked := App.is_unlocked("place", id)
+		var on: bool = id == current
+		var fill := Color.WHITE if on else Color(1, 1, 1, 0.0)
+		var ink := UI.ACCENT.darkened(0.2) if on else Color(1, 1, 1, 0.92 if unlocked else 0.35)
+		UI.style_button(button, fill, ink, 14)
+		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+			(button.get_theme_stylebox(state) as StyleBoxFlat).set_content_margin_all(0)
+		button.icon = Icons.texture(str(Content.biome(id).get("icon", "place_lake")), 22, Color.WHITE, 2.0)
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if _place_name:
+		_place_name.text = str(Content.biome(current).get("name", "")).to_upper()
+
+
 # --- Choosing ----------------------------------------------------------------
 
-func _show_pets(select_id: String = "", animate: bool = true) -> void:
-	_adopting = false
+func _build_pick(select_id: String = "") -> void:
+	for c in _pick.get_children():
+		_pick.remove_child(c)
+		c.queue_free()
 	_projects = App.state.active_projects()
 	if select_id == "":
 		select_id = _remembered
-	var v := await _swap_body(animate)
-	_new.disabled = false
-	_set_icon(_left, "bin", "Delete pet")
-	_set_icon(_right, "check", "Complete project")
+
+	var places := UI.vbox(4)
+	places.name = "Places"
+	places.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	places.add_child(_place_buttons())
+	_place_name = _shadowed(UI.label("", 12, UI.ON_DARK, false, 900))
+	_place_name.add_theme_constant_override("outline_size", 0)
+	places.add_child(_place_name)
+	_refresh_places()
+	_pick.add_child(places)
+
+	_words = UI.vbox(2)
+	_words.name = "Words"
+	_words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pick.add_child(_words)
 	_left.disabled = _projects.is_empty()
 	_right.disabled = _projects.is_empty()
-
-	var cap := UI.caption("Choose your focus")
-	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(cap)
+	_set_icon(_left, "bin", "Delete pet")
+	_set_icon(_right, "check", "Complete project")
 	if _projects.is_empty():
-		v.add_child(_empty())
+		_words.add_child(_shadowed(UI.label("No pets yet", 30, UI.ON_DARK, true, 600)))
+		var p := _shadowed(UI.label("Tap the + to adopt one for something you're working on.", 15, UI.ON_DARK_SOFT, false, 700))
+		p.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_words.add_child(p)
+		_pets = null
+		_layout()
 		return
 
-	_pets = Carousel.new()
-	_pets.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_pets.spacing = clampf(size.x * 0.44, 170.0, 300.0)
-	v.add_child(_pets)
-	_title = UI.label("", 30, UI.INK, true, 600)
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title = _shadowed(UI.label("", 32, UI.ON_DARK, true, 600))
 	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(_title)
-	_meta = UI.label("", 15, UI.INK_SOFT, false, 700)
-	_meta.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(_meta)
-	var hint := UI.label("Tap your pet to start walking", 14, UI.INK_FAINT, false, 700)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(hint)
+	_words.add_child(_title)
+	_meta = _shadowed(UI.label("", 15, UI.ON_DARK, false, 800))
+	_words.add_child(_meta)
+	_words.add_child(_shadowed(UI.label("Tap your pet to start walking", 13, UI.ON_DARK_SOFT, false, 700)))
 
+	_pets = Carousel.new()
+	_pets.spacing = clampf(size.x * 0.44, 170.0, 300.0)
+	_pick.add_child(_pets)
 	var items: Array[Control] = []
 	var start := 0
 	for i in _projects.size():
-		items.append(_pet(_projects[i].animal_id, _projects[i].colours, 200.0))
+		items.append(_pet(_projects[i].animal_id, _projects[i].colours, PET_HEIGHT))
 		if _projects[i].id == select_id:
 			start = i
 	_pets.changed.connect(_on_pet_changed)
 	_pets.activated.connect(_start_walk)
 	_pets.set_items(items, start)
 	_on_pet_changed(start)
+	_layout()
 	_pets.grab_focus.call_deferred()
 
 
-func _empty() -> Control:
-	var v := UI.vbox(12)
-	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	var add := UI.square_button("plus", "Adopt a pet", _start_adopting, UI.SURFACE, UI.INK, 96, UI.SAGE)
-	add.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	v.add_child(add)
-	var t := UI.label("No pets yet", 26, UI.INK, true, 600)
-	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(t)
-	var p := UI.para("Adopt one for each thing you're working on: a module, a project, a skill.", 15)
-	p.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	p.custom_minimum_size.x = minf(320.0, size.x - 48.0)
-	v.add_child(p)
-	return v
+## Places along the top; the words in the sky; the pets with their feet on
+## the scenery's path.
+func _layout() -> void:
+	if not is_instance_valid(_scenery):
+		return
+	var insets := UI.safe_insets(self)
+	var places := _pick.get_node_or_null("Places") as Control
+	if places:
+		places.size = places.get_combined_minimum_size()
+		places.position = Vector2((size.x - places.size.x) * 0.5, 72.0 + insets["top"])
+	var path := _scenery.path_y()
+	var pet_top := path - PET_HEIGHT * 0.86
+	if is_instance_valid(_words):
+		var w := minf(520.0, size.x - 40.0)
+		_words.size = Vector2(w, 0)
+		_words.size = Vector2(w, _words.get_combined_minimum_size().y)
+		var below_places := (places.position.y + places.size.y + 16.0) if places else 140.0
+		_words.position = Vector2((size.x - w) * 0.5, maxf(below_places, (below_places + pet_top) * 0.5 - _words.size.y * 0.5))
+	if is_instance_valid(_pets):
+		var band := PET_HEIGHT * 1.15
+		_pets.size = Vector2(size.x, band)
+		_pets.position = Vector2(0, path - 0.36 * PET_HEIGHT - band * 0.5)
 
 
 func _on_pet_changed(i: int) -> void:
@@ -159,13 +297,13 @@ func _on_pet_changed(i: int) -> void:
 func _start_walk(i: int) -> void:
 	var p := _projects[i]
 	var from := _pets.items[i].get_global_rect().get_center()
-	App.start_walk(p.id)
+	App.start_walk(p.id, -1, _place_id())
 	App.go("walk", {"from": from})
 
 
 func _on_left() -> void:
 	if _adopting:
-		_show_pets()
+		_show_mode(false)
 		return
 	var p := _projects[_pets.index]
 	Modal.confirm("Delete %s?" % p.name,
@@ -175,7 +313,7 @@ func _on_left() -> void:
 				var next := _neighbour_id(p.id)
 				App.delete_project(p.id)
 				Toast.show_text("%s deleted" % p.name, "bin")
-				_show_pets(next))
+				_build_pick(next))
 
 
 func _on_right() -> void:
@@ -191,7 +329,7 @@ func _on_right() -> void:
 				App.complete_project(p.id)
 				Audio.play("project_complete")
 				Toast.show_text("%s moved to Completed" % p.name)
-				_show_pets(next))
+				_build_pick(next))
 
 
 ## The pet that should be in the middle once this one's gone.
@@ -210,16 +348,51 @@ func _neighbour_id(id: String) -> String:
 func _start_adopting() -> void:
 	if _adopting:
 		return
-	_adopting = true
 	_draft = ProjectData.new()
-	_draft.animal_id = Content.animals[0]["id"]
-	_draft.colours = Content.animal_default_colours(_draft.animal_id)
-	var v := await _swap_body(true)
-	_new.disabled = true
-	_set_icon(_left, "close", "Cancel")
-	_set_icon(_right, "plus", "Adopt")
-	_left.disabled = false
-	_right.disabled = false
+	_build_adopt()
+	_show_mode(true)
+
+
+## Fades between choosing (scenery) and adopting (the form over a soft sheet).
+func _show_mode(adopting: bool, select_id: String = "") -> void:
+	_adopting = adopting
+	var hide_layer := _pick if adopting else _adopt_layer
+	var show_layer := _adopt_layer if adopting else _pick
+	_new.set_disabled_look(adopting)
+	if adopting:
+		_set_icon(_left, "close", "Cancel")
+		_set_icon(_right, "plus", "Adopt")
+		_left.disabled = false
+	else:
+		_build_pick(select_id)
+	_style_top(adopting)
+	var t := Motion.tween(self, "mode")
+	t.tween_property(hide_layer, "modulate:a", 0.0, Motion.time(Motion.FAST))
+	t.tween_callback(func():
+		hide_layer.visible = false
+		show_layer.visible = true
+		show_layer.modulate.a = 0.0)
+	t.tween_property(show_layer, "modulate:a", 1.0, Motion.time(Motion.NORMAL))
+
+
+func _build_adopt() -> void:
+	for c in _adopt_layer.get_children():
+		_adopt_layer.remove_child(c)
+		c.queue_free()
+	var sheet := ColorRect.new()
+	sheet.color = Color(UI.BG, 0.93)
+	sheet.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_adopt_layer.add_child(sheet)
+	var insets := UI.safe_insets(self)
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 16 + int(insets["left"]))
+	margin.add_theme_constant_override("margin_right", 16 + int(insets["right"]))
+	margin.add_theme_constant_override("margin_top", 76 + int(insets["top"]))
+	margin.add_theme_constant_override("margin_bottom", 96 + int(insets["bottom"]))
+	_adopt_layer.add_child(margin)
+	var v := UI.vbox(8)
+	margin.add_child(v)
 
 	_name_edit = _field("What are you focusing on?", 40, 18)
 	v.add_child(_name_edit)
@@ -240,12 +413,12 @@ func _start_adopting() -> void:
 	# and below on short windows too.
 	_animals.resized.connect(func(): _animals.spacing = clampf(_animals.size.y * 0.36, 90.0, 150.0))
 	v.add_child(_animals)
-	_title = UI.label("", 24, UI.INK, true, 600)
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(_title)
-	var hint := UI.label("Scroll for more animals", 13, UI.INK_FAINT, false, 700)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(hint)
+	_animal_title = UI.label("", 24, UI.INK, true, 600)
+	_animal_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(_animal_title)
+	_animal_hint = UI.label("", 13, UI.INK_FAINT, false, 700)
+	_animal_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(_animal_hint)
 
 	var row := UI.hbox(18)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -266,23 +439,44 @@ func _start_adopting() -> void:
 	v.add_child(row)
 
 	var items: Array[Control] = []
-	for a in Content.animals:
-		items.append(_pet(a["id"], Content.animal_default_colours(a["id"]), 150.0))
+	var first_open := -1
+	for i in Content.animals.size():
+		var a: Dictionary = Content.animals[i]
+		var level := Levels.unlock_level("animal", a["id"], Content.levels)
+		var open := App.is_unlocked("animal", a["id"])
+		items.append(_pet(a["id"], Content.animal_default_colours(a["id"]), 150.0, 0 if open else level))
+		if open and first_open < 0:
+			first_open = i
 	_animals.changed.connect(_on_animal_changed)
-	_animals.set_items(items, 0)
-	_on_animal_changed(0)
+	_animals.set_items(items, maxi(first_open, 0))
+	_on_animal_changed(_animals.index)
 
 
 func _on_animal_changed(i: int) -> void:
 	var a: Dictionary = Content.animals[i]
-	_draft.animal_id = a["id"]
-	_draft.colours = Content.animal_default_colours(a["id"])
+	var open := App.is_unlocked("animal", a["id"])
+	if open:
+		_draft.animal_id = a["id"]
+		_draft.colours = Content.animal_default_colours(a["id"])
 	for j in _animals.items.size():
 		var view: AnimalView = _animals.items[j].get_meta("view")
-		view.walking = j == i
-		view.colours = Content.animal_default_colours(Content.animals[j]["id"]) if j != i else _draft.colours
-	_title.text = a["name"]
-	_pet_edit.placeholder_text = "Name your %s" % str(a["name"]).to_lower()
+		var locked: bool = _animals.items[j].get_meta("locked", false)
+		view.walking = j == i and not locked
+		if j == i and open:
+			view.colours = _draft.colours
+		elif not locked:
+			view.colours = Content.animal_default_colours(Content.animals[j]["id"])
+	_animal_title.text = a["name"]
+	if open:
+		_animal_hint.text = "Scroll for more animals"
+		_animal_hint.add_theme_color_override("font_color", UI.INK_FAINT)
+		_pet_edit.placeholder_text = "Name your %s" % str(a["name"]).to_lower()
+	else:
+		_animal_hint.text = "Unlocks at level %d" % Levels.unlock_level("animal", a["id"], Content.levels)
+		_animal_hint.add_theme_color_override("font_color", UI.INK_SOFT)
+	_right.disabled = not open
+	for b in _swatches:
+		b.disabled = not open
 	_refresh_swatches()
 
 
@@ -293,7 +487,7 @@ func _refresh_swatches() -> void:
 		b.visible = k < parts.size()
 		var c := _draft.colours[k] if k < _draft.colours.size() else Color.WHITE
 		UI.style_button(b, c, UI.INK, 999, true)
-		for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 			var sb: StyleBoxFlat = b.get_theme_stylebox(state)
 			sb.set_border_width_all(3)
 			sb.border_color = UI.SURFACE
@@ -323,29 +517,31 @@ func _adopt() -> void:
 	App.add_project(_draft)
 	Audio.play(str(Content.animal(_draft.animal_id).get("sound", "")), 1.0, -6.0)
 	Toast.show_text("Say hello to %s" % Content.pet_called(_draft), "paw")
-	_show_pets(_draft.id)
+	_show_mode(false, _draft.id)
 
 
 # --- Pieces ------------------------------------------------------------------
 
-## Fades the old content out and returns a fresh, empty column in its place.
-func _swap_body(animate: bool) -> VBoxContainer:
-	var old := _body.get_children()
-	if animate and not old.is_empty():
-		var t := Motion.tween(_body, "swap")
-		t.tween_property(_body, "modulate:a", 0.0, Motion.time(Motion.FAST))
-		await t.finished
-	for c in old:
-		_body.remove_child(c)
-		c.queue_free()
-	var v := UI.vbox(8)
-	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_body.add_child(v)
-	if animate:
-		Motion.fade(_body, 1.0)
-	else:
-		_body.modulate.a = 1.0
-	return v
+## The back button reads white over scenery and ink over the adopt form.
+func _style_top(on_form: bool) -> void:
+	var ink := UI.INK if on_form else UI.ON_DARK
+	UI.style_button(_back, Color.TRANSPARENT, ink)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		var sb: StyleBoxFlat = _back.get_theme_stylebox(state)
+		sb.content_margin_left = 8
+		sb.content_margin_right = 14
+	_back.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.0 if on_form else 0.3))
+	_back.add_theme_constant_override("shadow_offset_y", 2)
+
+
+## Light text with a soft shadow, centred, so it reads over any scenery.
+func _shadowed(l: Label) -> Label:
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.32))
+	l.add_theme_constant_override("shadow_offset_y", 2)
+	l.add_theme_constant_override("shadow_outline_size", 6)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
 
 
 ## A centred text box for the adopt form.
@@ -365,8 +561,9 @@ func _set_icon(b: Button, icon: String, tip: String) -> void:
 	b.tooltip_text = tip
 
 
-## An animal standing on a soft shadow, for the carousels.
-func _pet(animal_id: String, colours: Array[Color], height: float) -> Control:
+## An animal standing on a soft shadow, for the carousels. `locked_at` > 0
+## greys it out with a padlock and the level it unlocks at.
+func _pet(animal_id: String, colours: Array[Color], height: float, locked_at: int = 0) -> Control:
 	var stage := _Stage.new()
 	stage.custom_minimum_size = Vector2(height * 1.25, height)
 	var view := AnimalView.new()
@@ -377,10 +574,38 @@ func _pet(animal_id: String, colours: Array[Color], height: float) -> Control:
 	var s := minf(stage.custom_minimum_size.x / 175.0, height / 105.0) / float(Content.animal(animal_id).get("size", 1.0))
 	view.scale = Vector2(s, s)
 	view.position = Vector2(stage.custom_minimum_size.x * 0.44, height * 0.86)
+	if locked_at > 0:
+		stage.set_meta("locked", true)
+		var greys: Array[Color] = []
+		for k in colours.size():
+			greys.append(UI.NEUTRAL.lerp(UI.INK_FAINT, k * 0.3))
+		view.colours = greys
+		view.modulate.a = 0.75
+		var badge := UI.panel(UI.SURFACE_SOFT, 999, 6)
+		var row := UI.hbox(4)
+		row.add_child(UI.icon_rect("lock", 14, UI.INK_SOFT))
+		row.add_child(UI.label("Lv %d" % locked_at, 13, UI.INK_SOFT, false, 900))
+		badge.add_child(row)
+		stage.add_child(badge)
+		badge.position = Vector2(stage.custom_minimum_size.x * 0.5 - 34.0, height * 0.12)
 	return stage
 
 
 class _Stage extends Control:
 	func _draw() -> void:
 		draw_set_transform(Vector2(size.x * 0.48, size.y * 0.87), 0.0, Vector2(1.0, 0.18))
-		draw_circle(Vector2.ZERO, size.x * 0.34, Color(0.18, 0.32, 0.24, 0.12), true, -1.0, true)
+		draw_circle(Vector2.ZERO, size.x * 0.34, Color(0.0, 0.0, 0.0, 0.16), true, -1.0, true)
+
+
+## A soft darkening at the top of the scenery so the place buttons and the
+## pet's name stay readable in bright daylight.
+class _Shade extends Control:
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var dark := Color(0, 0, 0, 0.28)
+		var clear := Color(0, 0, 0, 0)
+		var h := size.y * 0.5
+		draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0), Vector2(size.x, h), Vector2(0, h)]),
+			PackedColorArray([dark, dark, clear, clear]))

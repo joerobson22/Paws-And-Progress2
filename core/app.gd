@@ -17,6 +17,9 @@ var imported_from_v1 := false
 ## never saved locally.
 var friends: Array = []
 
+var _xp := 0
+var _xp_key := ""
+
 
 func _ready() -> void:
 	rng.randomize()
@@ -104,6 +107,26 @@ func set_grade(id: String, grade_ref: String) -> void:
 	if p:
 		p.grade = grade_ref
 		_changed()
+
+
+# --- Levels ------------------------------------------------------------------
+
+func xp() -> int:
+	# Summed from the walk log, so cached until the log changes.
+	var key := "%d:%d:%d" % [state.get_instance_id(), state.sessions.size(), int(state.profile.get("legacy_total_seconds", 0))]
+	if key != _xp_key:
+		_xp_key = key
+		_xp = Levels.total_xp(state.sessions, int(state.profile.get("legacy_total_seconds", 0)), Content.levels, Content.gift_rarity)
+	return _xp
+
+
+func level() -> int:
+	return Levels.level_for(xp(), Content.levels)
+
+
+## Whether an animal or place ("animal" / "place") is unlocked yet.
+func is_unlocked(type: String, id: String) -> bool:
+	return level() >= Levels.unlock_level(type, id, Content.levels)
 
 
 # --- Gifts -------------------------------------------------------------------

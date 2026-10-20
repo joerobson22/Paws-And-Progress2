@@ -46,6 +46,11 @@ func rebuild() -> void:
 		_restore_scroll(keep)
 
 
+## Rebuild next time it's shown (e.g. after a switch to dark mode).
+func mark_dirty() -> void:
+	_dirty = true
+
+
 ## Subclasses add their content here.
 func build() -> void:
 	pass

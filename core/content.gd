@@ -10,6 +10,10 @@ var biomes: Array = []
 var times_of_day: Dictionary = {}
 var grade_scales: Array = []
 var quotes: Array = []
+## Home screen lines: {morning, afternoon, evening, night, anytime}.
+var greetings: Dictionary = {}
+## XP rules and level rewards (data/levels.json).
+var levels: Dictionary = {}
 ## [{id, name}] in the order the customise popup lists them.
 var cosmetic_slots: Array = []
 ## Starter wardrobe items; wearable gifts are cosmetics too (see cosmetic()).
@@ -35,6 +39,8 @@ func _init() -> void:
 	times_of_day = b.get("times_of_day", {})
 	grade_scales = _load("res://data/grades.json").get("scales", [])
 	quotes = _load("res://data/quotes.json").get("quotes", [])
+	greetings = _load("res://data/greetings.json")
+	levels = _load("res://data/levels.json")
 	var c := _load("res://data/cosmetics.json")
 	cosmetic_slots = c.get("slots", [])
 	cosmetic_items = c.get("items", [])
@@ -109,6 +115,10 @@ func next_rarity(rarity_id: String) -> String:
 	return GiftRoller.RARITIES[i + 1] if i >= 0 and i < GiftRoller.RARITIES.size() - 1 else ""
 
 
+func gift_rarity(id: String) -> String:
+	return str(gift(id).get("rarity", ""))
+
+
 func biome(id: String) -> Dictionary:
 	for b in biomes:
 		if b["id"] == id:
@@ -162,6 +172,24 @@ func quote(seed: int) -> String:
 	if quotes.is_empty():
 		return ""
 	return str(quotes[posmod(seed, quotes.size())])
+
+
+## A line for the home screen at this hour: half the time a greeting for the
+## time of day, otherwise an anytime line. Lines needing a name are skipped
+## when there isn't one.
+func greeting(hour: int, name: String, rng: RandomNumberGenerator) -> String:
+	var part := "night"
+	if hour >= 5 and hour < 12:
+		part = "morning"
+	elif hour >= 12 and hour < 17:
+		part = "afternoon"
+	elif hour >= 17 and hour < 22:
+		part = "evening"
+	var pool: Array = greetings.get(part, []) if rng.randf() < 0.5 else greetings.get("anytime", [])
+	pool = pool.filter(func(l): return name != "" or not str(l).contains("{name}"))
+	if pool.is_empty():
+		return "Ready when you are"
+	return str(pool[rng.randi_range(0, pool.size() - 1)]).replace("{name}", name)
 
 
 # --- Cosmetics ---------------------------------------------------------------

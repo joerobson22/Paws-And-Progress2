@@ -1,8 +1,8 @@
 class_name GiftTile
 extends PanelContainer
-## One gift in a grid: its picture, name, and how many you've had in the
-## bottom-right corner. Tap it for details; press and hold to pick it up and
-## drag it somewhere (the screen listens for `lifted`).
+## One gift: its picture filling the tile, with how many you've had on a
+## tag overlapping its bottom-right corner. Tap it for details; press and hold
+## to pick it up and drag it somewhere (the screen listens for `lifted`).
 
 signal tapped(gift_id: String)
 signal lifted(tile: GiftTile)
@@ -13,12 +13,12 @@ var _press := Press.new(self, true)
 
 
 ## `plain` drops the card behind it and the count, for gifts on the shelf.
-func _init(id: String, count: int, show_name: bool = true, plain: bool = false) -> void:
+func _init(id: String, count: int, plain: bool = false) -> void:
 	gift_id = id
 	var g := Content.gift(id)
 	var colour := Content.rarity_colour(g.get("rarity", "common"))
 	var sb: StyleBox = UI.with_shadow(UI.box(UI.SURFACE, Color.TRANSPARENT, 20), 0.6) if not plain else StyleBoxEmpty.new()
-	sb.set_content_margin_all(10)
+	sb.set_content_margin_all(6)
 	add_theme_stylebox_override("panel", sb)
 	_press.tapped.connect(func(): tapped.emit(gift_id))
 	_press.held.connect(func():
@@ -28,25 +28,23 @@ func _init(id: String, count: int, show_name: bool = true, plain: bool = false) 
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	tooltip_text = g.get("name", "")
 
-	var v := UI.vbox(4)
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(v)
 	art = GiftArt.new(id)
 	art.faded = count <= 0
-	art.custom_minimum_size = Vector2(0, 54 if not plain else 64)
+	art.custom_minimum_size = Vector2(0, 84 if plain else 78)
 	art.glow = 0.6 if plain else 0.0
-	v.add_child(art)
-	# Name along the bottom, with the count in the bottom-right corner.
-	var foot := UI.hbox(4)
-	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_child(foot)
-	if show_name:
-		var name := UI.trimmed(g.get("name", "?"), 12, UI.INK if count > 0 else UI.INK_FAINT, false, 800)
-		name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if plain else HORIZONTAL_ALIGNMENT_LEFT
-		name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		foot.add_child(name)
-	if not plain:
-		foot.add_child(UI.tag("×%d" % count, colour if count > 0 else UI.SURFACE_SOFT, UI.SURFACE if count > 0 else UI.INK_SOFT, 11))
+	add_child(art)
+	if plain:
+		return
+	# The count sits over the picture's corner. A PanelContainer stretches its
+	# children, so the tag lives in its own holder.
+	var corner := Control.new()
+	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(corner)
+	var badge := UI.tag("×%d" % count, colour if count > 0 else UI.SURFACE_SOFT, UI.ON_COLOUR if count > 0 else UI.INK_SOFT, 12)
+	corner.add_child(badge)
+	corner.resized.connect(func():
+		badge.size = badge.get_combined_minimum_size()
+		badge.position = corner.size - badge.size + Vector2(2, 2))
 
 
 ## Where the finger went down, in viewport coordinates.

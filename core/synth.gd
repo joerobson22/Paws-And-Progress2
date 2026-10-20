@@ -5,7 +5,7 @@ extends RefCounted
 ## assets/sounds/ and Audio plays that instead.
 
 const RATE := 22050
-const NAMES := ["bong", "pop", "rustle", "chime", "whoosh"]
+const NAMES := ["bong", "pop", "rustle", "chime", "whoosh", "levelup", "wind", "splash"]
 
 static var _cache: Dictionary = {}
 static var _lock := Mutex.new()
@@ -43,6 +43,17 @@ static func sound(name: String) -> AudioStreamWAV:
 			samples = _mix(parts)
 		"whoosh":
 			samples = _whoosh(0.5)
+		"levelup":
+			# A bright run up a major scale and a held top note.
+			var notes := [523.25, 659.25, 783.99, 1046.5, 1318.5]
+			var parts: Array[PackedFloat32Array] = []
+			for i in notes.size():
+				parts.append(_delay(_bell(notes[i], 1.2 if i < notes.size() - 1 else 2.0, 0.6 + i * 0.08), i * 0.07))
+			samples = _mix(parts)
+		"wind":
+			samples = _wind(6.0)
+		"splash":
+			samples = _splash(0.7)
 		_:
 			return null
 	var wav := _to_wav(_normalise(samples, 0.6))
@@ -126,6 +137,39 @@ static func _whoosh(seconds: float) -> PackedFloat32Array:
 		var k := 0.02 + 0.25 * sin(PI * t / seconds)
 		low += k * (rng.randf_range(-1.0, 1.0) - low)
 		out[i] = low * sin(PI * t / seconds)
+	return out
+
+
+## A gusting wind, quiet at both ends so it loops without a click.
+static func _wind(seconds: float) -> PackedFloat32Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var n := int(seconds * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var low := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var gust := 0.55 + 0.3 * sin(TAU * t / seconds * 2.0) + 0.15 * sin(TAU * t / seconds * 5.0)
+		low += (0.015 + 0.03 * gust) * (rng.randf_range(-1.0, 1.0) - low)
+		out[i] = low * gust * sin(PI * t / seconds)
+	return out
+
+
+## Something dropping into water: a burst of noise with a falling plop.
+static func _splash(seconds: float) -> PackedFloat32Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 8
+	var n := int(seconds * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var low := 0.0
+	var phase := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		low += 0.3 * (rng.randf_range(-1.0, 1.0) - low)
+		phase += TAU * (520.0 - 300.0 * minf(1.0, t / 0.12)) / RATE
+		out[i] = low * exp(-t * 7.0) * 0.8 + sin(phase) * exp(-t * 18.0) * 0.6
 	return out
 
 

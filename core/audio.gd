@@ -60,6 +60,8 @@ func ambience(name: String) -> void:
 	if name == "":
 		return
 	var stream := _stream(AMBIENCE.get(name, name))
+	if stream == null:
+		stream = Synth.sound(name)
 	if stream:
 		_ambience.stream = stream
 		_ambience.play()

@@ -49,7 +49,7 @@ Goal: v1 feature parity on a clean, modern architecture.
 - [ ] Character customisation
 - [ ] Completion flow → completed projects panel + grade badge
 - [ ] Stats screen (weekly chart, totals, PBs)
-- [ ] Settings: sound, ambience, reduce motion, theme
+- [ ] Settings: sound, ambience, reduce motion, light/dark theme
 - [ ] Automated builds for desktop + Android in CI
 
 **Exit criteria:** a v1 user would happily switch.
@@ -57,8 +57,8 @@ Goal: v1 feature parity on a clean, modern architecture.
 ### Phase 2 — Polish & progression
 - [ ] Four rarities with drop table tuned by walk length (e.g. legendary only possible on 45 min+ walks, small pity timer), plus guaranteed minimum rarities shown filling the walk's gift button
 - [ ] Epic + legendary gifts equippable as cosmetics on the walker (and optionally on the animal)
-- [ ] More biomes: lake, forest, beach, mountains, snowy village, autumn park, night sky; weather + time-of-day tied to the real clock
-- [ ] Biome unlocks via total hours walked
+- [ ] More places: lakeside, forest, jungle, tundra (snow and wind), desert, beach, moon; then mountains, snowy village, autumn park; weather + time-of-day tied to the real clock
+- [ ] Place unlocks (and new animals) via XP levels: 1 XP a minute plus gift bonuses, rewards set in data
 - [ ] Animal bond levels (hours walked with that animal) unlocking extra idle animations / gifts
 - [ ] Streaks with gentle "rest day" tokens so a missed day doesn't punish you
 - [ ] Break reminders (Pomodoro-style optional mode: animal sits down for a drink)

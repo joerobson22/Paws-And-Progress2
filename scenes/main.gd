@@ -38,6 +38,7 @@ var _flow_layer := Control.new()
 var _flows: Array[CircleReveal] = []
 var _modal_layer := Control.new()
 var _minimap: Minimap
+var _bg := ColorRect.new()
 
 var _press := false
 var _press_pos := Vector2.ZERO
@@ -51,12 +52,14 @@ var _synthetic := false
 
 func _ready() -> void:
 	_fit_design_size()
+	UI.set_dark(UI.wants_dark(str(App.state.settings.get("theme", "auto"))))
 	theme = UI.build_theme()
-	var bg := ColorRect.new()
-	bg.color = UI.BG
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(bg)
+	# Before the panes connect, so a palette change lands before they rebuild.
+	App.state_changed.connect(_on_state_changed)
+	_bg.color = UI.BG
+	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_bg)
 
 	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_world)
@@ -122,6 +125,43 @@ func _layout() -> void:
 	_minimap.position = Vector2(roundf((size.x - _minimap.size.x) * 0.5), size.y - _minimap.size.y - 18.0 - insets["bottom"])
 
 
+# --- Light and dark ----------------------------------------------------------
+
+func _on_state_changed() -> void:
+	var want := UI.wants_dark(str(App.state.settings.get("theme", "auto")))
+	if want != UI.dark:
+		_switch_palette(want)
+
+
+## Swaps light and dark: everything on screen is rebuilt in the new colours
+## under a snapshot of the old ones, which then fades away.
+func _switch_palette(dark: bool) -> void:
+	# A picture of the screen as it was, to fade away over the new colours
+	# (there's no picture to take when running without a display).
+	var snapshot: Image = null
+	if DisplayServer.get_name() != "headless":
+		snapshot = get_viewport().get_texture().get_image()
+	UI.set_dark(dark)
+	theme = UI.build_theme()
+	_bg.color = UI.BG
+	_minimap.queue_redraw()
+	for cell in _panes:
+		var pane: Pane = _panes[cell]
+		if pane.shown:
+			pane.rebuild()
+		else:
+			pane.mark_dirty()
+	if snapshot == null or snapshot.is_empty():
+		return
+	var cover := TextureRect.new()
+	cover.texture = ImageTexture.create_from_image(snapshot)
+	cover.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cover.stretch_mode = TextureRect.STRETCH_SCALE
+	cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_modal_layer.add_child(cover)
+	Motion.fade(cover, 0.0, Motion.SLOW).tween_callback(cover.queue_free)
+
+
 # --- Navigation --------------------------------------------------------------
 
 func _open(screen: String, params: Dictionary) -> void:
@@ -131,7 +171,7 @@ func _open(screen: String, params: Dictionary) -> void:
 	elif screen == "home":
 		_close_flows()
 	elif FLOWS.has(screen):
-		_open_flow(screen, params)
+		_open_flow(screen, params, bool(params.get("instant", false)))
 	else:
 		push_error("Unknown screen %s" % screen)
 
@@ -352,7 +392,9 @@ func _scroll_blocks(pos: Vector2, horizontal: bool, along: float) -> bool:
 			continue
 		var value := bar.value
 		var most := bar.max_value - bar.page
-		if (along < 0.0 and value < most - 1.0) or (along > 0.0 and value > 1.0):
+		# A few pixels' slack, so a page that only just overflows doesn't
+		# have to be scrolled to its very end before you can swipe off it.
+		if (along < 0.0 and value < most - 8.0) or (along > 0.0 and value > 8.0):
 			return true
 	return false
 

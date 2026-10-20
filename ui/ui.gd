@@ -5,33 +5,56 @@ extends RefCounted
 ## change here shows up everywhere at once.
 
 # --- Colours -----------------------------------------------------------------
+# Palette tokens. They switch between the light and dark sets in PALETTES
+# (see set_dark), so screens always read them at build time.
 
-const BG := Color("#f5f3ee")
-const SURFACE := Color("#ffffff")
-const SURFACE_SOFT := Color("#efece6")
-const INK := Color("#1d2320")
-const INK_SOFT := Color("#68706b")
-const INK_FAINT := Color("#a3a9a5")
-const LINE := Color("#e4e0d8")
-const ACCENT := Color("#2f6b4f")
-const ACCENT_SOFT := Color("#e2eee7")
+const PALETTES := {
+	"light": {
+		"BG": "#f5f3ee", "SURFACE": "#ffffff", "SURFACE_SOFT": "#efece6",
+		"INK": "#1d2320", "INK_SOFT": "#68706b", "INK_FAINT": "#a3a9a5",
+		"LINE": "#e4e0d8", "ACCENT": "#2f6b4f", "ACCENT_SOFT": "#e2eee7",
+		"NEUTRAL": "#b8bcb8", "SHELF": "#ddd6c9",
+		"SCRIM": "#12171459", "SHADOW": "#1a211c17",
+	},
+	"dark": {
+		"BG": "#121714", "SURFACE": "#1c2420", "SURFACE_SOFT": "#28322d",
+		"INK": "#edf2ee", "INK_SOFT": "#a7b2ab", "INK_FAINT": "#6d7a72",
+		"LINE": "#303b35", "ACCENT": "#5bb487", "ACCENT_SOFT": "#1f3a2d",
+		"NEUTRAL": "#5c6660", "SHELF": "#3a332b",
+		"SCRIM": "#00000099", "SHADOW": "#00000059",
+	},
+}
+
+static var dark := false
+static var BG := Color("#f5f3ee")
+static var SURFACE := Color("#ffffff")
+static var SURFACE_SOFT := Color("#efece6")
+static var INK := Color("#1d2320")
+static var INK_SOFT := Color("#68706b")
+static var INK_FAINT := Color("#a3a9a5")
+static var LINE := Color("#e4e0d8")
+static var ACCENT := Color("#2f6b4f")
+static var ACCENT_SOFT := Color("#e2eee7")
+static var NEUTRAL := Color("#b8bcb8")
+## The plank under the gift shelf.
+static var SHELF := Color("#ddd6c9")
+static var SCRIM := Color("#12171459")
+static var SHADOW := Color("#1a211c17")
+
+# The same in both modes.
 const SUCCESS := Color("#3ba55c")
 const DANGER := Color("#e0524f")
-const NEUTRAL := Color("#b8bcb8")
+## Text and icons on a coloured fill (buttons, tags, badges).
+const ON_COLOUR := Color.WHITE
+## Text over scenery.
 const ON_DARK := Color("#f4f7f5")
 const ON_DARK_SOFT := Color(0.957, 0.969, 0.961, 0.66)
-const SCRIM := Color(0.07, 0.09, 0.08, 0.42)
-const SHADOW := Color(0.1, 0.13, 0.11, 0.09)
-## See-through dark buttons over scenery (the walk's pause button).
+## See-through dark buttons and panels over scenery.
 const GLASS := Color(0.06, 0.1, 0.08, 0.38)
 ## The streak flame.
 const FLAME := Color("#e0702b")
-## The plank under the gift shelf.
-const SHELF := Color("#ddd6c9")
-## Behind the choose-focus screen: the orb's green, so it reads as the orb opening up.
-const SAGE := Color("#e3eee7")
-## Behind the focus complete screen, so the gift's glow stands out.
-const NIGHT := Color("#16211b")
+## Behind the focus complete screen's scenery: a quarter-black sheet.
+const SHEET := Color(0, 0, 0, 0.25)
 ## Colours for each project in charts, assigned in the order projects were made.
 const SERIES := [
 	Color("#2f6b4f"), Color("#e39b3b"), Color("#4d84c4"), Color("#c45b7d"),
@@ -42,6 +65,33 @@ const RADIUS := 18
 const WIDE_BREAKPOINT := 900.0
 
 static var _fonts: Dictionary = {}
+
+
+## Switches every palette token to the dark (or light) set. Screens built
+## afterwards use the new colours; the shell rebuilds what's on screen.
+static func set_dark(on: bool) -> void:
+	dark = on
+	var p: Dictionary = PALETTES["dark" if on else "light"]
+	BG = Color(p["BG"])
+	SURFACE = Color(p["SURFACE"])
+	SURFACE_SOFT = Color(p["SURFACE_SOFT"])
+	INK = Color(p["INK"])
+	INK_SOFT = Color(p["INK_SOFT"])
+	INK_FAINT = Color(p["INK_FAINT"])
+	LINE = Color(p["LINE"])
+	ACCENT = Color(p["ACCENT"])
+	ACCENT_SOFT = Color(p["ACCENT_SOFT"])
+	NEUTRAL = Color(p["NEUTRAL"])
+	SHELF = Color(p["SHELF"])
+	SCRIM = Color(p["SCRIM"])
+	SHADOW = Color(p["SHADOW"])
+
+
+## Whether the saved setting asks for dark mode ("auto" follows the system).
+static func wants_dark(theme_setting: String) -> bool:
+	if theme_setting == "auto":
+		return DisplayServer.is_dark_mode_supported() and DisplayServer.is_dark_mode()
+	return theme_setting == "dark"
 
 
 # --- Type --------------------------------------------------------------------
@@ -64,7 +114,7 @@ static func build_theme() -> Theme:
 	t.default_font_size = 17
 	t.set_color("font_color", "Label", INK)
 
-	_theme_button(t, "Button", INK, SURFACE)
+	_theme_button(t, "Button", INK, BG)
 	t.set_font("font", "Button", font(false, 800))
 
 	t.set_color("font_color", "LineEdit", INK)
@@ -100,7 +150,7 @@ static func build_theme() -> Theme:
 	tip.content_margin_top = 6
 	tip.content_margin_bottom = 6
 	t.set_stylebox("panel", "TooltipPanel", tip)
-	t.set_color("font_color", "TooltipLabel", ON_DARK)
+	t.set_color("font_color", "TooltipLabel", BG)
 	t.set_font_size("font_size", "TooltipLabel", 13)
 	return t
 
@@ -273,19 +323,19 @@ static func button(text: String, on_press: Callable, kind: String = "primary") -
 	b.custom_minimum_size = Vector2(0, 50)
 	match kind:
 		"accent":
-			style_button(b, ACCENT, SURFACE)
+			style_button(b, ACCENT, ON_COLOUR)
 		"quiet":
 			style_button(b, SURFACE_SOFT, INK)
 		"danger":
-			style_button(b, DANGER, SURFACE)
+			style_button(b, DANGER, ON_COLOUR)
 		"success":
-			style_button(b, SUCCESS, SURFACE)
+			style_button(b, SUCCESS, ON_COLOUR)
 		"white":
 			style_button(b, SURFACE, INK, 16, true)
 		"ghost":
 			style_button(b, Color.TRANSPARENT, INK)
 		_:
-			style_button(b, INK, SURFACE)
+			style_button(b, INK, BG)
 	if on_press.is_valid():
 		b.pressed.connect(on_press)
 	return b
@@ -509,6 +559,27 @@ static func character_portrait(look: Dictionary, box_size: Vector2, face_only: b
 			view.position = Vector2(frame.size.x * 0.48, frame.size.y * 0.94)
 	frame.resized.connect(place)
 	return frame
+
+
+## A round badge with a level number in it.
+static func level_badge(level: int, diameter: int = 40) -> PanelContainer:
+	var p := PanelContainer.new()
+	var b := box(ACCENT, Color(1, 1, 1, 0.9), 999)
+	b.set_border_width_all(3)
+	b.set_content_margin_all(0)
+	b.shadow_color = Color(0, 0, 0, 0.15)
+	b.shadow_size = 6
+	b.shadow_offset = Vector2(0, 2)
+	p.add_theme_stylebox_override("panel", b)
+	p.custom_minimum_size = Vector2(diameter, diameter)
+	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l := label(str(level), int(diameter * 0.45), ON_COLOUR, true, 600)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	p.add_child(l)
+	return p
 
 
 ## A coloured badge for a grade ("gcse/9", "uni/first"...).

@@ -15,8 +15,8 @@ static func show_text(text: String, icon: String = "check") -> void:
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var row := UI.hbox(8)
 	if icon != "":
-		row.add_child(UI.icon_rect(icon, 16, UI.ON_DARK))
-	row.add_child(UI.label(text, 15, UI.ON_DARK, false, 800))
+		row.add_child(UI.icon_rect(icon, 16, UI.BG))
+	row.add_child(UI.label(text, 15, UI.BG, false, 800))
 	t.add_child(row)
 	var host: Node = Modal.layer if Modal.layer and is_instance_valid(Modal.layer) else (Engine.get_main_loop() as SceneTree).root
 	host.add_child(t)
