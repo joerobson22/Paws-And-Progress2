@@ -298,7 +298,18 @@ func _run() -> void:
 		await _drag(b.get_center(), b.get_center(), 1)
 		await _wait(25)
 		check(modal_class.is_open(), "the badge opens the rewards")
+		var rewards: Node = modal_class.top()
+		var title_y: float = rewards.header.get_global_rect().position.y
+		await _wait(50)
+		check(rewards.header.get_child_count() == 2, "the title and your level sit above the list")
+		check(rewards._scroll.scroll_vertical > 0, "it opens scrolled down to where you are (level %d)" % app.level())
+		# The next reward to come is in view: the first one with a padlock.
+		var next_up: Control = _find(rewards.body, func(n): return n is HBoxContainer and n.get_child_count() == 4)
+		check(next_up != null and rewards._scroll.get_global_rect().encloses(next_up.get_global_rect()), "the next reward to come is in view")
 		await _shot("rewards")
+		rewards._scroll.scroll_vertical = 0
+		await _wait(5)
+		check(is_equal_approx(rewards.header.get_global_rect().position.y, title_y), "the title doesn't scroll")
 		_close_modal()
 		await _wait(15)
 		await _drag(pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), 1)
@@ -537,7 +548,7 @@ func _run() -> void:
 		await _wait(50)
 		await _shot(pane + "_dark")
 	main._panes[Vector2i(0, -1)].open_rewards()
-	await _wait(25)
+	await _wait(50)
 	await _shot("rewards_dark")
 	_close_modal()
 	app.go("focus")
