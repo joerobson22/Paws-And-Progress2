@@ -1,264 +1,117 @@
+class_name GiftsPane
 extends Pane
-## Gifts, to the left of the focus screen. Your three favourites sit on the
-## shelf near the top; underneath is every gift you've found, with how many
-## you've had, in the order picked from the "Filter by" menu. Only the
-## collection scrolls: the shelf and the filter stay where they are. Press
-## and hold a gift to pick it up, then drop it on the shelf; drag a shelf
-## gift sideways to slide it along and swap places, or hold it and drag it
-## off to take it down. Tap any gift for a closer look and to trade it in.
+## Gifts, to the left of the focus screen: your three favourites on the
+## shelf, and three rings for how your collection's coming along (gifts
+## discovered, animals whose whole gift table you've found, and cosmetics
+## unlocked from gifts). Shelf gifts grow and glint under the pointer; tap one
+## for a closer look and its trade-in. The pencil opens the shelf editor,
+## with every gift you've found, where arranging the shelf is all drag and
+## drop.
 
-const SORTS := [["rarity", "Rarity"], ["name", "A–Z"], ["animal", "Animal"]]
-
-var _slots: Array[_Slot] = []
-var _shelf_card: Control
-var _ghost: GiftArt
-var _drag_id := ""
-var _drag_from := -1
-var _drag_source: Control
-## True while a shelf gift slides along the shelf (it can't leave it).
-var _sliding := false
-var _hover := -1
-## The pointer while dragging, in viewport coordinates (from the events
-## themselves, which also works for touch and for a consumed event).
-var _pointer := Vector2.ZERO
+var _slots: Array[ShelfEditor.Slot] = []
+var _rings: Array[ProgressRing] = []
 
 
 func build() -> void:
 	_slots.clear()
-	_drag_id = ""
-	var col := _frame(760)
-	var found := _found()
-	col.add_child(UI.title_row("Gifts", "%d of %d found" % [found.size(), Content.gifts.size()]))
-	_shelf_card = _shelf()
-	col.add_child(_shelf_card)
-	if found.is_empty():
+	_rings.clear()
+	var col := page(760, 22)
+	var counts := Collection.progress(App.state.inventory, Content.gifts, Content.animals)
+	col.add_child(UI.title_row("Gifts", "%d of %d found" % [counts["found"], counts["gifts"]]))
+	col.add_child(_shelf(col.custom_minimum_size.x))
+	if counts["found"] == 0:
 		var empty := UI.card(UI.SURFACE, 24)
 		var v := UI.vbox(6)
 		v.add_child(UI.label("No gifts yet", 20, UI.INK, true, 600))
 		v.add_child(UI.para("Focus for %d minutes and your pet dives into the bushes to find you one." % floori(Content.drop_table.get("min_seconds", 600) / 60.0)))
 		empty.add_child(v)
 		col.add_child(empty)
-		return
+	col.add_child(_progress(counts, col.custom_minimum_size.x))
 
+
+## The rings fill up each time you come to the screen.
+func _on_shown() -> void:
+	for ring in _rings:
+		ring.sweep()
+
+
+## The shelf: no box round it, just a plank with three gifts standing on it
+## and a pencil to arrange them.
+func _shelf(width: float) -> Control:
+	var v := UI.vbox(4)
 	var head := UI.hbox(8)
-	var cap := UI.caption("Your collection")
+	var cap := UI.caption("Your shelf")
 	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(cap)
 	head.add_child(UI.spacer())
-	var sort := Dropdown.new(SORTS, str(App.state.settings.get("gift_sort", "rarity")),
-		bool(App.state.settings.get("gift_sort_reversed", false)), "Filter by")
-	sort.chosen.connect(func(option: String, reversed: bool):
-		App.state.settings["gift_sort"] = option
-		App.set_setting("gift_sort_reversed", reversed))
-	head.add_child(sort)
-	col.add_child(head)
-
-	# Only the collection scrolls, under everything above it.
-	scroll = ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(scroll)
-	var pad := MarginContainer.new()
-	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	pad.add_theme_constant_override("margin_top", 4)
-	pad.add_theme_constant_override("margin_right", 6)
-	# Room under the last row to scroll it clear of the minimap.
-	pad.add_theme_constant_override("margin_bottom", 96 + int(UI.safe_insets(self)["bottom"]))
-	scroll.add_child(pad)
-	var grid := GridContainer.new()
-	grid.columns = clampi(int(col.custom_minimum_size.x / 100.0), 3, 7)
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 12)
-	for id in found:
-		var tile := GiftTile.new(id, App.state.gift_count(id))
-		tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tile.tapped.connect(show_gift)
-		tile.lifted.connect(_lift.bind(-1))
-		grid.add_child(tile)
-	pad.add_child(grid)
-
-
-## A column filling the pane, centred and at most `max_width` wide, that
-## doesn't scroll as a whole (unlike page()): the gifts screen scrolls just
-## its collection.
-func _frame(max_width: float) -> VBoxContainer:
-	var insets := UI.safe_insets(self)
-	var gutter := 32.0 if wide else 18.0
-	var width := maxf(0.0, minf(max_width, size.x - 2.0 * gutter - insets["left"] - insets["right"]))
-	var side := maxf(gutter, (size.x - width) * 0.5)
-	var margin := MarginContainer.new()
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", int(side + insets["left"]))
-	margin.add_theme_constant_override("margin_right", int(side + insets["right"]))
-	margin.add_theme_constant_override("margin_top", 26 + int(insets["top"]))
-	add_child(margin)
-	var column := UI.vbox(18)
-	column.custom_minimum_size.x = width
-	margin.add_child(column)
-	return column
-
-
-## Gifts found so far, in the chosen order.
-func _found() -> Array:
-	var ids: Array = App.state.inventory.keys().filter(func(id): return not Content.gift(id).is_empty())
-	return sort_gifts(ids, str(App.state.settings.get("gift_sort", "rarity")), bool(App.state.settings.get("gift_sort_reversed", false)))
-
-
-## Rarity puts the rarest first; A–Z is by name; animal follows the cast,
-## commonest first within each. `reversed` flips the whole order.
-static func sort_gifts(ids: Array, by: String, reversed: bool) -> Array:
-	var order := {}
-	for i in Content.animals.size():
-		order[Content.animals[i]["id"]] = i
-	var key := func(id: String) -> Array:
-		var g := Content.gift(id)
-		var rarity := GiftRoller.RARITIES.find(g["rarity"])
-		match by:
-			"name":
-				return [str(g["name"]).to_lower()]
-			"animal":
-				return [order.get(g["animal"], 99), rarity]
-			_:
-				return [-rarity, str(g["name"]).to_lower()]
-	var out := ids.duplicate()
-	out.sort_custom(func(a, b): return key.call(a) < key.call(b))
-	if reversed:
-		out.reverse()
-	return out
-
-
-## The shelf: no box round it, just a plank with three gifts standing on it.
-func _shelf() -> Control:
-	var v := UI.vbox(0)
+	head.add_child(UI.round_button("edit", "Arrange your shelf", ShelfEditor.open, UI.SURFACE, UI.INK, 34))
+	v.add_child(head)
 	var row := UI.hbox(10)
 	var shelf := App.state.shelf()
 	for i in shelf.size():
-		var slot := _Slot.new()
-		slot.custom_minimum_size = Vector2(0, 112)
+		var slot := ShelfEditor.Slot.new()
+		# As tall as a spot is wide, up to a point, so the gifts are as big as fits.
+		slot.custom_minimum_size = Vector2(0, clampf((width - 20.0) / 3.0, 104.0, 160.0))
 		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var id: String = shelf[i]
 		if id != "" and App.state.gift_count(id) > 0:
 			var tile := GiftTile.new(id, App.state.gift_count(id), true)
 			tile.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-			tile.slides = true
 			tile.tapped.connect(show_gift)
-			tile.lifted.connect(_lift.bind(i))
-			tile.slid.connect(_lift.bind(i, true))
 			slot.add_child(tile)
 			slot.filled = true
 		row.add_child(slot)
 		_slots.append(slot)
 	v.add_child(row)
-	var plank := _Plank.new()
+	var plank := ShelfEditor.Plank.new()
 	plank.custom_minimum_size.y = 18
 	v.add_child(plank)
 	return v
 
 
-# --- Dragging ----------------------------------------------------------------
-
-## Picks up a gift to drag it. `slide` keeps it on the shelf, moving
-## sideways only, to swap places with the others there.
-func _lift(tile: GiftTile, from: int, slide: bool = false) -> void:
-	_drag_id = tile.gift_id
-	_drag_from = from
-	_drag_source = tile
-	_sliding = slide
-	tile.modulate.a = 0.3
-	_ghost = GiftArt.new(_drag_id, 0.9)
-	_ghost.size = Vector2(84, 84)
-	_ghost.pivot_offset = _ghost.size * 0.5
-	_ghost.z_index = 20
-	add_child(_ghost)
-	_pointer = tile.press_point()
-	_move_ghost()
-	Motion.pop(_ghost, 0.15)
-	Audio.play("pop", 0.85, -8.0)
-	_update_hover()
-
-
-func _input(e: InputEvent) -> void:
-	if _drag_id == "":
-		return
-	if e is InputEventMouseMotion:
-		get_viewport().set_input_as_handled()
-		_pointer = e.position
-		_move_ghost()
-		_update_hover()
-	elif e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and not e.pressed:
-		get_viewport().set_input_as_handled()
-		_pointer = e.position
-		_update_hover()
-		_drop()
-
-
-func _move_ghost() -> void:
-	_ghost.position = get_global_transform_with_canvas().affine_inverse() * _drag_point() - _ghost.size * 0.5
-
-
-## Where the dragged gift is: under the pointer, or for a slide, level with
-## the shelf and no further than its ends.
-func _drag_point() -> Vector2:
-	if not _sliding or _slots.is_empty():
-		return _pointer
-	var first := _slots[0].get_global_rect()
-	var last := _slots[_slots.size() - 1].get_global_rect()
-	return Vector2(clampf(_pointer.x, first.get_center().x, last.get_center().x), first.get_center().y)
-
-
-func _update_hover() -> void:
-	var p := _drag_point()
-	var hit := -1
-	for i in _slots.size():
-		if _slots[i].get_global_rect().grow(10.0).has_point(p):
-			hit = i
-	if hit != _hover:
-		if _hover >= 0 and _hover < _slots.size():
-			_slots[_hover].highlight = false
-		_hover = hit
-		if hit >= 0:
-			_slots[hit].highlight = true
-
-
-func _drop() -> void:
-	Gestures.claimed = false
-	var id := _drag_id
-	var from := _drag_from
-	_drag_id = ""
-	var ghost := _ghost
-	var t := Motion.tween(ghost, "drop")
-	t.set_parallel(true)
-	if _hover >= 0:
-		var slot := _slots[_hover]
-		var at := slot.get_global_rect().get_center() - get_global_rect().position - ghost.size * 0.5
-		t.tween_property(ghost, "position", at, Motion.time(Motion.FAST))
-		t.chain().tween_callback(App.place_on_shelf.bind(id, _hover))
-		Audio.play("pop", 1.1, -4.0)
-	elif from >= 0 and not _sliding and not _shelf_card.get_global_rect().has_point(_pointer):
-		# Dragged off the shelf: take it down.
-		t.tween_property(ghost, "modulate:a", 0.0, Motion.time(Motion.FAST))
-		t.tween_property(ghost, "scale", Vector2.ONE * 0.6, Motion.time(Motion.FAST))
-		t.chain().tween_callback(App.remove_from_shelf.bind(from))
-	else:
-		# Dropped nowhere: float back to where it came from.
-		var source := _drag_source
-		var home := source.get_global_rect().get_center() - get_global_rect().position - ghost.size * 0.5
-		t.tween_property(ghost, "position", home, Motion.time(Motion.NORMAL))
-		t.tween_property(ghost, "modulate:a", 0.0, Motion.time(Motion.NORMAL))
-		t.chain().tween_callback(func():
-			if is_instance_valid(source):
-				source.modulate.a = 1.0
-			ghost.queue_free())
-	if _hover >= 0:
-		_slots[_hover].highlight = false
-	_hover = -1
+## Three rings side by side: gifts in green, pets' gift tables in blue and
+## cosmetics in purple (the common, rare and epic colours).
+func _progress(counts: Dictionary, width: float) -> Control:
+	var section := UI.vbox(10)
+	section.add_child(UI.caption("Your collection"))
+	var card := UI.card(UI.SURFACE, 18)
+	var row := UI.hbox(10)
+	card.add_child(row)
+	section.add_child(card)
+	var diameter := clampf((width - 56.0) / 3.0 - 12.0, 72.0, 124.0)
+	var stats := [
+		["Discovered", "%d of %d gifts" % [counts["found"], counts["gifts"]], counts["found"], counts["gifts"], "common",
+			"Every gift you've ever found"],
+		["Pet tables", "%d of %d complete" % [counts["tables"], counts["animals"]], counts["tables"], counts["animals"], "rare",
+			"Animals whose gifts you've found every one of"],
+		["Cosmetics", "%d of %d unlocked" % [counts["cosmetics"], counts["wearables"]], counts["cosmetics"], counts["wearables"], "epic",
+			"Gifts you can wear, out of all of them (trading the last one away takes it off you)"],
+	]
+	for s in stats:
+		var cell := UI.vbox(4)
+		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		cell.tooltip_text = s[5]
+		var ring := ProgressRing.new(Collection.fraction(s[2], s[3]), Content.rarity_colour(s[4]), diameter)
+		_rings.append(ring)
+		cell.add_child(ring)
+		var name_label := UI.label(s[0], 15, UI.INK, false, 800)
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(name_label)
+		var sub := UI.label(s[1], 12, UI.INK_FAINT, false, 700)
+		sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		cell.add_child(sub)
+		row.add_child(cell)
+	return section
 
 
 # --- Gift popup --------------------------------------------------------------
 
 ## A closer look at one gift, with its trade-in. `fresh` celebrates a gift
-## that's just arrived from a trade.
-func show_gift(id: String, fresh: bool = false) -> void:
+## that's just arrived from a trade. Opened from the shelf here and from the
+## shelf editor; putting gifts on and off the shelf is done by dragging them
+## in the editor, not from here.
+static func show_gift(id: String, fresh: bool = false) -> void:
 	var g := Content.gift(id)
 	if g.is_empty():
 		return
@@ -271,7 +124,7 @@ func show_gift(id: String, fresh: bool = false) -> void:
 	m.body.add_child(art)
 	if fresh:
 		Audio.play("chime", 1.0, -4.0)
-		get_tree().create_timer(Motion.time(Motion.NORMAL)).timeout.connect(func():
+		art.get_tree().create_timer(Motion.time(Motion.NORMAL)).timeout.connect(func():
 			if is_instance_valid(art):
 				Motion.pop(art, 0.2, 0.5))
 
@@ -293,7 +146,7 @@ func show_gift(id: String, fresh: bool = false) -> void:
 	if cost > 0 and next != "":
 		var next_name := Content.rarity_name(next).to_lower()
 		if count >= cost:
-			var trade := UI.button("Trade in %d for %s" % [cost, UI.a(next_name)], _trade.bind(m, id), "accent")
+			var trade := UI.button("Trade in %d for %s" % [cost, UI.a(next_name)], func(): _trade(m, id), "accent")
 			trade.icon = Icons.texture("trade", 18, Color.WHITE)
 			trade.add_theme_constant_override("h_separation", 10)
 			m.body.add_child(trade)
@@ -302,55 +155,10 @@ func show_gift(id: String, fresh: bool = false) -> void:
 	else:
 		m.body.add_child(UI.para("Legendary gifts can't be traded in.", 14, UI.INK_FAINT))
 
-	var shelf := App.state.shelf()
-	var on := shelf.find(id)
-	if on >= 0:
-		m.body.add_child(UI.button("Take off your shelf", func():
-			App.remove_from_shelf(on)
-			m.close(), "quiet"))
-	elif count > 0:
-		m.body.add_child(UI.button("Put on your shelf", func():
-			var spot := shelf.find("")
-			App.place_on_shelf(id, spot if spot >= 0 else shelf.size() - 1)
-			m.close()
-			Toast.show_text("On your shelf"), "quiet"))
 
-
-func _trade(m: Modal, id: String) -> void:
+## Trading away the last of a shelf gift takes it off the shelf too.
+static func _trade(m: Modal, id: String) -> void:
 	var new_id := App.trade_in(id)
 	m.close()
 	if new_id != "":
 		show_gift(new_id, true)
-
-
-## One spot on the shelf: dashed when empty, lit up while a gift hovers over it.
-class _Slot extends Control:
-	var filled := false
-	var highlight := false:
-		set(v):
-			highlight = v
-			queue_redraw()
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_PASS
-
-	func _draw() -> void:
-		var r := Rect2(Vector2(4, 4), size - Vector2(8, 8))
-		if highlight:
-			draw_style_box(UI.box(UI.ACCENT_SOFT, UI.ACCENT, 20), r)
-		elif not filled:
-			var c := r.get_center()
-			var d := minf(r.size.x, r.size.y) * 0.62
-			draw_arc(c, d * 0.5, 0, TAU, 40, UI.LINE, 2.0, true)
-			var plus := Icons.texture("plus", 20, UI.INK_FAINT)
-			draw_texture(plus, c - Vector2(10, 10))
-
-
-## The shelf itself: a soft plank under the three spots.
-class _Plank extends Control:
-	func _draw() -> void:
-		var b := UI.box(UI.SHELF, Color.TRANSPARENT, 7)
-		b.shadow_color = Color(0, 0, 0, 0.08)
-		b.shadow_size = 6
-		b.shadow_offset = Vector2(0, 3)
-		draw_style_box(b, Rect2(Vector2(0, 2), Vector2(size.x, 10)))

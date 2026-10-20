@@ -30,8 +30,11 @@ macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
 ## How it's laid out
 
 The app is five screens arranged like a plus sign. Swipe between them, use
-the arrow keys on a keyboard (Esc comes back to the middle), or tap a dot on
-the little map at the bottom, which shows where you are:
+the arrow keys on a keyboard (Esc comes back to the middle), or use the
+little map at the bottom, which shows where you are: tap it and it grows into
+a tile per screen, each with its icon (a home for focus, a present for gifts,
+a tick for completed, a person for your profile and a bar chart for stats).
+Tap a tile to go there, or anywhere else to shrink it back.
 
 ```
                  Profile
@@ -47,22 +50,39 @@ the little map at the bottom, which shows where you are:
   place you'll walk (holding still, with the place's growth in front of your
   pets): pick the place from the row at the top (in the order they unlock),
   with the project and the pet's name under it. Swipe through your pets (each
-  one's kind and time focused is under it), tap one to start a walk, adopt a
-  new one with the + (what it's for, the pet's name, its animal and three
-  colours; a locked animal hides the colours), or complete or delete one.
-  Debug builds (running from the editor) also show a switch in the top left
-  that unlocks every animal and place.
-- **Gifts** (left): a shelf for your three favourites (press and hold a gift to
-  drag it up; drag a shelf gift sideways to swap it along), every gift you've
-  found (filter by rarity, A–Z or animal; pick the same one again to reverse
-  it; only this collection scrolls), and trade-ins (10 commons for a rare,
-  5 rares for an epic, 3 epics for a legendary).
-- **Completed** (right): a panel per finished project; tap one to give it a
-  GCSE, A-Level or university grade badge.
-- **Profile** (up): your character (tap it or the pencil to customise) with
-  your level badge in the bottom left (tap it for every reward) and your XP
-  along the bottom, account details, and the settings behind the gear in the
-  top left.
+  one's kind and time focused is under it), tap one to start a walk, or
+  complete or delete one with the buttons at the bottom. The × in the top left
+  goes back. The + in the top right adopts a new one (what it's for, the pet's
+  name, its animal and three colours; a locked animal hides the colours):
+  while you fill that in the bottom buttons go, the × cancels and the + turns
+  into a tick that adopts it. Debug builds (running from the editor) also show
+  two switches in the top left: one unlocks every animal and place, the
+  other shows the app at a phone's proportions (letterboxed in the window)
+  instead of the desktop layout.
+- **Gifts** (left): a shelf for your three favourites (they grow and glint
+  under the pointer; tap one for a closer look and its trade-in), and three
+  rings for how your collection's coming along: gifts discovered (green),
+  pets' gift tables completed (blue) and cosmetics unlocked from gifts
+  (purple). The pencil by the shelf opens the shelf editor, with every gift
+  you've found (filter by rarity, A–Z or animal; pick the same one again to
+  reverse it). There it's all drag and drop: onto an empty spot to put a gift
+  up, onto a full one to swap it in, along the shelf to rearrange, and off it
+  to take one down. Gifts on the shelf are greyed out in the collection. On a
+  phone, press and hold a gift first, as dragging scrolls the list. Tap any
+  gift for its trade-in (10 commons for a rare, 5 rares for an epic, 3 epics
+  for a legendary); trading away the last of a shelf gift takes it off the
+  shelf.
+- **Completed** (right): a panel per finished project. Tap the circled "?" in
+  its corner to give it a GCSE, A-Level or university grade, and tap the grade
+  to change it.
+- **Profile** (up): your character (the pencil customises it) with your level
+  badge in the bottom left (it shines under the pointer; tap it for every
+  reward) and your XP along the bottom, and your account details. Your
+  achievements fill the rest of the screen, as many as fit, so the page never
+  scrolls; tap them for the full list with how far along each one is: 10, 50,
+  100, 500, 1,000 and 10,000 hours focused, every gift found, and a set for
+  each animal's gifts (`data/achievements.json`). The settings are behind the
+  gear in the top left.
 - **Stats** (down): this week's focus split by project, past weeks with any
   focus in them, your streak (one rest day allowed after three days in a row)
   and the friends leaderboard.
@@ -127,11 +147,12 @@ godot --headless --path . -s tests/run_tests.gd   # unit tests
 godot --headless --path . -s tests/smoke.gd       # drives the whole app with sample data
 ```
 
-The smoke run draws every place, swipes between panes, drags a gift onto the
-shelf, sorts and trades gifts, opens every popup, picks a place (and tries a
-locked one), adopts a pet, walks for "50 minutes" through to the gift and the
-XP bar, throws the gift for the pet to fetch, and switches to dark mode and
-back.
+The smoke run draws every place, opens the map and swipes between panes,
+arranges the shelf by dragging (on, swapped in, along and off), sorts and
+trades gifts, grades a project from its "?", opens every popup (achievements
+included), picks a place (and tries a locked one), adopts a pet, walks for
+"50 minutes" through to the gift and the XP bar, throws the gift for the pet
+to fetch, and switches to dark mode and back.
 CI runs all three on every push (`.github/workflows/ci.yml`). With a display,
 `-s tests/smoke.gd -- --shots=<dir>` saves a screenshot of each step.
 
@@ -153,9 +174,12 @@ core/            game logic, no UI
   gift_roller.gd   gift odds, guaranteed rarities, pity timer, trade-ins
   levels.gd        XP from the walk log, levels, and what each one unlocks
   stats.gd         weekly totals, records, streaks (from the session log)
+  achievements.gd  achievements and how far along each one is
+  collection.gd    the gifts screen's rings: discovered, gift tables, cosmetics
   models/          ProjectData, FocusSession resources
 data/            all content: animals, gifts, drop table, places (biomes),
-                 levels, cosmetics, grades, walk quotes, home greetings
+                 levels, cosmetics, grades, achievements, walk quotes,
+                 home greetings
 scenes/
   main.gd          the app shell: panes, swiping, minimap, flows, popups
   panes/           focus, gifts, completed, profile, stats (and their base, Pane)
@@ -192,6 +216,8 @@ tests/           headless unit tests and the smoke run
 - **Trade-in rates:** `trade_in` on each rarity in `data/gifts.json`.
 - **Clothes:** `data/cosmetics.json`.
 - **Grades:** `data/grades.json`.
+- **Achievements:** `data/achievements.json` (hour goals; the gift sets come
+  from the animals and gifts).
 - **Walk quotes:** `data/quotes.json`.
 - **Place:** add a stack of layers to `data/biomes.json` (and an icon), and
   give it a level in `data/levels.json`.

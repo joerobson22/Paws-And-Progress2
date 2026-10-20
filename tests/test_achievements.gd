@@ -1,0 +1,56 @@
+extends TestCase
+
+var data: Dictionary
+var animals: Array
+var gifts: Array
+var list: Array
+
+
+func _init() -> void:
+	data = load_json("res://data/achievements.json")
+	animals = load_json("res://data/animals.json")["animals"]
+	gifts = load_json("res://data/gifts.json")["gifts"]
+	list = Achievements.list(data, animals, gifts)
+
+
+func _row(rows: Array, id: String) -> Dictionary:
+	for r in rows:
+		if r["id"] == id:
+			return r
+	return {}
+
+
+func test_the_list() -> void:
+	var hours := list.filter(func(a): return a["kind"] == "hours").map(func(a): return a["goal"])
+	eq(hours, [10, 50, 100, 500, 1000, 10000], "the focus milestones")
+	eq(_row(list, "focus_10000")["description"], "Focus for 10,000 hours in total")
+	eq(_row(list, "all_gifts")["goal"], gifts.size(), "every gift")
+	var staffy := _row(list, "animal_staffy")
+	eq(staffy["name"], "Staffy set")
+	eq(staffy["goal"], gifts.filter(func(g): return g["animal"] == "staffy").size())
+	var with_gifts := {}
+	for g in gifts:
+		with_gifts[g["animal"]] = true
+	eq(list.filter(func(a): return a["kind"] == "animal").size(), with_gifts.size(), "one per animal with gifts")
+
+
+func test_hours() -> void:
+	var rows := Achievements.progress(list, 49 * 3600 + 3599, [], gifts)
+	check(_row(rows, "focus_10")["earned"], "10 hours done")
+	check(not _row(rows, "focus_50")["earned"], "49h59m isn't 50 hours")
+	eq(_row(rows, "focus_50")["have"], 49)
+	eq(_row(rows, "focus_10")["have"], 10, "progress stops at the goal")
+	check(_row(Achievements.progress(list, 50 * 3600, [], gifts), "focus_50")["earned"], "50 hours exactly")
+
+
+func test_gift_sets() -> void:
+	var staffy: Array = gifts.filter(func(g): return g["animal"] == "staffy").map(func(g): return g["id"])
+	var rows := Achievements.progress(list, 0, staffy, gifts)
+	check(_row(rows, "animal_staffy")["earned"], "every staffy gift")
+	check(not _row(rows, "animal_bear")["earned"], "but no bear gifts")
+	eq(_row(rows, "all_gifts")["have"], staffy.size())
+	check(not _row(rows, "all_gifts")["earned"])
+	var one_short := staffy.slice(1)
+	check(not _row(Achievements.progress(list, 0, one_short, gifts), "animal_staffy")["earned"], "one missing")
+	var everything: Array = gifts.map(func(g): return g["id"])
+	check(_row(Achievements.progress(list, 0, everything, gifts), "all_gifts")["earned"], "the full collection")

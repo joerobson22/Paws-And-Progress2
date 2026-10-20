@@ -155,6 +155,7 @@ func close(result: Variant = null) -> void:
 	# Let taps straight through while it fades away.
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UI.ignore_mouse(card)
 	var t := Motion.tween(self, "modal")
 	t.set_parallel(true)

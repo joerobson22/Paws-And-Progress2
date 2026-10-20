@@ -200,7 +200,7 @@ func _show_project(project_id: String, day: int) -> void:
 	top.add_child(UI.spacer())
 	top.add_child(UI.round_button("close", "Close", m.close.bind(null), UI.SURFACE_SOFT, UI.INK, 36, false))
 	m.body.add_child(top)
-	var panel := ProjectPanel.new(p, extra)
+	var panel := ProjectPanel.new(p, extra, false, true)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	m.body.add_child(panel)
 	if not p.is_complete():

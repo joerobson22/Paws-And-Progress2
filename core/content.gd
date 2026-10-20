@@ -12,6 +12,8 @@ var day_cycle: Dictionary = {}
 ## How each kind of weather looks (see Weather).
 var weathers: Dictionary = {}
 var grade_scales: Array = []
+## What the profile's achievements are (see Achievements.list()).
+var achievements: Dictionary = {}
 var quotes: Array = []
 ## Home screen lines: {morning, afternoon, evening, night, anytime}.
 var greetings: Dictionary = {}
@@ -44,6 +46,7 @@ func _init() -> void:
 	var keys: Array = day_cycle.get("keys", [])
 	keys.sort_custom(func(x, y): return float(x["hour"]) < float(y["hour"]))
 	grade_scales = _load("res://data/grades.json").get("scales", [])
+	achievements = _load("res://data/achievements.json")
 	quotes = _load("res://data/quotes.json").get("quotes", [])
 	greetings = _load("res://data/greetings.json")
 	levels = _load("res://data/levels.json")

@@ -1,7 +1,8 @@
 extends Pane
 ## Completed projects, to the right of the focus screen: a panel for each,
-## newest first. Tap one to give it a grade (GCSE, A-Level or university);
-## the grade's badge then shows in the panel's top right corner.
+## newest first. Tap the circled "?" in a panel's top right to give it a
+## grade (GCSE, A-Level or university); its badge then shows there instead,
+## and tapping that changes it.
 
 ## Which grading scale the picker opens on; remembered while the app runs.
 var _scale := ""
@@ -26,8 +27,8 @@ func build() -> void:
 		col.add_child(empty)
 		return
 	for p in done:
-		var panel := ProjectPanel.new(p)
-		panel.tapped.connect(_pick_grade)
+		var panel := ProjectPanel.new(p, "", true)
+		panel.grade_pressed.connect(_pick_grade)
 		col.add_child(panel)
 
 

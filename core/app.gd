@@ -162,6 +162,12 @@ func debug_unlock_all() -> bool:
 	return OS.is_debug_build() and bool(state.settings.get("debug_unlock_all", false))
 
 
+## The debug-only "phone size" switch: the window shows the app at a phone's
+## proportions, letterboxed, instead of filling it (see main.gd).
+func debug_phone_view() -> bool:
+	return OS.is_debug_build() and bool(state.settings.get("debug_phone_view", false))
+
+
 ## The walk's debug time buttons: the walk started `minutes` earlier.
 ## Does nothing outside debug builds.
 func debug_add_minutes(minutes: int) -> void:

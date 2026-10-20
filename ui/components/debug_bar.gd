@@ -1,7 +1,9 @@
 class_name DebugBar
 extends VBoxContainer
 ## Only in debug builds (runs from the editor, debug exports). On the focus
-## screen, in the top left: a switch that unlocks every animal and place.
+## screen, in the top left: a switch that unlocks every animal and place,
+## and one that shows the app at a phone's proportions (off: the desktop
+## layout filling the window).
 ## The walk uses the other two pieces here: a picker to preview each kind
 ## of weather instead of the real one, and buttons that move the walk on.
 
@@ -11,14 +13,26 @@ const STEPS := [5, 10, 30, 60]
 
 func _init() -> void:
 	add_theme_constant_override("separation", 4)
-	var row := UI.hbox(8)
-	row.add_child(UI.label("DEBUG", 11, UI.INK_FAINT, false, 900))
-	var unlock := Switch.new(App.debug_unlock_all())
-	unlock.tooltip_text = "Unlock every animal and place (debug builds only)"
-	unlock.toggled.connect(func(on: bool): App.set_setting("debug_unlock_all", on))
-	row.add_child(unlock)
-	row.add_child(UI.label("Unlock all", 13, UI.INK_SOFT, false, 800))
-	add_child(row)
+	# Two switches, one under the other, with "DEBUG" by the first.
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 4)
+	grid.add_child(UI.label("DEBUG", 11, UI.INK_FAINT, false, 900))
+	_switch(grid, "Unlock all", "Unlock every animal and place (debug builds only)", App.debug_unlock_all(), "debug_unlock_all")
+	grid.add_child(Control.new())
+	_switch(grid, "Phone size", "Show the app at a phone's proportions (debug builds only)", App.debug_phone_view(), "debug_phone_view")
+	add_child(grid)
+
+
+func _switch(grid: GridContainer, title: String, tip: String, on: bool, setting: String) -> void:
+	var sw := Switch.new(on)
+	sw.tooltip_text = tip
+	sw.toggled.connect(func(value: bool): App.set_setting(setting, value))
+	grid.add_child(sw)
+	var words := UI.label(title, 13, UI.INK_SOFT, false, 800)
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	grid.add_child(words)
 
 
 ## A picker for the weather the places show: the real one, or any kind.

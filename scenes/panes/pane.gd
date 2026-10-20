@@ -93,8 +93,10 @@ func _restore_scroll(value: int) -> void:
 
 
 ## A scrolling, centred column for the pane's content, clear of the notch at
-## the top and the minimap at the bottom. Returns the column to fill.
-func page(max_width: float = 680.0, gap: int = 18) -> VBoxContainer:
+## the top and the minimap at the bottom. Returns the column to fill. With
+## `fill_height` the column is at least as tall as the screen, so a vertical
+## spacer in it pushes what follows down to the bottom.
+func page(max_width: float = 680.0, gap: int = 18, fill_height: bool = false) -> VBoxContainer:
 	var insets := UI.safe_insets(self)
 	scroll = ScrollContainer.new()
 	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -112,4 +114,6 @@ func page(max_width: float = 680.0, gap: int = 18) -> VBoxContainer:
 	column.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	margin.add_child(column)
 	column.custom_minimum_size.x = minf(max_width, size.x - 2.0 * gutter - insets["left"] - insets["right"])
+	if fill_height:
+		column.custom_minimum_size.y = maxf(0.0, size.y - 122.0 - insets["top"] - insets["bottom"])
 	return column
