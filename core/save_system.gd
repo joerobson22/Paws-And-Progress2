@@ -204,6 +204,7 @@ static func _import_v1_project(d: Dictionary, index: int, now: int) -> ProjectDa
 	var p := ProjectData.new()
 	p.id = "v1_%d" % index
 	p.name = str(d.get("projectName", "Project"))
+	p.pet_name = str(d.get("animalName", ""))
 	var animal_index := int(d.get("animal", 0))
 	p.animal_id = V1_TO_V2[V1_ANIMALS[clampi(animal_index, 0, V1_ANIMALS.size() - 1)]]
 	for part in ["part1", "part2", "part3"]:

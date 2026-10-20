@@ -68,7 +68,8 @@ func _ready() -> void:
 	else:
 		var g := Content.gift(roll["gift_id"])
 		var rarity: String = roll["rarity"]
-		found.add_child(_centred(UI.label("You got %s gift" % UI.a(Content.rarity_name(rarity).to_lower()), 16, colour.lightened(0.35), false, 800)))
+		var finder := Content.pet_called(project, true) if project else "Your pet"
+		found.add_child(_centred(UI.label("%s found you %s gift" % [finder, UI.a(Content.rarity_name(rarity).to_lower())], 16, colour.lightened(0.35), false, 800)))
 		found.add_child(_centred(UI.label(g.get("name", "?"), 32, UI.ON_DARK, true, 600)))
 		var desc := _centred(UI.para(g.get("description", ""), 15, UI.ON_DARK_SOFT))
 		desc.custom_minimum_size.x = minf(420.0, size.x - 48.0)

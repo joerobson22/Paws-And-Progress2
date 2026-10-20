@@ -3,8 +3,9 @@ extends Control
 ## in the middle walks on the spot) and tap it to head out on a walk. At the
 ## bottom, the red bin deletes that pet and the green tick completes its
 ## project, each after a check. The + at the top switches to adopting a new
-## pet: name it, scroll up and down through the animals and pick its three
-## colours; the red cross cancels and the green + adopts it.
+## pet: say what it's for, give it a name, scroll up and down through the
+## animals and pick its three colours; the red cross cancels and the green +
+## adopts it.
 ## params: {"from": where the opening circle grew from}
 
 const COLOUR_ROLES := ["Primary", "Secondary", "Tertiary"]
@@ -29,6 +30,7 @@ var _animals: Carousel
 var _title: Label
 var _meta: Label
 var _name_edit: LineEdit
+var _pet_edit: LineEdit
 var _swatches: Array[Button] = []
 var _left: Button
 var _right: Button
@@ -150,8 +152,7 @@ func _on_pet_changed(i: int) -> void:
 	var p := _projects[i]
 	_remembered = p.id
 	_title.text = p.name
-	var animal_name: String = Content.animal(p.animal_id).get("name", "")
-	_meta.text = "%s · %s focused" % [animal_name, Stats.format_duration(App.state.project_seconds(p.id))]
+	_meta.text = "%s · %s focused" % [Content.pet_label(p), Stats.format_duration(App.state.project_seconds(p.id))]
 	Motion.pop(_title, 0.04, 0.25)
 
 
@@ -167,9 +168,8 @@ func _on_left() -> void:
 		_show_pets()
 		return
 	var p := _projects[_pets.index]
-	var animal_name: String = Content.animal(p.animal_id).get("name", "")
 	Modal.confirm("Delete %s?" % p.name,
-		"Your %s will go for good. Time you've already spent stays in your stats." % animal_name.to_lower(),
+		"%s will go for good. Time you've already spent stays in your stats." % Content.pet_called(p, true),
 		"Delete", "danger").closed.connect(func(ok):
 			if ok:
 				var next := _neighbour_id(p.id)
@@ -183,9 +183,8 @@ func _on_right() -> void:
 		_adopt()
 		return
 	var p := _projects[_pets.index]
-	var animal_name: String = Content.animal(p.animal_id).get("name", "")
 	Modal.confirm("Complete %s?" % p.name,
-		"It moves to Completed with everything your %s found along the way. You can't undo this." % animal_name.to_lower(),
+		"It moves to Completed with everything %s found along the way. You can't undo this." % Content.pet_called(p),
 		"Complete", "success").closed.connect(func(ok):
 			if ok:
 				var next := _neighbour_id(p.id)
@@ -222,15 +221,14 @@ func _start_adopting() -> void:
 	_left.disabled = false
 	_right.disabled = false
 
-	_name_edit = LineEdit.new()
-	_name_edit.placeholder_text = "What are you focusing on?"
-	_name_edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_name_edit.max_length = 40
-	_name_edit.custom_minimum_size = Vector2(minf(420.0, size.x - 48.0), 52)
-	_name_edit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_name_edit.add_theme_font_size_override("font_size", 18)
-	_name_edit.text_submitted.connect(func(_t): _name_edit.release_focus())
+	_name_edit = _field("What are you focusing on?", 40, 18)
 	v.add_child(_name_edit)
+	# Optional: a pet without a name goes by its kind ("your staffy").
+	_pet_edit = _field("", 24, 16)
+	_pet_edit.custom_minimum_size.y = 46
+	v.add_child(_pet_edit)
+	_name_edit.text_submitted.connect(func(_t): _pet_edit.grab_focus())
+	_pet_edit.text_submitted.connect(func(_t): _pet_edit.release_focus())
 
 	_animals = Carousel.new()
 	_animals.vertical = true
@@ -238,6 +236,9 @@ func _start_adopting() -> void:
 	_animals.side_scale = 0.62
 	_animals.reach = 1.7
 	_animals.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Space the animals to the room there is, so the neighbours peek in above
+	# and below on short windows too.
+	_animals.resized.connect(func(): _animals.spacing = clampf(_animals.size.y * 0.36, 90.0, 150.0))
 	v.add_child(_animals)
 	_title = UI.label("", 24, UI.INK, true, 600)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -281,6 +282,7 @@ func _on_animal_changed(i: int) -> void:
 		view.walking = j == i
 		view.colours = Content.animal_default_colours(Content.animals[j]["id"]) if j != i else _draft.colours
 	_title.text = a["name"]
+	_pet_edit.placeholder_text = "Name your %s" % str(a["name"]).to_lower()
 	_refresh_swatches()
 
 
@@ -317,9 +319,10 @@ func _adopt() -> void:
 		_name_edit.grab_focus()
 		return
 	_draft.name = name
+	_draft.pet_name = _pet_edit.text.strip_edges()
 	App.add_project(_draft)
 	Audio.play(str(Content.animal(_draft.animal_id).get("sound", "")), 1.0, -6.0)
-	Toast.show_text("Say hello to your %s" % str(Content.animal(_draft.animal_id).get("name", "")).to_lower(), "paw")
+	Toast.show_text("Say hello to %s" % Content.pet_called(_draft), "paw")
 	_show_pets(_draft.id)
 
 
@@ -343,6 +346,18 @@ func _swap_body(animate: bool) -> VBoxContainer:
 	else:
 		_body.modulate.a = 1.0
 	return v
+
+
+## A centred text box for the adopt form.
+func _field(placeholder: String, max_length: int, font_size: int) -> LineEdit:
+	var e := LineEdit.new()
+	e.placeholder_text = placeholder
+	e.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	e.max_length = max_length
+	e.custom_minimum_size = Vector2(minf(420.0, size.x - 48.0), 52)
+	e.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	e.add_theme_font_size_override("font_size", font_size)
+	return e
 
 
 func _set_icon(b: Button, icon: String, tip: String) -> void:

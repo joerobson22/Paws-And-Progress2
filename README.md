@@ -29,8 +29,8 @@ the arrow keys, or tap the little map at the bottom):
 
 - **Focus** (middle): the orb. Tap it and the choose focus screen grows out of
   it: swipe through your pets, tap one to start a walk, adopt a new one with
-  the + (name it, pick an animal and its three colours), or complete or
-  delete one.
+  the + (what it's for, the pet's name, its animal and three colours), or
+  complete or delete one.
 - **Gifts** (left): a shelf for your three favourites (press and hold a gift to
   drag it up), every gift you've found, and trade-ins (10 commons for a rare,
   5 rares for an epic, 3 epics for a legendary).

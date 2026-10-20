@@ -136,6 +136,8 @@ func _run() -> void:
 	chooser._animals.go_to(4)
 	await _wait(25)
 	chooser._name_edit.text = "Chemistry"
+	chooser._pet_edit.text = "Bramble"
+	await _shot("new_pet_named")
 	chooser._pick_colour(0)
 	await _wait(20)
 	await _shot("colour_picker")
@@ -144,6 +146,7 @@ func _run() -> void:
 	chooser._adopt()
 	await _wait(30)
 	check(app.state.projects.size() == count + 1, "adopting adds a project")
+	check(app.state.projects.back().pet_name == "Bramble", "adopting keeps the pet's name")
 	await _wait(150 if _shots_dir != "" else 10)
 
 	app.start_walk(app.state.projects[1].id)
@@ -188,9 +191,11 @@ func _fill_sample_data() -> void:
 	var now: int = app.now()
 	var animals := ["staffy", "tabby_cat", "snail", "bird", "bear", "rabbit"]
 	var names := ["Dissertation", "Spanish", "Portfolio", "Statistics", "Guitar", "Reading"]
+	var pets := ["Biscuit", "Mochi", "", "Pip", "Bruno", ""]
 	for i in animals.size():
 		var p := ProjectData.new()
 		p.name = names[i]
+		p.pet_name = pets[i]
 		p.animal_id = animals[i]
 		p.colours = content.animal_default_colours(animals[i])
 		p.created_unix = now - 30 * 86400

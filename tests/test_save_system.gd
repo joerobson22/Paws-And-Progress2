@@ -15,6 +15,7 @@ func _sample() -> GameState:
 	var p := ProjectData.new()
 	p.id = "p1"
 	p.name = "Dissertation"
+	p.pet_name = "Biscuit"
 	p.animal_id = "staffy"
 	p.colours = [Color("#112233"), Color("#445566"), Color("#778899")]
 	s.projects.append(p)
@@ -36,6 +37,7 @@ func test_round_trip() -> void:
 	check(back != null)
 	eq(back.profile["username"], "joe")
 	eq(back.projects[0].name, "Dissertation")
+	eq(back.projects[0].pet_name, "Biscuit")
 	eq(back.projects[0].colours[1].to_html(false), "445566")
 	eq(back.sessions[0].focus_seconds, 1234)
 	eq(back.inventory["staffy_common"], 2)
@@ -130,6 +132,7 @@ func test_import_v1() -> void:
 	eq(s.inventory, {"staffy_common": 2, "black_cat_epic": 1})
 	eq(s.projects.size(), 2)
 	eq(s.projects[0].name, "Maths")
+	eq(s.projects[0].pet_name, "Tilly", "v1 animal names carry over")
 	eq(s.projects[0].animal_id, "cockapoo")
 	eq(s.projects[0].legacy_seconds, 3600)
 	eq(s.projects[0].colours[0], Color(1, 0, 0))

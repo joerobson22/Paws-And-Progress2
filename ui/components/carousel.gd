@@ -10,7 +10,10 @@ signal activated(index: int)
 
 var vertical := false
 ## Distance between item centres, in pixels.
-var spacing := 200.0
+var spacing := 200.0:
+	set(v):
+		spacing = v
+		_layout()
 var side_scale := 0.6
 var side_alpha := 0.32
 ## How many items away from the middle are still shown (they fade out towards it).
@@ -30,6 +33,8 @@ var _velocity := 0.0  # items per second while dragging
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_ALL
+	# Neighbours fade out at the edges rather than spilling over what's around it.
+	clip_contents = true
 	resized.connect(_layout)
 
 

@@ -228,9 +228,8 @@ func _on_gift_pressed() -> void:
 	if GiftRoller.min_rarity(seconds, Content.drop_table) == "":
 		var left := int(Content.drop_table.get("min_seconds", 600)) - seconds
 		var minutes := ceili(left / 60.0)
-		var animal_name: String = Content.animal(_project.animal_id).get("name", "")
 		Modal.confirm("End your walk?",
-			"Your %s hasn't found a gift yet. %s more and it will." % [animal_name.to_lower(), "1 minute" if minutes == 1 else "%d minutes" % minutes],
+			"%s hasn't found a gift yet. %s more and it will." % [Content.pet_called(_project, true), "1 minute" if minutes == 1 else "%d minutes" % minutes],
 			"End walk", "danger", "Keep walking").closed.connect(func(ok):
 				if ok:
 					_end())

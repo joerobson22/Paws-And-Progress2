@@ -40,7 +40,7 @@ func _init(p: ProjectData, extra: String = "") -> void:
 	var names := UI.vbox(0)
 	names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	names.add_child(UI.trimmed(p.name, 21, UI.INK, true, 600))
-	names.add_child(UI.trimmed(Content.animal(p.animal_id).get("name", ""), 13, UI.INK_SOFT, false, 700))
+	names.add_child(UI.trimmed(Content.pet_label(p), 13, UI.INK_SOFT, false, 700))
 	top.add_child(names)
 	if p.grade != "" and not Content.grade(p.grade).is_empty():
 		var badge := UI.grade_badge(p.grade, 42)
