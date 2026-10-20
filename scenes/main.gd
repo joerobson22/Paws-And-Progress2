@@ -25,6 +25,9 @@ const FLOWS := {
 ## (phones) get a smaller design size so text stays its intended size.
 const DESIGN_SHORT_SIDE := 720.0
 const PHONE_MIN_SHORT_SIDE := 360.0
+## Computers: the window's short side in design units, whatever its size.
+const DESKTOP_SHORT_SIDE := 600.0
+const MIN_DESKTOP_SCALE := 0.75
 ## The debug "phone size" switch shows the app at this size, letterboxed.
 const PHONE_VIEW := Vector2i(390, 844)
 ## A drag becomes a swipe once it moves this far...
@@ -103,9 +106,10 @@ func _ready() -> void:
 		_maybe_ask_location()
 
 
-## Phones report a short side of ~390 points, so a fixed 720 design size
-## would draw everything at half size. Use the window's own size in points
-## there, and the 720 design size (scaled up) on bigger screens.
+## On phones the design size is the screen's own size in points, so text
+## stays its intended size. On computers everything scales with the window:
+## its short side is always DESKTOP_SHORT_SIDE design units, so a bigger
+## window draws everything bigger (never below MIN_DESKTOP_SCALE).
 func _fit_design_size() -> void:
 	var window := get_window()
 	# Debug builds can show a phone's screen in the window, with bars round it.
@@ -116,8 +120,14 @@ func _fit_design_size() -> void:
 		if window.content_scale_size != PHONE_VIEW:
 			window.content_scale_size = PHONE_VIEW
 		return
-	var points := Vector2(DisplayServer.window_get_size()) / _screen_scale()
-	var side := clampf(minf(points.x, points.y), PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
+	var side: float
+	if OS.has_feature("mobile"):
+		var points := Vector2(DisplayServer.window_get_size()) / _screen_scale()
+		side = clampf(minf(points.x, points.y), PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
+	else:
+		var window_size := Vector2(DisplayServer.window_get_size())
+		var short := maxf(1.0, minf(window_size.x, window_size.y))
+		side = maxf(short / maxf(short / DESKTOP_SHORT_SIDE, MIN_DESKTOP_SCALE), PHONE_MIN_SHORT_SIDE)
 	var target := Vector2i(roundi(side), roundi(side))
 	if window.content_scale_size != target:
 		window.content_scale_size = target
