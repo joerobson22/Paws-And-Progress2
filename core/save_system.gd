@@ -50,9 +50,16 @@ static func to_dict(state: GameState) -> Dictionary:
 		"projects": projects,
 		"sessions": sessions,
 		"inventory": state.inventory,
-		"active": state.active.to_dict() if state.active else null,
+		"active": _active_dict(state.active),
 		"settings": state.settings,
 	}
+
+
+## The walk in progress for the save, or null when there isn't one.
+static func _active_dict(active: SessionClock) -> Variant:
+	if active == null:
+		return null
+	return active.to_dict()
 
 
 static func from_dict(raw: Dictionary) -> GameState:
@@ -196,6 +203,7 @@ static func _import_v1_player(g: Dictionary, state: GameState, now: int) -> void
 	var gifts: Array = g.get("gifts", [])
 	for i in gifts.size():
 		var count := int(gifts[i])
+		@warning_ignore("integer_division")
 		var animal_index := i / 3
 		if count <= 0 or animal_index >= V1_ANIMALS.size():
 			continue

@@ -58,7 +58,7 @@ var _new: KnockoutButton
 
 
 func _ready() -> void:
-	_show_place(_place_id(), false)
+	_show_place(_place_id())
 	add_child(_shade)
 	_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for layer in [_pick, _adopt_layer]:
@@ -124,7 +124,7 @@ func _place_id() -> String:
 
 
 ## Puts the place's scenery behind everything, fading over the old one.
-func _show_place(id: String, animate: bool = true) -> void:
+func _show_place(id: String) -> void:
 	var old := _scenery
 	_scenery = Scenery.new()
 	_scenery.biome = Content.biome(id)
@@ -543,13 +543,13 @@ func _set_colour(c: Color, k: int) -> void:
 
 
 func _adopt() -> void:
-	var name := _name_edit.text.strip_edges()
-	if name == "":
+	var project_name := _name_edit.text.strip_edges()
+	if project_name == "":
 		_name_edit.placeholder_text = "Give it a name first"
 		Motion.shake(_name_edit)
 		_name_edit.grab_focus()
 		return
-	_draft.name = name
+	_draft.name = project_name
 	_draft.pet_name = _pet_edit.text.strip_edges()
 	App.add_project(_draft)
 	Audio.play(str(Content.animal(_draft.animal_id).get("sound", "")), 1.0, -6.0)

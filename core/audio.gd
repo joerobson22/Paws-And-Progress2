@@ -50,27 +50,27 @@ func play(sound: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
 
 
 ## Starts (or keeps) a looping ambience, or stops it with "".
-func ambience(name: String) -> void:
+func ambience(sound: String) -> void:
 	if not App.state.settings.get("ambience", true):
-		name = ""
-	if name == _ambience_name:
+		sound = ""
+	if sound == _ambience_name:
 		return
-	_ambience_name = name
+	_ambience_name = sound
 	_ambience.stop()
-	if name == "":
+	if sound == "":
 		return
-	var stream := _stream(AMBIENCE.get(name, name))
+	var stream := _stream(AMBIENCE.get(sound, sound))
 	if stream == null:
-		stream = Synth.sound(name)
+		stream = Synth.sound(sound)
 	if stream:
 		_ambience.stream = stream
 		_ambience.play()
 
 
 ## Re-applies the settings after they change (e.g. ambience switched off).
-func refresh(current_ambience: String) -> void:
+func refresh(playing: String) -> void:
 	_ambience_name = "-"
-	ambience(current_ambience)
+	ambience(playing)
 
 
 func current_ambience() -> String:

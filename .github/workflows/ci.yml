@@ -6,7 +6,7 @@ on:
   pull_request:
 
 env:
-  GODOT_VERSION: 4.5.1
+  GODOT_VERSION: 4.6.3
 
 jobs:
   test:

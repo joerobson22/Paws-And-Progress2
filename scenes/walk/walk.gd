@@ -176,9 +176,9 @@ func _process(delta: float) -> void:
 	if _render_check <= 0.0:
 		_render_check = 0.5
 		# A minimised window shows nothing, so stop drawing until it's back.
-		var hidden := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED
-		if RenderingServer.render_loop_enabled == hidden:
-			RenderingServer.render_loop_enabled = not hidden
+		var minimised := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED
+		if RenderingServer.render_loop_enabled == minimised:
+			RenderingServer.render_loop_enabled = not minimised
 
 
 func _draw_lead() -> void:

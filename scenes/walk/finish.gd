@@ -153,7 +153,7 @@ func _build_words(session: FocusSession, roll: Dictionary) -> void:
 	if roll.is_empty():
 		found.add_child(_word(UI.label("No gift this time", 24, UI.ON_DARK, true, 600)))
 		var why := "Walks under a minute aren't saved." if seconds < 60 else \
-			"Focus for %d minutes or more and your pet finds you one." % (int(Content.drop_table.get("min_seconds", 600)) / 60)
+			"Focus for %d minutes or more and your pet finds you one." % floori(Content.drop_table.get("min_seconds", 600) / 60.0)
 		found.add_child(_word(UI.para(why, 15, UI.ON_DARK_SOFT)))
 	else:
 		var g := Content.gift(_gift_id)

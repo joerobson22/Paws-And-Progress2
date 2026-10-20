@@ -155,10 +155,10 @@ func _update_light() -> void:
 	# Cloud cover greys the sky, dims the light and hides the sun and moon.
 	var o := float(_look["overcast"])
 	if o > 0.0:
-		for name in ["sky_top", "sky_bottom"]:
-			var c: Color = _light[name]
+		for key in ["sky_top", "sky_bottom"]:
+			var c: Color = _light[key]
 			var grey := c.get_luminance() * 0.92
-			_light[name] = c.lerp(Color(grey * 0.96, grey, grey * 1.04), o * 0.85).darkened(o * 0.2)
+			_light[key] = c.lerp(Color(grey * 0.96, grey, grey * 1.04), o * 0.85).darkened(o * 0.2)
 		_light["tint"] = (_light["tint"] as Color).lerp((_light["tint"] as Color) * Color(0.8, 0.82, 0.86), o)
 	_light["glow"] = 1.0 - clampf(o * 1.15, 0.0, 1.0)
 	var t := tint()
@@ -343,7 +343,7 @@ class _Chunk extends Node2D:
 			"reeds":
 				_slots(x0, spacing, sd, 0.35, func(x, r, _i): _reed_tuft(x, y, h * r, colour, r, size))
 			"fronds":
-				_slots(x0, spacing, sd, 0.3, func(x, r, _i): _frond(x, y, h * (0.6 + 0.6 * r), colour, r, size))
+				_slots(x0, spacing, sd, 0.3, func(x, r, _i): _frond(x, h * (0.6 + 0.6 * r), colour, r, size))
 			"trees":
 				_slots(x0, spacing, sd, 0.25, func(x, r, i): _tree(x, y, h * (0.6 + 0.6 * r), colour.darkened(0.1 * Scenery._hash(i + 3, sd))))
 			"pines":
@@ -353,7 +353,7 @@ class _Chunk extends Node2D:
 			"canopy":
 				_slots(x0, spacing, sd, 0.0, func(x, r, i): _canopy(x, y, h * (0.75 + 0.35 * r), colour, i, sd))
 			"palms":
-				_slots(x0, spacing, sd, 0.35, func(x, r, i): _palm(x, y, h * (0.7 + 0.4 * r), colour, r))
+				_slots(x0, spacing, sd, 0.35, func(x, r, _i): _palm(x, y, h * (0.7 + 0.4 * r), colour, r))
 			"mountains":
 				_slots(x0, spacing, sd, 0.0, func(x, r, i): _mountain(x, y, h * (0.6 + 0.5 * r), spacing * (0.9 + 0.6 * Scenery._hash(i + 9, sd)), colour.darkened(0.08 * Scenery._hash(i + 2, sd)), snow))
 			"mesas":
@@ -454,7 +454,7 @@ class _Chunk extends Node2D:
 			draw_line(Vector2(bx, size.y), Vector2(bx + sway + (k - 1) * 5.0, top - h), colour.darkened(0.1 * k), 3.0, true)
 
 	## A broad leaf on a stem, bending in the breeze (forest and jungle floor).
-	func _frond(x: float, base: float, h: float, colour: Color, r: float, size: Vector2) -> void:
+	func _frond(x: float, h: float, colour: Color, r: float, size: Vector2) -> void:
 		var sway := sin(scenery.time() * 1.1 + r * 5.0) * 0.12
 		for k in 3:
 			var angle := -PI * 0.5 + (k - 1) * 0.55 + sway

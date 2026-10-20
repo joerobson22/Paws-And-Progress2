@@ -101,7 +101,7 @@ static func next_pity_count(current: int, seconds: int, rolled_rarity: String, t
 static func trade(inventory: Dictionary, gift_id: String, gifts: Array, cost: int) -> String:
 	if cost <= 0 or int(inventory.get(gift_id, 0)) < cost:
 		return ""
-	var found: Array = gifts.filter(func(g): return g["id"] == gift_id)
+	var found: Array = gifts.filter(func(candidate): return candidate["id"] == gift_id)
 	if found.is_empty():
 		return ""
 	var g: Dictionary = found[0]
