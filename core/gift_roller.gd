@@ -6,15 +6,31 @@ extends RefCounted
 const RARITIES: Array[String] = ["common", "rare", "epic", "legendary"]
 
 
-## The odds for a walk of this length, or an empty Dictionary if it earns no gift.
+## The odds for a walk of this length, or an empty Dictionary if it earns
+## no gift. Between two tiers they blend from one to the next, so they grow
+## steadily as the walk goes on; a rarity the earlier tier doesn't have
+## stays out until the tier that brings it in (legendary from 45 minutes).
 static func weights_for(seconds: int, table: Dictionary) -> Dictionary:
 	if seconds < int(table.get("min_seconds", 600)):
 		return {}
-	var best: Dictionary = {}
+	var below: Dictionary = {}
+	var above: Dictionary = {}
 	for tier in table.get("tiers", []):
 		if seconds >= int(tier["min_seconds"]):
-			best = tier["weights"]
-	return best
+			below = tier
+		else:
+			above = tier
+			break
+	if below.is_empty():
+		return {}
+	if above.is_empty():
+		return below["weights"]
+	var f := float(seconds - int(below["min_seconds"])) / float(int(above["min_seconds"]) - int(below["min_seconds"]))
+	var out := {}
+	for r in RARITIES:
+		var from := float(below["weights"].get(r, 0))
+		out[r] = 0.0 if from <= 0.0 else lerpf(from, float(above["weights"].get(r, 0)), f)
+	return out
 
 
 ## The lowest rarity a walk this long is sure to bring, or "" for no gift.
@@ -42,8 +58,10 @@ static func fill(seconds: int, table: Dictionary) -> Dictionary:
 	return out
 
 
-## Odds as whole percentages, with rarities below the guaranteed one at 0.
-static func percentages_for(seconds: int, table: Dictionary) -> Dictionary:
+## The chance of each rarity (0..1, adding up to 1), with rarities below
+## the guaranteed one at 0; all 0 before the walk earns a gift. The gift
+## button draws these as its pie.
+static func chances(seconds: int, table: Dictionary) -> Dictionary:
 	var w := weights_for(seconds, table)
 	var allowed := _from(min_rarity(seconds, table))
 	var out := {}
@@ -51,7 +69,16 @@ static func percentages_for(seconds: int, table: Dictionary) -> Dictionary:
 	for r in allowed:
 		total += float(w.get(r, 0))
 	for r in RARITIES:
-		out[r] = 0 if total <= 0.0 or not allowed.has(r) else roundi(100.0 * float(w.get(r, 0)) / total)
+		out[r] = 0.0 if total <= 0.0 or not allowed.has(r) else float(w.get(r, 0)) / total
+	return out
+
+
+## The chances as whole percentages.
+static func percentages_for(seconds: int, table: Dictionary) -> Dictionary:
+	var c := chances(seconds, table)
+	var out := {}
+	for r in RARITIES:
+		out[r] = roundi(100.0 * float(c[r]))
 	return out
 
 

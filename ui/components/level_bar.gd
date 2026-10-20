@@ -44,6 +44,11 @@ func level() -> int:
 	return Levels.level_for(int(_xp), Content.levels)
 
 
+## The round badge with the level number, e.g. to make it tappable.
+func badge() -> Control:
+	return _badge
+
+
 func _set_xp(v: float) -> void:
 	var before := level()
 	_xp = v

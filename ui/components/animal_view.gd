@@ -117,6 +117,31 @@ func _draw() -> void:
 		_draw_held_gift(str(data.get("shape", "dog")))
 
 
+## Where a lead clips on, in this node's own space: the neck, just behind
+## the head, rising and falling with each step.
+func neck() -> Vector2:
+	var data := Content.animal(animal_id)
+	var lift := 0.0
+	var at := Vector2(34, -55)
+	match str(data.get("shape", "dog")):
+		"bear":
+			at = Vector2(30, -58)
+			lift = absf(sin(_phase)) * 2.0 * _stride() if walking else 0.0
+		"cat":
+			at = Vector2(28, -46)
+		"rabbit":
+			at = Vector2(14, -40)
+			lift = absf(sin(_phase * 0.5)) * 14.0 * _stride() if walking else 0.0
+		"snail":
+			at = Vector2(32, -12)
+		"bird":
+			at = Vector2(11, -38)
+			lift = absf(sin(_phase * 0.7)) * 8.0 * _stride() if walking else 0.0
+		_:
+			lift = absf(sin(_phase)) * 2.0 * _stride() if walking else 0.0
+	return (at - Vector2(0, lift)) * float(data.get("size", 1.0))
+
+
 ## The gift's position in this node's own space (for glows behind it).
 func mouth() -> Vector2:
 	var s := float(Content.animal(animal_id).get("size", 1.0))

@@ -29,9 +29,9 @@ macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
 
 ## How it's laid out
 
-The app is five screens arranged like a plus sign. Swipe between them, or use
-the arrow keys on a keyboard (Esc comes back to the middle). The little map at
-the bottom shows where you are:
+The app is five screens arranged like a plus sign. Swipe between them, use
+the arrow keys on a keyboard (Esc comes back to the middle), or tap a dot on
+the little map at the bottom, which shows where you are:
 
 ```
                  Profile
@@ -50,26 +50,32 @@ the bottom shows where you are:
   one's kind and time focused is under it), tap one to start a walk, adopt a
   new one with the + (what it's for, the pet's name, its animal and three
   colours; a locked animal hides the colours), or complete or delete one.
-  Debug builds (running from the editor) also show a debug bar in the top
-  left: a switch that unlocks every animal and place, and a weather picker.
+  Debug builds (running from the editor) also show a switch in the top left
+  that unlocks every animal and place.
 - **Gifts** (left): a shelf for your three favourites (press and hold a gift to
-  drag it up), every gift you've found (filter by rarity, A–Z or animal; pick
-  the same one again to reverse it), and trade-ins (10 commons for a rare,
+  drag it up; drag a shelf gift sideways to swap it along), every gift you've
+  found (filter by rarity, A–Z or animal; pick the same one again to reverse
+  it; only this collection scrolls), and trade-ins (10 commons for a rare,
   5 rares for an epic, 3 epics for a legendary).
 - **Completed** (right): a panel per finished project; tap one to give it a
   GCSE, A-Level or university grade badge.
-- **Profile** (up): your character (tap to customise) with your level along
-  the bottom (tap it for every reward), account details, and the settings
-  behind the gear in the top left.
-- **Stats** (down): this week's focus split by project, past weeks, your
-  streak (one rest day allowed after three days in a row) and the friends
-  leaderboard.
+- **Profile** (up): your character (tap it or the pencil to customise) with
+  your level badge in the bottom left (tap it for every reward) and your XP
+  along the bottom, account details, and the settings behind the gear in the
+  top left.
+- **Stats** (down): this week's focus split by project, past weeks with any
+  focus in them, your streak (one rest day allowed after three days in a row)
+  and the friends leaderboard.
 
-On a walk, the button in the corner shows what gift you've earned: grey, then
-green at 10 minutes, then filling with blue, purple and gold as rarer gifts
-become guaranteed. When you finish, your pet dives into a bush and comes back
-with the gift, the camera zooms in, and the XP you earned pours into your level
-bar.
+On a walk, the button in the corner is a pie chart of the gift your pet will
+bring back. For the first ten minutes a dark green slice sweeps round; then it
+dings and fills with bright green from the middle, and from there blue, purple
+and gold slices show the chance of a rare, epic or legendary gift, growing as
+you go (rarities below a guaranteed one drop out). The sound button in the top
+right mutes everything. Debug builds add a weather picker in the top left and
+buttons that add 5, 10, 30 or 60 minutes. When you finish, your pet dives into
+a bush and comes back with the gift, the camera zooms in, and the XP you
+earned pours into your level bar.
 
 **Levels.** Every minute focused is 1 XP, plus a bonus for the walk's gift.
 Levelling up unlocks new animals and places (lakeside, forest, jungle, tundra,

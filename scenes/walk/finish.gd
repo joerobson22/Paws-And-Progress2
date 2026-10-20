@@ -89,6 +89,8 @@ func _ready() -> void:
 	_glow = _Glow.new()
 	_glow.colour = Content.rarity_colour(roll.get("rarity", "common")) if not roll.is_empty() else UI.ACCENT
 	_glow.strength = 0.0
+	# Only a gift glows: with nothing found, nothing lights up.
+	_glow.visible = _gift_id != ""
 	_front_actors.add_child(_glow)
 	if _project:
 		_animal = AnimalView.new()
@@ -217,7 +219,7 @@ func _play() -> void:
 	t.tween_property(_sheet, "color:a", SHEET_ALPHA, Motion.time(0.6))
 	t.tween_property(_stage, "scale", Vector2.ONE * zoom["scale"], Motion.time(1.0))
 	t.tween_property(_stage, "position", zoom["position"], Motion.time(1.0))
-	t.tween_property(_glow, "strength", 1.0 if _gift_id != "" else 0.35, Motion.time(1.0))
+	t.tween_property(_glow, "strength", 1.0 if _gift_id != "" else 0.0, Motion.time(1.0))
 	await t.finished
 	if _animal and _gift_id != "":
 		_state = "ready"

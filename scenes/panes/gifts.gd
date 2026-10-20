@@ -1,10 +1,11 @@
 extends Pane
 ## Gifts, to the left of the focus screen. Your three favourites sit on the
 ## shelf near the top; underneath is every gift you've found, with how many
-## you've had, in the order picked from the "Filter by" menu. Press and hold
-## a gift to pick it up, then drop it on the shelf; hold a shelf gift to move
-## it along, or drag it off to take it down. Tap any gift for a closer look
-## and to trade it in.
+## you've had, in the order picked from the "Filter by" menu. Only the
+## collection scrolls: the shelf and the filter stay where they are. Press
+## and hold a gift to pick it up, then drop it on the shelf; drag a shelf
+## gift sideways to slide it along and swap places, or hold it and drag it
+## off to take it down. Tap any gift for a closer look and to trade it in.
 
 const SORTS := [["rarity", "Rarity"], ["name", "A–Z"], ["animal", "Animal"]]
 
@@ -14,6 +15,8 @@ var _ghost: GiftArt
 var _drag_id := ""
 var _drag_from := -1
 var _drag_source: Control
+## True while a shelf gift slides along the shelf (it can't leave it).
+var _sliding := false
 var _hover := -1
 ## The pointer while dragging, in viewport coordinates (from the events
 ## themselves, which also works for touch and for a consumed event).
@@ -23,7 +26,7 @@ var _pointer := Vector2.ZERO
 func build() -> void:
 	_slots.clear()
 	_drag_id = ""
-	var col := page(760)
+	var col := _frame(760)
 	var found := _found()
 	col.add_child(UI.title_row("Gifts", "%d of %d found" % [found.size(), Content.gifts.size()]))
 	_shelf_card = _shelf()
@@ -49,6 +52,19 @@ func build() -> void:
 		App.set_setting("gift_sort_reversed", reversed))
 	head.add_child(sort)
 	col.add_child(head)
+
+	# Only the collection scrolls, under everything above it.
+	scroll = ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(scroll)
+	var pad := MarginContainer.new()
+	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pad.add_theme_constant_override("margin_top", 4)
+	pad.add_theme_constant_override("margin_right", 6)
+	# Room under the last row to scroll it clear of the minimap.
+	pad.add_theme_constant_override("margin_bottom", 96 + int(UI.safe_insets(self)["bottom"]))
+	scroll.add_child(pad)
 	var grid := GridContainer.new()
 	grid.columns = clampi(int(col.custom_minimum_size.x / 100.0), 3, 7)
 	grid.add_theme_constant_override("h_separation", 12)
@@ -59,7 +75,27 @@ func build() -> void:
 		tile.tapped.connect(show_gift)
 		tile.lifted.connect(_lift.bind(-1))
 		grid.add_child(tile)
-	col.add_child(grid)
+	pad.add_child(grid)
+
+
+## A column filling the pane, centred and at most `max_width` wide, that
+## doesn't scroll as a whole (unlike page()): the gifts screen scrolls just
+## its collection.
+func _frame(max_width: float) -> VBoxContainer:
+	var insets := UI.safe_insets(self)
+	var gutter := 32.0 if wide else 18.0
+	var width := maxf(0.0, minf(max_width, size.x - 2.0 * gutter - insets["left"] - insets["right"]))
+	var side := maxf(gutter, (size.x - width) * 0.5)
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", int(side + insets["left"]))
+	margin.add_theme_constant_override("margin_right", int(side + insets["right"]))
+	margin.add_theme_constant_override("margin_top", 26 + int(insets["top"]))
+	add_child(margin)
+	var column := UI.vbox(18)
+	column.custom_minimum_size.x = width
+	margin.add_child(column)
+	return column
 
 
 ## Gifts found so far, in the chosen order.
@@ -104,8 +140,10 @@ func _shelf() -> Control:
 		if id != "" and App.state.gift_count(id) > 0:
 			var tile := GiftTile.new(id, App.state.gift_count(id), true)
 			tile.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			tile.slides = true
 			tile.tapped.connect(show_gift)
 			tile.lifted.connect(_lift.bind(i))
+			tile.slid.connect(_lift.bind(i, true))
 			slot.add_child(tile)
 			slot.filled = true
 		row.add_child(slot)
@@ -119,10 +157,13 @@ func _shelf() -> Control:
 
 # --- Dragging ----------------------------------------------------------------
 
-func _lift(tile: GiftTile, from: int) -> void:
+## Picks up a gift to drag it. `slide` keeps it on the shelf, moving
+## sideways only, to swap places with the others there.
+func _lift(tile: GiftTile, from: int, slide: bool = false) -> void:
 	_drag_id = tile.gift_id
 	_drag_from = from
 	_drag_source = tile
+	_sliding = slide
 	tile.modulate.a = 0.3
 	_ghost = GiftArt.new(_drag_id, 0.9)
 	_ghost.size = Vector2(84, 84)
@@ -152,11 +193,21 @@ func _input(e: InputEvent) -> void:
 
 
 func _move_ghost() -> void:
-	_ghost.position = get_global_transform_with_canvas().affine_inverse() * _pointer - _ghost.size * 0.5
+	_ghost.position = get_global_transform_with_canvas().affine_inverse() * _drag_point() - _ghost.size * 0.5
+
+
+## Where the dragged gift is: under the pointer, or for a slide, level with
+## the shelf and no further than its ends.
+func _drag_point() -> Vector2:
+	if not _sliding or _slots.is_empty():
+		return _pointer
+	var first := _slots[0].get_global_rect()
+	var last := _slots[_slots.size() - 1].get_global_rect()
+	return Vector2(clampf(_pointer.x, first.get_center().x, last.get_center().x), first.get_center().y)
 
 
 func _update_hover() -> void:
-	var p := _pointer
+	var p := _drag_point()
 	var hit := -1
 	for i in _slots.size():
 		if _slots[i].get_global_rect().grow(10.0).has_point(p):
@@ -183,7 +234,7 @@ func _drop() -> void:
 		t.tween_property(ghost, "position", at, Motion.time(Motion.FAST))
 		t.chain().tween_callback(App.place_on_shelf.bind(id, _hover))
 		Audio.play("pop", 1.1, -4.0)
-	elif from >= 0 and not _shelf_card.get_global_rect().has_point(_pointer):
+	elif from >= 0 and not _sliding and not _shelf_card.get_global_rect().has_point(_pointer):
 		# Dragged off the shelf: take it down.
 		t.tween_property(ghost, "modulate:a", 0.0, Motion.time(Motion.FAST))
 		t.tween_property(ghost, "scale", Vector2.ONE * 0.6, Motion.time(Motion.FAST))

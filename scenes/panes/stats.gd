@@ -95,8 +95,11 @@ func _streak() -> Control:
 ## sideways strip under it on phones.
 func _history(today: int) -> Control:
 	_weeks.clear()
-	var weeks := Stats.week_history(App.state.sessions, today, App.tz_bias(), Stats.local_day(int(App.state.profile.get("created_unix", 0)), App.tz_bias()))
 	var totals := Stats.weekly_totals(App.state.sessions, App.tz_bias())
+	# Past weeks with no focus at all are left out; this week always shows.
+	var this_week := Stats.week_start(today)
+	var weeks := Stats.week_history(App.state.sessions, today, App.tz_bias(), Stats.local_day(int(App.state.profile.get("created_unix", 0)), App.tz_bias())) \
+		.filter(func(w): return w == this_week or int(totals.get(w, 0)) > 0)
 	var best := 1
 	for w in weeks:
 		best = maxi(best, int(totals.get(w, 0)))
@@ -337,7 +340,7 @@ class _Chart extends Control:
 				if seg < 0.5:
 					continue
 				var r := Rect2(x, y - seg, bar, seg)
-				var sb := UI.box(UI.series_colour(id), Color.TRANSPARENT, int(minf(8.0, seg * 0.5)))
+				var sb := UI.box(UI.series_colour(id), Color.TRANSPARENT, 2)
 				draw_style_box(sb, r)
 				_pieces.append([r, id, i])
 				y -= seg + 2.0

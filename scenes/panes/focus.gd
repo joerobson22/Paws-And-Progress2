@@ -2,7 +2,7 @@ extends Pane
 ## The middle of the app: a greeting, and under it the focus orb. Tap the orb
 ## (a soft bong) and the choose focus screen grows out of it. The sun or moon
 ## in the top right switches between light and dark. Debug builds also get
-## a debug bar in the top left (DebugBar).
+## an unlock-everything switch in the top left (DebugBar).
 
 var _orb: FocusOrb
 var _greeting: Label

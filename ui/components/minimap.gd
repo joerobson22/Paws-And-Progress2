@@ -2,14 +2,16 @@ class_name Minimap
 extends Control
 ## The little map of the app: five dots laid out like the screens (focus in
 ## the middle, one each side), with the one you're on filled in. The
-## highlight glides with you as you swipe. It only shows where you are:
-## swipe, or use the arrow keys, to move.
+## highlight glides with you as you swipe; tap a dot to go there (or use
+## the arrow keys).
+
+signal picked(cell: Vector2i)
 
 const CELL := 10.0
 const GAP := 5.0
 const PAD := 9.0
 
-var cells: Dictionary = {}  # Vector2i -> name
+var cells: Dictionary = {}  # Vector2i -> name, for tooltips
 var _at := Vector2.ZERO  # highlight position in cell units (animates)
 
 
@@ -17,7 +19,8 @@ func _init() -> void:
 	var side := PAD * 2.0 + CELL * 3.0 + GAP * 2.0
 	custom_minimum_size = Vector2(side, side)
 	size = custom_minimum_size
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
 ## Moves the highlight to `cell`, gliding unless `instant`.
@@ -46,3 +49,23 @@ func _draw() -> void:
 		draw_style_box(dot, _cell_rect(Vector2(cell)))
 	var on := UI.box(UI.ACCENT, Color.TRANSPARENT, 3)
 	draw_style_box(on, _cell_rect(_at).grow(1.0))
+
+
+func _cell_at(p: Vector2) -> Variant:
+	for cell in cells:
+		if _cell_rect(Vector2(cell)).grow(GAP * 0.5 + 1.0).has_point(p):
+			return cell
+	return null
+
+
+func _get_tooltip(at_position: Vector2) -> String:
+	var cell = _cell_at(at_position)
+	return str(cells[cell]).capitalize() if cell != null else ""
+
+
+func _gui_input(e: InputEvent) -> void:
+	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and not e.pressed:
+		var cell = _cell_at(e.position)
+		if cell != null:
+			picked.emit(cell)
+		accept_event()
