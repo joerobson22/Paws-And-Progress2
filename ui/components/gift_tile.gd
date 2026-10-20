@@ -17,7 +17,9 @@ func _init(id: String, count: int, plain: bool = false) -> void:
 	gift_id = id
 	var g := Content.gift(id)
 	var colour := Content.rarity_colour(g.get("rarity", "common"))
-	var sb: StyleBox = UI.with_shadow(UI.box(UI.SURFACE, Color.TRANSPARENT, 20), 0.6) if not plain else StyleBoxEmpty.new()
+	var sb: StyleBox = StyleBoxEmpty.new()
+	if not plain:
+		sb = UI.with_shadow(UI.box(UI.SURFACE, Color.TRANSPARENT, 20), 0.6)
 	sb.set_content_margin_all(6)
 	add_theme_stylebox_override("panel", sb)
 	_press.tapped.connect(func(): tapped.emit(gift_id))

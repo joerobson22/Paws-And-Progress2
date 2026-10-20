@@ -32,7 +32,7 @@ func build() -> void:
 		var empty := UI.card(UI.SURFACE, 24)
 		var v := UI.vbox(6)
 		v.add_child(UI.label("No gifts yet", 20, UI.INK, true, 600))
-		v.add_child(UI.para("Focus for %d minutes and your pet dives into the bushes to find you one." % (int(Content.drop_table.get("min_seconds", 600)) / 60)))
+		v.add_child(UI.para("Focus for %d minutes and your pet dives into the bushes to find you one." % floori(Content.drop_table.get("min_seconds", 600) / 60.0)))
 		empty.add_child(v)
 		col.add_child(empty)
 		return

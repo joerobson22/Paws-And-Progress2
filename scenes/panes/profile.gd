@@ -16,7 +16,11 @@ func build() -> void:
 	var p := App.state.profile
 
 	var me := UI.card(UI.SURFACE, 18)
-	var body: BoxContainer = UI.hbox(24) if wide else UI.vbox(12)
+	var body: BoxContainer
+	if wide:
+		body = UI.hbox(24)
+	else:
+		body = UI.vbox(12)
 	me.add_child(body)
 	col.add_child(me)
 	body.add_child(_figure())
@@ -24,8 +28,8 @@ func build() -> void:
 	var info := UI.vbox(2)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.alignment = BoxContainer.ALIGNMENT_CENTER
-	var name := str(p.get("username", ""))
-	info.add_child(_field("Username", name if name != "" else "Add your name", name == "",
+	var username := str(p.get("username", ""))
+	info.add_child(_field("Username", username if username != "" else "Add your name", username == "",
 		_edit.bind("username", "Your name", "What should we call you?", 24)))
 	info.add_child(UI.divider())
 	var school := str(p.get("institution", ""))
@@ -236,15 +240,15 @@ func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
 	row.add_child(track)
 
 	var icon: Control
-	var name := ""
+	var title := ""
 	if r["type"] == "place":
 		var b := Content.biome(r["id"])
-		name = b.get("name", "")
+		title = b.get("name", "")
 		icon = UI.panel(_place_colour(b), 16, 0)
 		icon.custom_minimum_size = Vector2(56, 56)
 		icon.add_child(UI.icon_rect(str(b.get("icon", "place_lake")), 28, Color.WHITE))
 	else:
-		name = Content.animal(r["id"]).get("name", "")
+		title = Content.animal(r["id"]).get("name", "")
 		icon = UI.animal_portrait(r["id"], Content.animal_default_colours(r["id"]), Vector2(56, 56))
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.modulate.a = 1.0 if open else 0.45
@@ -253,7 +257,7 @@ func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
 	var words := UI.vbox(0)
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.alignment = BoxContainer.ALIGNMENT_CENTER
-	words.add_child(UI.trimmed(name, 17, UI.INK if open else UI.INK_SOFT, false, 800))
+	words.add_child(UI.trimmed(title, 17, UI.INK if open else UI.INK_SOFT, false, 800))
 	var kind := "place" if r["type"] == "place" else "animal"
 	var when := ("From the start" if level == 1 else "Level %d" % level) + "  ·  new " + kind
 	words.add_child(UI.label(when, 13, UI.INK_FAINT, false, 700))

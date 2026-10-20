@@ -162,7 +162,9 @@ static func _run_ending(work: Dictionary, day: int) -> int:
 
 
 static func format_duration(seconds: int) -> String:
+	@warning_ignore("integer_division")
 	var h := seconds / 3600
+	@warning_ignore("integer_division")
 	var m := (seconds / 60) % 60
 	if h > 0:
 		return "%dh %02dm" % [h, m]

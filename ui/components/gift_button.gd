@@ -29,11 +29,11 @@ func set_seconds(seconds: int) -> void:
 	_seconds = seconds
 	_fill = GiftRoller.fill(seconds, Content.drop_table)
 	var floor_rarity := GiftRoller.min_rarity(seconds, Content.drop_table)
-	var level := GiftRoller.RARITIES.find(floor_rarity) if floor_rarity != "" else -1
-	if _level != -2 and level > _level:
+	var reached := GiftRoller.RARITIES.find(floor_rarity) if floor_rarity != "" else -1
+	if _level != -2 and reached > _level:
 		Motion.pop(self, 0.22, 0.45)
-		Audio.play("pop", 1.0 + 0.12 * maxi(level, 0))
-	_level = level
+		Audio.play("pop", 1.0 + 0.12 * maxi(reached, 0))
+	_level = reached
 	tooltip_text = _tip(floor_rarity)
 	queue_redraw()
 

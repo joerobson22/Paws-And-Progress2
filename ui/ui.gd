@@ -243,20 +243,32 @@ static func is_wide(c: Control) -> bool:
 
 
 ## Space kept clear for the notch and home indicator on phones, in the
-## viewport's own units: {top, bottom, left, right}.
+## viewport's own units: {top, bottom, left, right}. Always none on desktop:
+## there the "safe area" is the whole screen's (in desktop coordinates, so a
+## window on a second monitor would get the first one's width as a margin),
+## and a window has nothing to keep clear of.
 static func safe_insets(c: Control) -> Dictionary:
-	var out := {"top": 0.0, "bottom": 0.0, "left": 0.0, "right": 0.0}
 	if not c.is_inside_tree():
+		return insets_for(Rect2(), Rect2(), 0.0, false)
+	return insets_for(
+		Rect2(Vector2(DisplayServer.window_get_position()), Vector2(DisplayServer.window_get_size())),
+		Rect2(DisplayServer.get_display_safe_area()),
+		c.get_viewport_rect().size.x, OS.has_feature("mobile"))
+
+
+## The insets for a `window` and the display's `safe` area (both in desktop
+## coordinates), scaled to a viewport `viewport_width` units wide. Measured
+## from the window's own edges, never more than a quarter of it, and none
+## at all off mobile.
+static func insets_for(window: Rect2, safe: Rect2, viewport_width: float, mobile: bool) -> Dictionary:
+	var out := {"top": 0.0, "bottom": 0.0, "left": 0.0, "right": 0.0}
+	if not mobile or window.size.x <= 0.0 or safe.size.x <= 0.0:
 		return out
-	var screen := Vector2(DisplayServer.window_get_size())
-	var safe := Rect2(DisplayServer.get_display_safe_area())
-	if screen.x <= 0.0 or safe.size.x <= 0.0 or safe.size == screen:
-		return out
-	var k := c.get_viewport_rect().size.x / screen.x
-	out["top"] = maxf(0.0, safe.position.y) * k
-	out["left"] = maxf(0.0, safe.position.x) * k
-	out["bottom"] = maxf(0.0, screen.y - safe.end.y) * k
-	out["right"] = maxf(0.0, screen.x - safe.end.x) * k
+	var k := viewport_width / window.size.x
+	out["top"] = clampf(safe.position.y - window.position.y, 0.0, window.size.y * 0.25) * k
+	out["left"] = clampf(safe.position.x - window.position.x, 0.0, window.size.x * 0.25) * k
+	out["bottom"] = clampf(window.end.y - safe.end.y, 0.0, window.size.y * 0.25) * k
+	out["right"] = clampf(window.end.x - safe.end.x, 0.0, window.size.x * 0.25) * k
 	return out
 
 
@@ -541,7 +553,7 @@ static func animal_portrait(animal_id: String, colours: Array[Color], box_size: 
 static func character_portrait(look: Dictionary, box_size: Vector2, face_only: bool = false, fill: Color = ACCENT_SOFT) -> Control:
 	var frame := RoundFrame.new()
 	frame.fill = fill
-	frame.round = face_only
+	frame.circle = face_only
 	frame.custom_minimum_size = box_size
 	var view := CharacterView.new()
 	view.look = look

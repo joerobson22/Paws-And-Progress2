@@ -67,19 +67,19 @@ func build() -> void:
 func _streak() -> Control:
 	var sessions := App.state.sessions
 	var days := Stats.current_streak(sessions, App.today(), App.tz_bias())
-	var ready := Stats.rest_day_ready(sessions, App.today(), App.tz_bias())
+	var rest_ready := Stats.rest_day_ready(sessions, App.today(), App.tz_bias())
 	var pill := UI.card(UI.SURFACE, 12, 20)
 	var sb: StyleBoxFlat = pill.get_theme_stylebox("panel")
 	sb.content_margin_left = 14
 	sb.content_margin_right = 16
 	pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	pill.tooltip_text = "Focus %d+ minutes a day to keep it going. After %d days in a row you can rest for a day without losing it." % [Stats.STREAK_MIN_SECONDS / 60, Stats.REST_DAY_AFTER]
+	pill.tooltip_text = "Focus %d+ minutes a day to keep it going. After %d days in a row you can rest for a day without losing it." % [floori(Stats.STREAK_MIN_SECONDS / 60.0), Stats.REST_DAY_AFTER]
 	var row := UI.hbox(10)
 	pill.add_child(row)
 	row.add_child(UI.icon_rect("flame", 26, UI.FLAME if days > 0 else UI.INK_FAINT))
 	var v := UI.vbox(0)
 	v.add_child(UI.label("%d day%s" % [days, "" if days == 1 else "s"], 18, UI.INK, true, 600))
-	if ready:
+	if rest_ready:
 		var rest := UI.hbox(4)
 		rest.add_child(UI.icon_rect("moon", 12, UI.ACCENT))
 		rest.add_child(UI.label("Rest day ready", 12, UI.ACCENT, false, 800))
@@ -100,7 +100,11 @@ func _history(today: int) -> Control:
 	var best := 1
 	for w in weeks:
 		best = maxi(best, int(totals.get(w, 0)))
-	var list: BoxContainer = UI.vbox(8) if wide else UI.hbox(8)
+	var list: BoxContainer
+	if wide:
+		list = UI.vbox(8)
+	else:
+		list = UI.hbox(8)
 	for w in weeks:
 		var b := _week_button(w, int(totals.get(w, 0)), best, today)
 		list.add_child(b)
@@ -126,8 +130,8 @@ func _week_button(w: int, seconds: int, best: int, today: int) -> Button:
 	v.offset_right = -14
 	v.offset_top = 10
 	v.offset_bottom = -10
-	var name := "This week" if w == Stats.week_start(today) else ("Last week" if w == Stats.week_start(today) - 7 else "%s – %s" % [Stats.format_day(w), Stats.format_day(w + 6)])
-	v.add_child(UI.trimmed(name, 13, UI.INK_SOFT, false, 800))
+	var title := "This week" if w == Stats.week_start(today) else ("Last week" if w == Stats.week_start(today) - 7 else "%s – %s" % [Stats.format_day(w), Stats.format_day(w + 6)])
+	v.add_child(UI.trimmed(title, 13, UI.INK_SOFT, false, 800))
 	v.add_child(UI.label(Stats.format_duration(seconds), 17, UI.INK, true, 600))
 	v.add_child(UI.progress_line(float(seconds) / best))
 	b.add_child(v)
@@ -237,9 +241,9 @@ func _leader_row(rank: int, f: Dictionary) -> Control:
 	row.add_child(r)
 	var face := UI.character_portrait(f.get("look", {}), Vector2(44, 44), true)
 	row.add_child(face)
-	var name := UI.trimmed(str(f.get("name", "")), 16, UI.INK, false, 800 if f.get("me", false) else 700)
-	name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(name)
+	var who := UI.trimmed(str(f.get("name", "")), 16, UI.INK, false, 800 if f.get("me", false) else 700)
+	who.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(who)
 	if f.get("walking", false):
 		var walking := WalkingIndicator.new()
 		walking.size_flags_vertical = Control.SIZE_SHRINK_CENTER

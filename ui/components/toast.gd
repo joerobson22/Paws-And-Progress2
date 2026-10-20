@@ -18,7 +18,9 @@ static func show_text(text: String, icon: String = "check") -> void:
 		row.add_child(UI.icon_rect(icon, 16, UI.BG))
 	row.add_child(UI.label(text, 15, UI.BG, false, 800))
 	t.add_child(row)
-	var host: Node = Modal.layer if Modal.layer and is_instance_valid(Modal.layer) else (Engine.get_main_loop() as SceneTree).root
+	var host: Node = (Engine.get_main_loop() as SceneTree).root
+	if Modal.layer and is_instance_valid(Modal.layer):
+		host = Modal.layer
 	host.add_child(t)
 	t._run.call_deferred()
 

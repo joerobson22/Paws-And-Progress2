@@ -85,4 +85,5 @@ static func from_dict(d: Dictionary) -> SessionClock:
 
 
 static func format(seconds: int) -> String:
+	@warning_ignore("integer_division")
 	return "%02d:%02d:%02d" % [seconds / 3600, (seconds / 60) % 60, seconds % 60]

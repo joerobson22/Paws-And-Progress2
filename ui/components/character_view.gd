@@ -312,9 +312,9 @@ func _cap_dome(h: Vector2, c: Color) -> void:
 	draw_colored_polygon(pts, c)
 
 
-func _ellipse(centre: Vector2, radius: Vector2, colour: Color, rotation: float = 0.0) -> void:
+func _ellipse(centre: Vector2, radius: Vector2, colour: Color, angle: float = 0.0) -> void:
 	var pts := PackedVector2Array()
 	for i in 20:
 		var a := TAU * i / 20.0
-		pts.append(centre + Vector2(cos(a) * radius.x, sin(a) * radius.y).rotated(rotation))
+		pts.append(centre + Vector2(cos(a) * radius.x, sin(a) * radius.y).rotated(angle))
 	draw_colored_polygon(pts, colour)

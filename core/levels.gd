@@ -7,12 +7,14 @@ extends RefCounted
 
 ## XP for one walk of `seconds` that brought a gift of `rarity` ("" for none).
 static func walk_xp(seconds: int, rarity: String, table: Dictionary) -> int:
+	@warning_ignore("integer_division")
 	var xp := (seconds / 60) * int(table.get("xp_per_minute", 1))
 	return xp + int(table.get("gift_bonus", {}).get(rarity, 0))
 
 
 ## All the XP in a save. `rarity_of` turns a gift id into its rarity.
 static func total_xp(sessions: Array, legacy_seconds: int, table: Dictionary, rarity_of: Callable) -> int:
+	@warning_ignore("integer_division")
 	var xp := (legacy_seconds / 60) * int(table.get("xp_per_minute", 1))
 	for s in sessions:
 		xp += walk_xp(s.focus_seconds, rarity_of.call(s.gift_id) if s.gift_id != "" else "", table)
@@ -25,6 +27,7 @@ static func xp_to_reach(level: int, table: Dictionary) -> int:
 	var growth := int(table.get("xp_growth", 20))
 	var n := maxi(0, level - 1)
 	# Sum of base + growth * k for k = 0 .. n - 1.
+	@warning_ignore("integer_division")
 	return n * base + growth * n * (n - 1) / 2
 
 

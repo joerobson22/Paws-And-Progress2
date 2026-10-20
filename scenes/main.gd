@@ -410,7 +410,9 @@ func _scroll_blocks(pos: Vector2, horizontal: bool, along: float) -> bool:
 		var sc := n as ScrollContainer
 		if sc == null or not sc.is_visible_in_tree() or not sc.get_global_rect().has_point(pos):
 			continue
-		var bar: ScrollBar = sc.get_h_scroll_bar() if horizontal else sc.get_v_scroll_bar()
+		var bar: ScrollBar = sc.get_v_scroll_bar()
+		if horizontal:
+			bar = sc.get_h_scroll_bar()
 		var mode := sc.horizontal_scroll_mode if horizontal else sc.vertical_scroll_mode
 		if mode == ScrollContainer.SCROLL_MODE_DISABLED:
 			continue

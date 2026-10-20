@@ -82,9 +82,9 @@ func _stride() -> float:
 	return 2.2 if running else 1.0
 
 
-func _part(name: String, fallback: Color) -> Color:
+func _part(part: String, fallback: Color) -> Color:
 	var parts: Array = Content.animal(animal_id).get("parts", [])
-	var i := parts.find(name)
+	var i := parts.find(part)
 	if i >= 0 and i < colours.size():
 		return colours[i]
 	var defaults := Content.animal_default_colours(animal_id)
@@ -133,11 +133,11 @@ func _draw_held_gift(shape: String) -> void:
 	draw_texture(icon, at - Vector2(8, 8))
 
 
-func _ellipse(centre: Vector2, radius: Vector2, colour: Color, rotation: float = 0.0) -> void:
+func _ellipse(centre: Vector2, radius: Vector2, colour: Color, angle: float = 0.0) -> void:
 	var pts := PackedVector2Array()
 	for i in 24:
 		var a := TAU * i / 24.0
-		pts.append(centre + Vector2(cos(a) * radius.x, sin(a) * radius.y).rotated(rotation))
+		pts.append(centre + Vector2(cos(a) * radius.x, sin(a) * radius.y).rotated(angle))
 	draw_colored_polygon(pts, colour)
 
 
