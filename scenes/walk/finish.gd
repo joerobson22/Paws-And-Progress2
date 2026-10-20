@@ -73,12 +73,13 @@ func _ready() -> void:
 	_scenery.size = size
 	_stage.add_child(_scenery)
 	_stage.add_child(_back_actors)
-	_scenery.front_into(_stage)
 	_sheet.color = Color(0, 0, 0, 0)
 	_sheet.size = size
 	_sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stage.add_child(_sheet)
 	_stage.add_child(_front_actors)
+	# The growth stays in front of everyone, darkened with the rest.
+	_scenery.front_into(_stage)
 
 	var feet := _scenery.path_y()
 	_walker = CharacterView.new()
@@ -324,6 +325,12 @@ func _pick_up(pointer: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
+	# The growth in front darkens with the sheet, and no tall plant stands
+	# between you and your pet while it's at home.
+	_scenery.front_tint = Color.WHITE.darkened(_sheet.color.a)
+	if _animal:
+		var reach := 140.0 * _unit
+		_scenery.front_gap = Vector2(_rest.x - reach, _rest.x + reach)
 	if _state == "holding" and is_instance_valid(_held):
 		var at := _held.position + _held.size * 0.5
 		_held.position = at.lerp(_hold_target, minf(1.0, delta * 18.0)) - _held.size * 0.5

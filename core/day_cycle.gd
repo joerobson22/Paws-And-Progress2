@@ -45,6 +45,21 @@ static func at(hour: float, cycle: Dictionary) -> Dictionary:
 	return out
 
 
+## Where the local time `hour` falls on the cycle's own day, given the real
+## `sunrise` and `sunset` (local hours): sunrise lands on the cycle's
+## sunrise and sunset on its sunset, and the day between (and the night
+## after) stretches or squeezes to fit. at() on the result then has the
+## sun up exactly while it's really up.
+static func solar_hour(hour: float, sunrise: float, sunset: float, cycle: Dictionary) -> float:
+	var c_rise := float(cycle.get("sunrise", 6.0))
+	var c_day := fposmod(float(cycle.get("sunset", 18.0)) - c_rise, 24.0)
+	var day := clampf(fposmod(sunset - sunrise, 24.0), 0.5, 23.5)
+	var into := fposmod(hour - sunrise, 24.0)
+	if into <= day:
+		return fposmod(c_rise + c_day * into / day, 24.0)
+	return fposmod(c_rise + c_day + (24.0 - c_day) * (into - day) / (24.0 - day), 24.0)
+
+
 ## How far across the sky something is that rises at `rise` and sets at
 ## `set_at` (hours; it may be up over midnight): 0..1, or -1 while it's down.
 static func arc(hour: float, rise: float, set_at: float) -> float:

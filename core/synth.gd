@@ -5,7 +5,7 @@ extends RefCounted
 ## assets/sounds/ and Audio plays that instead.
 
 const RATE := 22050
-const NAMES := ["bong", "pop", "rustle", "chime", "whoosh", "levelup", "wind", "splash"]
+const NAMES := ["bong", "pop", "rustle", "chime", "whoosh", "levelup", "wind", "splash", "rain", "thunder"]
 
 static var _cache: Dictionary = {}
 static var _lock := Mutex.new()
@@ -54,6 +54,10 @@ static func sound(name: String) -> AudioStreamWAV:
 			samples = _wind(6.0)
 		"splash":
 			samples = _splash(0.7)
+		"rain":
+			samples = _rain(6.0)
+		"thunder":
+			samples = _thunder(4.0)
 		_:
 			return null
 	var wav := _to_wav(_normalise(samples, 0.6))
@@ -170,6 +174,50 @@ static func _splash(seconds: float) -> PackedFloat32Array:
 		low += 0.3 * (rng.randf_range(-1.0, 1.0) - low)
 		phase += TAU * (520.0 - 300.0 * minf(1.0, t / 0.12)) / RATE
 		out[i] = low * exp(-t * 7.0) * 0.8 + sin(phase) * exp(-t * 18.0) * 0.6
+	return out
+
+
+## Steady rain: a soft hiss with drops pattering through it. The end is
+## blended into the start, so it loops without a seam.
+static func _rain(seconds: float) -> PackedFloat32Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var n := int(seconds * RATE)
+	var blend := int(0.5 * RATE)
+	var raw := PackedFloat32Array()
+	raw.resize(n + blend)
+	var low := 0.0
+	for i in raw.size():
+		low += 0.18 * (rng.randf_range(-1.0, 1.0) - low)
+		raw[i] = low * 0.6
+	for d in int(seconds * 40):
+		var at := rng.randi_range(0, raw.size() - 200)
+		var amp := rng.randf_range(0.15, 0.5)
+		var freq := rng.randf_range(1800.0, 4200.0)
+		for j in 160:
+			raw[at + j] += sin(TAU * freq * j / RATE) * amp * exp(-j / 30.0)
+	var out := raw.slice(0, n)
+	for i in blend:
+		var f := float(i) / blend
+		out[i] = raw[n + i] * (1.0 - f) + raw[i] * f
+	return out
+
+
+## Distant thunder: a sharp crack, then a low rumble rolling away.
+static func _thunder(seconds: float) -> PackedFloat32Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 13
+	var n := int(seconds * RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var low := 0.0
+	var lower := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		low += 0.06 * (rng.randf_range(-1.0, 1.0) - low)
+		lower += 0.02 * (low - lower)
+		var roll := (1.0 - exp(-t * 30.0)) * exp(-t * 1.1) * (0.7 + 0.3 * sin(TAU * t * 1.7))
+		out[i] = lower * 4.0 * roll + rng.randf_range(-1.0, 1.0) * exp(-t * 25.0) * 0.5
 	return out
 
 

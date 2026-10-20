@@ -37,8 +37,15 @@ var held_gift := "":
 	set(v):
 		held_gift = v
 		queue_redraw()
+## 0 normally, up to 1 when it's dejected: head, ears and tail hang, the
+## eyes droop and it sighs now and then.
+var sad := 0.0:
+	set(v):
+		sad = v
+		queue_redraw()
 
 var _phase: float = 0.0
+var _sigh: float = 0.0
 
 
 func _process(delta: float) -> void:
@@ -46,6 +53,29 @@ func _process(delta: float) -> void:
 		var walk_speed := float(Content.animal(animal_id).get("walk_speed", 1.0))
 		_phase += delta * TAU * (0.6 + walk_speed) * speed * (2.4 if running else 1.0)
 		queue_redraw()
+	if sad > 0.0:
+		_sigh += delta
+		queue_redraw()
+
+
+## How far the head hangs, in the animal's own pixels.
+func _droop() -> Vector2:
+	return Vector2(4, 14) * sad + Vector2(0, (sin(_sigh * 1.3) * 0.5 + 0.5) * 2.0 * sad)
+
+
+## An eye, with a heavy lid in the head's colour when it's sad.
+func _eye(at: Vector2, r: float, lid: Color) -> void:
+	draw_circle(at, r, UI.INK)
+	_lid(at, r, lid)
+
+
+## The sad lid over an eye: lower at the outer corner (away from the nose)
+## than the inner one.
+func _lid(at: Vector2, r: float, lid: Color) -> void:
+	if sad > 0.05:
+		draw_colored_polygon(PackedVector2Array([
+			at + Vector2(-r - 1.5, -r - 2.0), at + Vector2(r + 1.5, -r - 2.0),
+			at + Vector2(r + 1.5, -r + 2.0 * r * 0.25 * sad), at + Vector2(-r - 1.5, -r + 2.0 * r * 0.75 * sad)]), lid)
 
 
 func _stride() -> float:
@@ -126,14 +156,16 @@ func _draw_dog() -> void:
 	var pattern := _part("Pattern", Color.WHITE)
 	var bob := absf(sin(_phase)) * 2.0 * _stride() if walking else 0.0
 	_legs([-30, -18, 18, 30], -30 - bob, 30, 9, legs)
-	draw_line(Vector2(-40, -44 - bob), Vector2(-58, -62 - bob + sin(_phase * 2.0) * 4.0), body, 7, true)
+	var tail_tip := Vector2(-58, -62 - bob + sin(_phase * 2.0) * 4.0).lerp(Vector2(-54, -24), sad)
+	draw_line(Vector2(-40, -44 - bob), tail_tip, body, 7, true)
 	_ellipse(Vector2(0, -42 - bob), Vector2(44, 19), body)
 	_ellipse(Vector2(6, -34 - bob), Vector2(26, 10), pattern)
-	_ellipse(Vector2(46, -62 - bob), Vector2(17, 15), body)
-	_ellipse(Vector2(60, -57 - bob), Vector2(10, 7), pattern)
-	_ellipse(Vector2(38, -60 - bob), Vector2(6, 12), body.darkened(0.25), 0.3)
-	draw_circle(Vector2(50, -66 - bob), 2.5, UI.INK)
-	draw_circle(Vector2(69, -58 - bob), 3.0, UI.INK)
+	var d := _droop()
+	_ellipse(Vector2(46, -62 - bob) + d, Vector2(17, 15), body)
+	_ellipse(Vector2(60, -57 - bob) + d, Vector2(10, 7), pattern)
+	_ellipse(Vector2(38, -60 - bob) + d, Vector2(6, 12), body.darkened(0.25), 0.3 - 0.25 * sad)
+	_eye(Vector2(50, -66 - bob) + d, 2.5, body)
+	draw_circle(Vector2(69, -58 - bob) + d, 3.0, UI.INK)
 
 
 func _draw_bear() -> void:
@@ -143,12 +175,13 @@ func _draw_bear() -> void:
 	var bob := absf(sin(_phase)) * 2.0 * _stride() if walking else 0.0
 	_legs([-26, -14, 14, 26], -26 - bob, 26, 14, legs)
 	_ellipse(Vector2(0, -44 - bob), Vector2(42, 24), body)
-	_ellipse(Vector2(42, -60 - bob), Vector2(18, 16), body)
-	draw_circle(Vector2(34, -76 - bob), 6, body)
-	draw_circle(Vector2(50, -76 - bob), 6, body)
-	_ellipse(Vector2(56, -56 - bob), Vector2(9, 7), pattern)
-	draw_circle(Vector2(46, -64 - bob), 2.5, UI.INK)
-	draw_circle(Vector2(63, -57 - bob), 3.0, UI.INK)
+	var d := _droop()
+	_ellipse(Vector2(42, -60 - bob) + d, Vector2(18, 16), body)
+	draw_circle(Vector2(34, -76 - bob) + d, 6, body)
+	draw_circle(Vector2(50, -76 - bob) + d, 6, body)
+	_ellipse(Vector2(56, -56 - bob) + d, Vector2(9, 7), pattern)
+	_eye(Vector2(46, -64 - bob) + d, 2.5, body)
+	draw_circle(Vector2(63, -57 - bob) + d, 3.0, UI.INK)
 
 
 func _draw_cat() -> void:
@@ -159,14 +192,18 @@ func _draw_cat() -> void:
 	var tail := PackedVector2Array()
 	for i in 10:
 		var t := i / 9.0
-		tail.append(Vector2(-34 - t * 16, -36 - t * 36 + sin(_phase + t * 3.0) * 3.0))
+		tail.append(Vector2(-34 - t * 16, -36 + lerpf(-t * 36.0, t * 24.0, sad) + sin(_phase + t * 3.0) * 3.0 * (1.0 - sad)))
 	draw_polyline(tail, body, 5, true)
 	_ellipse(Vector2(0, -36), Vector2(36, 13), body)
-	_ellipse(Vector2(38, -52), Vector2(13, 12), body)
-	draw_colored_polygon(PackedVector2Array([Vector2(28, -58), Vector2(31, -72), Vector2(37, -61)]), body)
-	draw_colored_polygon(PackedVector2Array([Vector2(39, -62), Vector2(45, -73), Vector2(48, -59)]), body)
-	draw_circle(Vector2(43, -54), 3.0, eyes)
-	draw_circle(Vector2(43, -54), 1.2, UI.INK)
+	var d := _droop() * 0.8
+	_ellipse(Vector2(38, -52) + d, Vector2(13, 12), body)
+	# Ears flatten back when it's sad.
+	var flat := Vector2(-4, 5) * sad
+	draw_colored_polygon(PackedVector2Array([Vector2(28, -58) + d, Vector2(31, -72) + d + flat, Vector2(37, -61) + d]), body)
+	draw_colored_polygon(PackedVector2Array([Vector2(39, -62) + d, Vector2(45, -73) + d + flat, Vector2(48, -59) + d]), body)
+	draw_circle(Vector2(43, -54) + d, 3.0, eyes)
+	draw_circle(Vector2(43, -54) + d, 1.2, UI.INK)
+	_lid(Vector2(43, -54) + d, 3.0, body)
 
 
 func _draw_rabbit() -> void:
@@ -178,10 +215,12 @@ func _draw_rabbit() -> void:
 	_ellipse(Vector2(12, -8 - hop), Vector2(6, 8), legs)
 	_ellipse(Vector2(0, -28 - hop), Vector2(26, 20), body)
 	draw_circle(Vector2(-26, -30 - hop), 7, pattern)
-	_ellipse(Vector2(22, -46 - hop), Vector2(13, 12), body)
-	_ellipse(Vector2(16, -70 - hop), Vector2(5, 16), body, -0.2)
-	_ellipse(Vector2(24, -70 - hop), Vector2(5, 16), body, 0.15)
-	draw_circle(Vector2(27, -48 - hop), 2.2, UI.INK)
+	var d := _droop() * 0.6
+	_ellipse(Vector2(22, -46 - hop) + d, Vector2(13, 12), body)
+	# The ears flop down its back when it's sad.
+	_ellipse(Vector2(16, -70 - hop).lerp(Vector2(4, -52), sad) + d, Vector2(5, 16), body, lerpf(-0.2, -1.35, sad))
+	_ellipse(Vector2(24, -70 - hop).lerp(Vector2(10, -54), sad) + d, Vector2(5, 16), body, lerpf(0.15, -1.2, sad))
+	_eye(Vector2(27, -48 - hop) + d, 2.2, body)
 
 
 func _draw_snail() -> void:
@@ -190,9 +229,11 @@ func _draw_snail() -> void:
 	var pattern := _part("Pattern", Color.BURLYWOOD)
 	var stretch := 1.0 + (sin(_phase) * 0.06 if walking else 0.0)
 	_ellipse(Vector2(4, -8), Vector2(40 * stretch, 9), body)
-	draw_line(Vector2(36, -12), Vector2(44, -34), body, 3, true)
-	draw_line(Vector2(30, -12), Vector2(34, -30), body, 3, true)
-	draw_circle(Vector2(44, -34), 3, UI.INK)
+	# The eye stalks sag when it's sad.
+	var stalk := Vector2(44, -34).lerp(Vector2(50, -20), sad)
+	draw_line(Vector2(36, -12), stalk, body, 3, true)
+	draw_line(Vector2(30, -12), Vector2(34, -30).lerp(Vector2(40, -18), sad), body, 3, true)
+	draw_circle(stalk, 3, UI.INK)
 	draw_circle(Vector2(-4, -30), 24, shell)
 	var spiral := PackedVector2Array()
 	for i in 40:
@@ -212,6 +253,7 @@ func _draw_bird() -> void:
 	_ellipse(Vector2(4, -22 - hop), Vector2(11, 9), pattern)
 	var flap := sin(_phase * 2.0) * 0.5 if walking else 0.0
 	_ellipse(Vector2(-6, -32 - hop), Vector2(15, 7), wings, -0.3 + flap)
-	draw_circle(Vector2(18, -40 - hop), 9, body)
-	draw_colored_polygon(PackedVector2Array([Vector2(26, -42 - hop), Vector2(34, -39 - hop), Vector2(26, -36 - hop)]), pattern.darkened(0.2))
-	draw_circle(Vector2(20, -43 - hop), 1.8, UI.INK)
+	var d := _droop() * 0.5
+	draw_circle(Vector2(18, -40 - hop) + d, 9, body)
+	draw_colored_polygon(PackedVector2Array([Vector2(26, -42 - hop) + d, Vector2(34, -39 - hop) + d, Vector2(26, -36 - hop) + d]), pattern.darkened(0.2))
+	_eye(Vector2(20, -43 - hop) + d, 1.8, body)

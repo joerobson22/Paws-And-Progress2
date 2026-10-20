@@ -1,12 +1,14 @@
 extends Pane
 ## The middle of the app: a greeting, and under it the focus orb. Tap the orb
 ## (a soft bong) and the choose focus screen grows out of it. The sun or moon
-## in the top right switches between light and dark.
+## in the top right switches between light and dark. Debug builds also get
+## a debug bar in the top left (DebugBar).
 
 var _orb: FocusOrb
 var _greeting: Label
 var _hint: Label
 var _toggle: ThemeToggle
+var _debug: DebugBar
 var _line := ""
 ## How many walks there had been when the greeting was picked: a new line
 ## each time you come home from one.
@@ -28,6 +30,9 @@ func build() -> void:
 	add_child(_hint)
 	_toggle = ThemeToggle.new()
 	add_child(_toggle)
+	if OS.is_debug_build():
+		_debug = DebugBar.new()
+		add_child(_debug)
 	_update_hint()
 	_place()
 
@@ -58,6 +63,9 @@ func _place() -> void:
 	var insets := UI.safe_insets(self)
 	_toggle.size = _toggle.custom_minimum_size
 	_toggle.position = Vector2(size.x - _toggle.size.x - 18.0 - insets["right"], 18.0 + insets["top"])
+	if is_instance_valid(_debug):
+		_debug.size = _debug.get_combined_minimum_size()
+		_debug.position = Vector2(18.0 + insets["left"], 12.0 + insets["top"])
 
 
 func _update_hint() -> void:

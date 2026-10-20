@@ -134,6 +134,8 @@ func open_settings() -> void:
 	s.add_child(_toggle("Reduce motion", "Gentler scenery and quicker, simpler animations.", "reduce_motion"))
 	s.add_child(UI.divider())
 	s.add_child(_toggle("Keep the screen on", "Stops your phone or laptop sleeping during a walk.", "keep_screen_on"))
+	s.add_child(UI.divider())
+	s.add_child(_location_toggle())
 	m.body.add_child(s)
 	var about := UI.para("Paws & Progress %s  ·  Fonts: Fredoka and Nunito (SIL Open Font License)" % ProjectSettings.get_setting("application/config/version", ""), 13, UI.INK_FAINT)
 	about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -153,6 +155,25 @@ func _toggle(title: String, detail: String, key: String) -> Control:
 		App.set_setting(key, on)
 		if key == "ambience":
 			Audio.refresh(Audio.current_ambience()))
+	row.add_child(sw)
+	return row
+
+
+## Real sunrise, sunset and weather: on and off goes through Outdoors, which
+## also says where it thinks you are once it knows.
+func _location_toggle() -> Control:
+	var row := UI.hbox(16)
+	var text := UI.vbox(2)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_child(UI.label("Local sunrise and weather", 16, UI.INK, false, 800))
+	var detail := "Walks follow the real sky where you are, from your rough location (worked out from your internet connection)."
+	if Outdoors.place_name() != "":
+		detail += " Now: %s, %s." % [Outdoors.place_name(), Weather.look(Outdoors.weather(), Content.weathers)["name"].to_lower()]
+	text.add_child(UI.para(detail, 13))
+	row.add_child(text)
+	var sw := Switch.new(Outdoors.enabled())
+	sw.tooltip_text = "Local sunrise and weather"
+	sw.toggled.connect(Outdoors.set_enabled)
 	row.add_child(sw)
 	return row
 

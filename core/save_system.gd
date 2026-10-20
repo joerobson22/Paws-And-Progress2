@@ -139,6 +139,11 @@ static func read(path: String = SAVE_PATH) -> GameState:
 	return null
 
 
+## When the save was last written (unix seconds), or 0 if there isn't one.
+static func saved_unix(path: String = SAVE_PATH) -> int:
+	return int(FileAccess.get_modified_time(path)) if FileAccess.file_exists(path) else 0
+
+
 ## Where v1 kept its save on desktop: a sibling of this app's user data folder.
 static func v1_save_path() -> String:
 	return OS.get_user_data_dir().get_base_dir().path_join("Paws-And-Progress").path_join("gamedata.save")

@@ -2,10 +2,14 @@ class_name FocusOrb
 extends Control
 ## The living centre of the focus screen: soft, see-through circles of
 ## slightly different greens, each drifting round the middle at its own speed
-## and direction, while the whole cluster slowly breathes in and out.
+## and direction, while the whole cluster slowly breathes in and out. It
+## grows a little under the pointer and dips when pressed.
 ## Tapping it is how a focus session starts.
 
 signal tapped
+
+const HOVER_GROW := 1.07
+const PRESS_GROW := 0.95
 
 ## [colour, opacity, radius, orbit, speed (radians/s), phase]; radius and
 ## orbit are fractions of the orb's radius.
@@ -27,6 +31,9 @@ var running := true:
 var _time := 0.0
 var _press_at := Vector2.ZERO
 var _pressing := false
+var _hovered := false
+## How big it's drawn, from the hover and press: 1 at rest.
+var _grow := 1.0
 
 
 func _init() -> void:
@@ -46,7 +53,7 @@ func radius() -> float:
 
 func _draw() -> void:
 	var c := size * 0.5
-	var base := radius()
+	var base := radius() * _grow
 	var breathe := 1.0 + 0.045 * sin(_time * 0.55) + 0.02 * sin(_time * 1.27 + 1.0)
 	# A faint halo so the orb sits softly on the page.
 	for i in 6:
@@ -62,13 +69,34 @@ func _has_point(point: Vector2) -> bool:
 	return point.distance_to(size * 0.5) <= radius()
 
 
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_MOUSE_ENTER:
+			_hovered = true
+			_grow_to(PRESS_GROW if _pressing else HOVER_GROW)
+		NOTIFICATION_MOUSE_EXIT:
+			_hovered = false
+			_grow_to(1.0)
+
+
+func _grow_to(v: float) -> void:
+	Motion.method(self, "grow", _set_grow, _grow, v, Motion.FAST)
+
+
+func _set_grow(v: float) -> void:
+	_grow = v
+	queue_redraw()
+
+
 func _gui_input(e: InputEvent) -> void:
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		if e.pressed:
 			_pressing = true
 			_press_at = e.position
+			_grow_to(PRESS_GROW)
 		elif _pressing:
 			_pressing = false
+			_grow_to(HOVER_GROW if _hovered else 1.0)
 			if e.position.distance_to(_press_at) < Gestures.TAP_SLOP and _has_point(e.position):
 				tapped.emit()
 		accept_event()
