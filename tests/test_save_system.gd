@@ -68,6 +68,39 @@ func test_old_saves_get_new_fields() -> void:
 	check(back.profile["cosmetics"].has("hat"))
 
 
+func test_v1_save_migrates_slots() -> void:
+	var back := SaveSystem.from_dict({"version": 1, "profile": {"cosmetics": {"jumper": "staffy_epic", "handwear": "rabbit_epic", "hat": "bird_epic"}}})
+	eq(back.profile["cosmetics"]["top"], "staffy_epic")
+	eq(back.profile["cosmetics"]["gloves"], "rabbit_epic")
+	eq(back.profile["cosmetics"]["hat"], "bird_epic")
+	check(not back.profile["cosmetics"].has("jumper"), "old slot gone")
+	eq(back.profile["shelf"], ["", "", ""])
+
+
+func test_shelf_round_trip_and_moves() -> void:
+	var s := _sample()
+	s.place_on_shelf("staffy_common", 2)
+	s.place_on_shelf("bear_rare", 0)
+	eq(s.shelf(), ["bear_rare", "", "staffy_common"])
+	s.place_on_shelf("staffy_common", 0)
+	eq(s.shelf(), ["staffy_common", "", "bear_rare"], "moving swaps")
+	s.remove_from_shelf(2)
+	eq(s.shelf(), ["staffy_common", "", ""])
+	var back := SaveSystem.from_dict(SaveSystem.to_dict(s))
+	eq(back.shelf(), ["staffy_common", "", ""])
+
+
+func test_traded_away_gifts_leave_shelf_and_wardrobe() -> void:
+	var s := _sample()
+	s.inventory["bear_epic"] = 0
+	s.place_on_shelf("bear_epic", 1)
+	s.place_on_shelf("staffy_common", 0)
+	s.profile["cosmetics"]["walking_stick"] = "bear_epic"
+	s.tidy_gift_references()
+	eq(s.shelf(), ["staffy_common", "", ""])
+	eq(s.profile["cosmetics"]["walking_stick"], "")
+
+
 func test_import_v1() -> void:
 	var player := {
 		"username": "Joe", "totalFocusTime": 90000, "longestFocusTime": 7200, "weeklyFocusPB": 30000,
@@ -92,6 +125,7 @@ func test_import_v1() -> void:
 	eq(s.profile["legacy_total_seconds"], 90000)
 	eq(s.profile["legacy_best_week_seconds"], 30000)
 	eq(s.profile["cosmetics"]["hair"], "v1:3")
+	eq(s.profile["cosmetics"]["top"], "v1:1", "v1 jumper slot is now top")
 	eq(s.settings["sound"], false)
 	eq(s.inventory, {"staffy_common": 2, "black_cat_epic": 1})
 	eq(s.projects.size(), 2)

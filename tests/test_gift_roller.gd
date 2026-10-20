@@ -35,10 +35,59 @@ func test_distribution_roughly_matches_table() -> void:
 	rng.seed = 7
 	var counts := {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
 	for i in 20000:
+		counts[GiftRoller.roll(1800, "staffy", 0, table, gifts, rng)["rarity"]] += 1
+	# 30 minute tier is 75 / 23 / 2 / 0.
+	check(absf(counts["common"] / 20000.0 - 0.75) < 0.02, "common %s" % counts)
+	check(absf(counts["epic"] / 20000.0 - 0.02) < 0.01, "epic %s" % counts)
+	eq(counts["legendary"], 0)
+
+
+func test_guaranteed_rarity_drops_lower_ones() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var counts := {"common": 0, "rare": 0, "epic": 0, "legendary": 0}
+	for i in 20000:
 		counts[GiftRoller.roll(3600, "staffy", 0, table, gifts, rng)["rarity"]] += 1
-	# 1 hour tier is 60 / 32 / 6 / 2.
-	check(absf(counts["common"] / 20000.0 - 0.60) < 0.02, "common %s" % counts)
-	check(absf(counts["legendary"] / 20000.0 - 0.02) < 0.01, "legendary %s" % counts)
+	# 1 hour: at least rare, so 32 / 6 / 2 of the tier's weights share it all.
+	eq(counts["common"], 0, "no commons once rare is guaranteed")
+	check(absf(counts["rare"] / 20000.0 - 0.80) < 0.02, "rare %s" % counts)
+	check(absf(counts["legendary"] / 20000.0 - 0.05) < 0.01, "legendary %s" % counts)
+
+
+func test_min_rarity_follows_the_gift_button() -> void:
+	var g: Dictionary = table["guaranteed"]
+	eq(GiftRoller.min_rarity(599, table), "")
+	eq(GiftRoller.min_rarity(600, table), "common")
+	eq(GiftRoller.min_rarity(int(g["rare"]) - 1, table), "common")
+	eq(GiftRoller.min_rarity(int(g["rare"]), table), "rare")
+	eq(GiftRoller.min_rarity(int(g["epic"]), table), "epic")
+	eq(GiftRoller.min_rarity(int(g["legendary"]), table), "legendary")
+	var rng := RandomNumberGenerator.new()
+	for i in 50:
+		eq(GiftRoller.roll(int(g["legendary"]), "bird", 0, table, gifts, rng)["rarity"], "legendary")
+
+
+func test_fill_grows_to_each_threshold() -> void:
+	var g: Dictionary = table["guaranteed"]
+	var start := int(table["min_seconds"])
+	eq(GiftRoller.fill(start, table)["rare"], 0.0)
+	eq(GiftRoller.fill(int(g["rare"]), table)["rare"], 1.0)
+	check(GiftRoller.fill(int(g["rare"]), table)["epic"] < 1.0, "epic fills slower")
+	check(GiftRoller.fill(int(g["rare"]), table)["legendary"] < GiftRoller.fill(int(g["rare"]), table)["epic"], "legendary slowest")
+	eq(GiftRoller.fill(int(g["legendary"]) + 999, table)["legendary"], 1.0)
+
+
+func test_trade_in() -> void:
+	var inv := {"staffy_common": 12}
+	eq(GiftRoller.trade(inv, "staffy_common", gifts, 10), "staffy_rare")
+	eq(inv, {"staffy_common": 2, "staffy_rare": 1})
+	eq(GiftRoller.trade(inv, "staffy_common", gifts, 10), "", "not enough left")
+	inv["bear_epic"] = 3
+	eq(GiftRoller.trade(inv, "bear_epic", gifts, 3), "bear_legendary")
+	eq(inv["bear_epic"], 0, "stays listed at zero")
+	inv["bear_legendary"] = 9
+	eq(GiftRoller.trade(inv, "bear_legendary", gifts, 3), "", "legendaries can't be traded")
+	eq(GiftRoller.trade(inv, "nope", gifts, 1), "")
 
 
 func test_pity_guarantees_epic_or_better() -> void:

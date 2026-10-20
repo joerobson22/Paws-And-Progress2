@@ -1,8 +1,9 @@
 {
-	"_doc": "Gift odds by walk length. A walk shorter than min_seconds gives no gift. The highest tier whose min_seconds the walk reaches is used. Legendary starts at 45 minutes. Pity: after pity_walks walks of at least pity_min_seconds without an epic or legendary, the next such walk is guaranteed at least epic.",
+	"_doc": "Gift odds by walk length. A walk shorter than min_seconds gives no gift. The highest tier whose min_seconds the walk reaches is used. Legendary starts at 45 minutes. 'guaranteed' is when each rarity becomes the minimum gift: the walk screen's gift button fills with that rarity's colour as the walk approaches it, and rarities below it drop out of the odds. Pity: after pity_walks walks of at least pity_min_seconds without an epic or legendary, the next such walk is guaranteed at least epic.",
 	"min_seconds": 600,
 	"pity_walks": 8,
 	"pity_min_seconds": 1800,
+	"guaranteed": {"rare": 2700, "epic": 7200, "legendary": 14400},
 	"tiers": [
 		{"min_seconds": 600,   "weights": {"common": 90, "rare": 10, "epic": 0,  "legendary": 0}},
 		{"min_seconds": 1800,  "weights": {"common": 75, "rare": 23, "epic": 2,  "legendary": 0}},

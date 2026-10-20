@@ -1,65 +1,65 @@
 {
-	"_doc": "One gift per rarity per animal. Epic and legendary gifts are wearable: 'slot' says where. Names carried over from v1 where the animal carried over; legendary gifts are placeholders for Joe to rename.",
+	"_doc": "One gift per rarity per animal. Epic and legendary gifts are wearable: 'slot' says where and 'style' how the placeholder drawing shows it. 'trade_in' on a rarity is how many of one gift swap for the next rarity up from the same animal (legendaries can't be traded). Names carried over from v1 where the animal carried over; legendary gifts are placeholders for Joe to rename.",
 	"rarities": [
-		{"id": "common",    "name": "Common",    "colour": "#8c8c7e", "text_colour": "#5e5e52"},
-		{"id": "rare",      "name": "Rare",      "colour": "#2f7bc2", "text_colour": "#1f5e99"},
-		{"id": "epic",      "name": "Epic",      "colour": "#7e4fd6", "text_colour": "#5f35ae"},
+		{"id": "common",    "name": "Common",    "colour": "#3ba55c", "text_colour": "#25713d", "trade_in": 10},
+		{"id": "rare",      "name": "Rare",      "colour": "#2f7bc2", "text_colour": "#1f5e99", "trade_in": 5},
+		{"id": "epic",      "name": "Epic",      "colour": "#7e4fd6", "text_colour": "#5f35ae", "trade_in": 3},
 		{"id": "legendary", "name": "Legendary", "colour": "#e2a615", "text_colour": "#8a5f00"}
 	],
 	"gifts": [
 		{"id": "staffy_common",       "animal": "staffy",    "rarity": "common",    "name": "Tennis Ball",        "description": "Used for fetch. It's a bit slobbery..."},
 		{"id": "staffy_rare",         "animal": "staffy",    "rarity": "rare",      "name": "Pinecone",           "description": "Fell from a pine tree. Smells nice."},
-		{"id": "staffy_epic",         "animal": "staffy",    "rarity": "epic",      "name": "Seasonal Jumper",    "description": "Can be worn. Makes you feel very autumnal.", "slot": "jumper"},
-		{"id": "staffy_legendary",    "animal": "staffy",    "rarity": "legendary", "name": "Golden Collar",      "description": "Can be worn. Placeholder legendary.", "slot": "neckwear"},
+		{"id": "staffy_epic",         "animal": "staffy",    "rarity": "epic",      "name": "Seasonal Jumper",    "description": "Can be worn. Makes you feel very autumnal.", "slot": "top", "style": "jumper"},
+		{"id": "staffy_legendary",    "animal": "staffy",    "rarity": "legendary", "name": "Golden Collar",      "description": "Can be worn. Placeholder legendary.", "slot": "neckwear", "style": "collar"},
 
 		{"id": "spaniel_common",      "animal": "spaniel",   "rarity": "common",    "name": "Stick",              "description": "Broke from a tree. Smells of sticks."},
 		{"id": "spaniel_rare",        "animal": "spaniel",   "rarity": "rare",      "name": "Pebble",             "description": "A lovely smooth oval pebble. Very nice."},
-		{"id": "spaniel_epic",        "animal": "spaniel",   "rarity": "epic",      "name": "Basic Walking Stick", "description": "Can be equipped to walk with. Makes you feel like a wizard.", "slot": "walking_stick"},
-		{"id": "spaniel_legendary",   "animal": "spaniel",   "rarity": "legendary", "name": "Feathered Cap",      "description": "Can be worn. Placeholder legendary.", "slot": "hat"},
+		{"id": "spaniel_epic",        "animal": "spaniel",   "rarity": "epic",      "name": "Basic Walking Stick", "description": "Can be equipped to walk with. Makes you feel like a wizard.", "slot": "walking_stick", "style": "stick"},
+		{"id": "spaniel_legendary",   "animal": "spaniel",   "rarity": "legendary", "name": "Feathered Cap",      "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "feather_cap"},
 
 		{"id": "labrador_common",     "animal": "labrador",  "rarity": "common",    "name": "Daisy",              "description": "A fresh flower. Can be put in a bouquet."},
 		{"id": "labrador_rare",       "animal": "labrador",  "rarity": "rare",      "name": "Toy Chicken",        "description": "A great gift for any dog."},
-		{"id": "labrador_epic",       "animal": "labrador",  "rarity": "epic",      "name": "Necklace Charm",     "description": "Can be worn. Seems like it has some backstory to it.", "slot": "neckwear"},
-		{"id": "labrador_legendary",  "animal": "labrador",  "rarity": "legendary", "name": "Sunflower Crown",    "description": "Can be worn. Placeholder legendary.", "slot": "hat"},
+		{"id": "labrador_epic",       "animal": "labrador",  "rarity": "epic",      "name": "Necklace Charm",     "description": "Can be worn. Seems like it has some backstory to it.", "slot": "neckwear", "style": "necklace"},
+		{"id": "labrador_legendary",  "animal": "labrador",  "rarity": "legendary", "name": "Sunflower Crown",    "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "crown"},
 
 		{"id": "cockapoo_common",     "animal": "cockapoo",  "rarity": "common",    "name": "Chew Toy",           "description": "A chewy toy for a dog. Very slobbery..."},
 		{"id": "cockapoo_rare",       "animal": "cockapoo",  "rarity": "rare",      "name": "Ladybird",           "description": "A little ladybird! Her name is Wendy."},
-		{"id": "cockapoo_epic",       "animal": "cockapoo",  "rarity": "epic",      "name": "Burger Jumper",      "description": "Can be worn. It's a woolly jumper with a... burger on it?", "slot": "jumper"},
-		{"id": "cockapoo_legendary",  "animal": "cockapoo",  "rarity": "legendary", "name": "Curly Wig",          "description": "Can be worn. Placeholder legendary.", "slot": "hair"},
+		{"id": "cockapoo_epic",       "animal": "cockapoo",  "rarity": "epic",      "name": "Burger Jumper",      "description": "Can be worn. It's a woolly jumper with a... burger on it?", "slot": "top", "style": "jumper"},
+		{"id": "cockapoo_legendary",  "animal": "cockapoo",  "rarity": "legendary", "name": "Curly Wig",          "description": "Can be worn. Placeholder legendary.", "slot": "hair", "style": "curly"},
 
 		{"id": "bernese_common",      "animal": "bernese",   "rarity": "common",    "name": "Frog",               "description": "It's literally just a frog."},
 		{"id": "bernese_rare",        "animal": "bernese",   "rarity": "rare",      "name": "Rabbit Toy",         "description": "Can also be used as a hot water bottle."},
-		{"id": "bernese_epic",        "animal": "bernese",   "rarity": "epic",      "name": "Cow Jumper",         "description": "Can be worn. It's an awesome jumper with a cow on it!", "slot": "jumper"},
-		{"id": "bernese_legendary",   "animal": "bernese",   "rarity": "legendary", "name": "Alpine Hat",         "description": "Can be worn. Placeholder legendary.", "slot": "hat"},
+		{"id": "bernese_epic",        "animal": "bernese",   "rarity": "epic",      "name": "Cow Jumper",         "description": "Can be worn. It's an awesome jumper with a cow on it!", "slot": "top", "style": "jumper"},
+		{"id": "bernese_legendary",   "animal": "bernese",   "rarity": "legendary", "name": "Alpine Hat",         "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "alpine"},
 
 		{"id": "tabby_cat_common",    "animal": "tabby_cat", "rarity": "common",    "name": "Feather",            "description": "From a colourful green bird. Shines a little bit."},
 		{"id": "tabby_cat_rare",      "animal": "tabby_cat", "rarity": "rare",      "name": "Beetle",             "description": "A shiny green beetle. His name is Small."},
-		{"id": "tabby_cat_epic",      "animal": "tabby_cat", "rarity": "epic",      "name": "Jade Ring",          "description": "Can be worn. Makes you feel royal.", "slot": "handwear"},
-		{"id": "tabby_cat_legendary", "animal": "tabby_cat", "rarity": "legendary", "name": "Cat Ear Beanie",     "description": "Can be worn. Placeholder legendary.", "slot": "hat"},
+		{"id": "tabby_cat_epic",      "animal": "tabby_cat", "rarity": "epic",      "name": "Jade Ring",          "description": "Can be worn. Makes you feel royal.", "slot": "gloves", "style": "ring"},
+		{"id": "tabby_cat_legendary", "animal": "tabby_cat", "rarity": "legendary", "name": "Cat Ear Beanie",     "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "ears"},
 
 		{"id": "black_cat_common",    "animal": "black_cat", "rarity": "common",    "name": "Ball of Yarn",       "description": "Placeholder common."},
 		{"id": "black_cat_rare",      "animal": "black_cat", "rarity": "rare",      "name": "Moth",               "description": "Placeholder rare."},
-		{"id": "black_cat_epic",      "animal": "black_cat", "rarity": "epic",      "name": "Moon Scarf",         "description": "Can be worn. Placeholder epic.", "slot": "neckwear"},
-		{"id": "black_cat_legendary", "animal": "black_cat", "rarity": "legendary", "name": "Witch Hat",          "description": "Can be worn. Placeholder legendary.", "slot": "hat"},
+		{"id": "black_cat_epic",      "animal": "black_cat", "rarity": "epic",      "name": "Moon Scarf",         "description": "Can be worn. Placeholder epic.", "slot": "neckwear", "style": "scarf"},
+		{"id": "black_cat_legendary", "animal": "black_cat", "rarity": "legendary", "name": "Witch Hat",          "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "witch"},
 
 		{"id": "rabbit_common",       "animal": "rabbit",    "rarity": "common",    "name": "Carrot",             "description": "Helps you to see in the dark (maybe)."},
 		{"id": "rabbit_rare",         "animal": "rabbit",    "rarity": "rare",      "name": "Celery",             "description": "Crunchy. Shaped like a slide for ants."},
-		{"id": "rabbit_epic",         "animal": "rabbit",    "rarity": "epic",      "name": "Ruby Ring",          "description": "Can be worn. Looks very shiny.", "slot": "handwear"},
-		{"id": "rabbit_legendary",    "animal": "rabbit",    "rarity": "legendary", "name": "Bunny Ear Headband", "description": "Can be worn. Placeholder legendary.", "slot": "hat"},
+		{"id": "rabbit_epic",         "animal": "rabbit",    "rarity": "epic",      "name": "Ruby Ring",          "description": "Can be worn. Looks very shiny.", "slot": "gloves", "style": "ring"},
+		{"id": "rabbit_legendary",    "animal": "rabbit",    "rarity": "legendary", "name": "Bunny Ear Headband", "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "bunny_ears"},
 
 		{"id": "snail_common",        "animal": "snail",     "rarity": "common",    "name": "Slime",              "description": "Sticky and gooey slime."},
 		{"id": "snail_rare",          "animal": "snail",     "rarity": "rare",      "name": "Burger",             "description": "A burger! Where did it find this?"},
-		{"id": "snail_epic",          "animal": "snail",     "rarity": "epic",      "name": "Bow Tie",            "description": "Can be worn. Makes you look fancy.", "slot": "neckwear"},
-		{"id": "snail_legendary",     "animal": "snail",     "rarity": "legendary", "name": "Spiral Shell Hat",   "description": "Can be worn. Placeholder legendary.", "slot": "hat"},
+		{"id": "snail_epic",          "animal": "snail",     "rarity": "epic",      "name": "Bow Tie",            "description": "Can be worn. Makes you look fancy.", "slot": "neckwear", "style": "bowtie"},
+		{"id": "snail_legendary",     "animal": "snail",     "rarity": "legendary", "name": "Spiral Shell Hat",   "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "beanie"},
 
 		{"id": "bird_common",         "animal": "bird",      "rarity": "common",    "name": "Berries",            "description": "A few lovely red berries. Yummy."},
 		{"id": "bird_rare",           "animal": "bird",      "rarity": "rare",      "name": "Egg",                "description": "A freshly laid egg!"},
-		{"id": "bird_epic",           "animal": "bird",      "rarity": "epic",      "name": "Nest Hat",           "description": "Can be worn. 'Hand' made by the bird just for you!", "slot": "hat"},
-		{"id": "bird_legendary",      "animal": "bird",      "rarity": "legendary", "name": "Feather Cape",       "description": "Can be worn. Placeholder legendary.", "slot": "jumper"},
+		{"id": "bird_epic",           "animal": "bird",      "rarity": "epic",      "name": "Nest Hat",           "description": "Can be worn. 'Hand' made by the bird just for you!", "slot": "hat", "style": "nest"},
+		{"id": "bird_legendary",      "animal": "bird",      "rarity": "legendary", "name": "Feather Cape",       "description": "Can be worn. Placeholder legendary.", "slot": "top", "style": "cape"},
 
 		{"id": "bear_common",         "animal": "bear",      "rarity": "common",    "name": "Blackberry",         "description": "A sweet and tangy blackberry. Scrummy."},
 		{"id": "bear_rare",           "animal": "bear",      "rarity": "rare",      "name": "Beehive",            "description": "I think there are still bees living here..."},
-		{"id": "bear_epic",           "animal": "bear",      "rarity": "epic",      "name": "Bear Walking Stick", "description": "Can be equipped to walk with. Looks super cool.", "slot": "walking_stick"},
-		{"id": "bear_legendary",      "animal": "bear",      "rarity": "legendary", "name": "Honey Pot Hat",      "description": "Can be worn. Placeholder legendary.", "slot": "hat"}
+		{"id": "bear_epic",           "animal": "bear",      "rarity": "epic",      "name": "Bear Walking Stick", "description": "Can be equipped to walk with. Looks super cool.", "slot": "walking_stick", "style": "stick"},
+		{"id": "bear_legendary",      "animal": "bear",      "rarity": "legendary", "name": "Honey Pot Hat",      "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "pot"}
 	]
 }

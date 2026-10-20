@@ -4,6 +4,7 @@ extends RefCounted
 ## at the size and colour asked for, so they stay crisp at any UI scale.
 
 ## 24x24 viewBox paths. "fill:" marks a filled icon; the rest are 2px strokes.
+## Pass `stroke` to texture() for a bolder or lighter line.
 const PATHS := {
 	"back": "M15 5l-7 7 7 7",
 	"forward": "M9 5l7 7-7 7",
@@ -26,6 +27,13 @@ const PATHS := {
 	"lock": "M5 11h14v10H5zM8 11V8a4 4 0 0 1 8 0v3",
 	"star": "fill:M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z",
 	"close": "M6 6l12 12M18 6L6 18",
+	"bin": "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
+	"arrow_right": "M4 12h15M13 6l6 6-6 6",
+	"moon": "M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z",
+	"user": "M12 4a4 4 0 1 0 0 8a4 4 0 1 0 0-8zM4.5 20c1-3.8 4.2-5.8 7.5-5.8s6.5 2 7.5 5.8",
+	"trade": "M5 9h13l-4-4M19 15H6l4 4",
+	"dot": "fill:M12 5.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13z",
+	"shelf": "M3 15h18M5 15v4M19 15v4M7 15V9h4v6M13 15v-4h4v4",
 }
 
 static var _cache: Dictionary = {}
@@ -33,22 +41,23 @@ static var _cache: Dictionary = {}
 
 ## A texture of `name` at `px` logical pixels, drawn in `colour`. Rendered at
 ## the window's content scale (and at least 2x) so it's sharp when stretched.
-static func texture(name: String, px: int, colour: Color) -> Texture2D:
+static func texture(name: String, px: int, colour: Color, stroke: float = 2.2) -> Texture2D:
 	var oversample := 2.0
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree and tree.root:
 		oversample = maxf(2.0, tree.root.content_scale_factor * 2.0)
-	var key := "%s_%d_%s_%.1f" % [name, px, colour.to_html(), oversample]
+	var key := "%s_%d_%s_%.1f_%.1f" % [name, px, colour.to_html(), oversample, stroke]
 	if _cache.has(key):
 		return _cache[key]
 	var path: String = PATHS.get(name, PATHS["close"])
 	var hex := "#" + colour.to_html(false)
+	var opacity := ' opacity="%.3f"' % colour.a if colour.a < 1.0 else ""
 	var body: String
 	if path.begins_with("fill:"):
 		body = '<path d="%s" fill="%s"/>' % [path.trim_prefix("fill:"), hex]
 	else:
-		body = '<path d="%s" fill="none" stroke="%s" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' % [path, hex]
-	var svg := '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">%s</svg>' % body
+		body = '<path d="%s" fill="none" stroke="%s" stroke-width="%.2f" stroke-linecap="round" stroke-linejoin="round"/>' % [path, hex, stroke]
+	var svg := '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g%s>%s</g></svg>' % [opacity, body]
 	var img := Image.new()
 	img.load_svg_from_string(svg, px * oversample / 24.0)
 	var tex := ImageTexture.create_from_image(img)
