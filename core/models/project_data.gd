@@ -7,6 +7,8 @@ const KIND_MODULE := "module"
 
 @export var id: String = ""
 @export var name: String = ""
+## The pet's own name ("Biscuit"); "" if it hasn't been given one.
+@export var pet_name: String = ""
 @export var animal_id: String = ""
 ## One colour per recolourable part of the animal, in the order the animal lists its parts.
 @export var colours: Array[Color] = []
@@ -32,6 +34,7 @@ func to_dict() -> Dictionary:
 	return {
 		"id": id,
 		"name": name,
+		"pet_name": pet_name,
 		"animal_id": animal_id,
 		"colours": cols,
 		"kind": kind,
@@ -48,6 +51,7 @@ static func from_dict(d: Dictionary) -> ProjectData:
 	var p := ProjectData.new()
 	p.id = str(d.get("id", ""))
 	p.name = str(d.get("name", ""))
+	p.pet_name = str(d.get("pet_name", ""))
 	p.animal_id = str(d.get("animal_id", ""))
 	for c in d.get("colours", []):
 		p.colours.append(Color.from_string(str(c), Color.WHITE))

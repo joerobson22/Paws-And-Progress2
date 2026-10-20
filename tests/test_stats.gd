@@ -42,6 +42,50 @@ func test_streak() -> void:
 	eq(Stats.current_streak(s, today + 2, 0), 0)
 
 
+func test_rest_day_after_three_days() -> void:
+	var d := 86400
+	# Work Mon-Wed, rest Thu, work Fri.
+	var s := [_session(MONDAY, 900), _session(MONDAY + d, 900), _session(MONDAY + 2 * d, 900), _session(MONDAY + 4 * d, 900)]
+	var monday := Stats.local_day(MONDAY, 0)
+	eq(Stats.current_streak(s, monday + 4, 0), 4, "rest day forgiven, not counted")
+	eq(Stats.current_streak(s, monday + 3, 0), 3, "the rest day itself is still pending")
+	check(Stats.rest_day_ready(s, monday + 2, 0), "three days banks a rest day")
+	check(not Stats.rest_day_ready(s, monday + 1, 0), "two days doesn't")
+	check(not Stats.rest_day_ready(s, monday + 4, 0), "a rest day was just used")
+	# Two missed days in a row break it.
+	eq(Stats.current_streak(s, monday + 6, 0), 0)
+
+
+func test_rest_day_needs_three_days_before_it() -> void:
+	var d := 86400
+	# Work Mon, Tue, miss Wed, work Thu.
+	var s := [_session(MONDAY, 900), _session(MONDAY + d, 900), _session(MONDAY + 3 * d, 900)]
+	eq(Stats.current_streak(s, Stats.local_day(MONDAY, 0) + 3, 0), 1)
+
+
+func test_rest_day_yesterday_keeps_streak_alive_today() -> void:
+	var d := 86400
+	var s := [_session(MONDAY, 900), _session(MONDAY + d, 900), _session(MONDAY + 2 * d, 900)]
+	# Thursday missed, Friday not over yet.
+	eq(Stats.current_streak(s, Stats.local_day(MONDAY, 0) + 4, 0), 3)
+
+
+func test_daily_project_totals() -> void:
+	var monday := Stats.local_day(MONDAY, 0)
+	var s := [_session(MONDAY, 600, "a"), _session(MONDAY + 60, 300, "b"), _session(MONDAY + 2 * 86400, 900, "a")]
+	var days := Stats.daily_project_totals(s, monday, 0)
+	eq(days[0], {"a": 600, "b": 300})
+	eq(days[1], {})
+	eq(days[2], {"a": 900})
+
+
+func test_week_history() -> void:
+	var monday := Stats.local_day(MONDAY, 0)
+	var s := [_session(MONDAY - 14 * 86400, 600)]
+	eq(Stats.week_history(s, monday + 3, 0), [monday, monday - 7, monday - 14])
+	eq(Stats.week_history([], monday + 3, 0), [monday])
+
+
 func test_totals_by_project() -> void:
 	var s := [_session(0, 10, "a"), _session(0, 5, "b"), _session(0, 7, "a")]
 	eq(Stats.totals_by_project(s), {"a": 17, "b": 5})

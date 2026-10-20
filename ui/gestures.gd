@@ -1,0 +1,12 @@
+class_name Gestures
+extends RefCounted
+## Shared pointer rules, so one drag never does two things. A control that
+## takes over the pointer (lifting a gift to drag it) sets `claimed` until
+## the pointer is released, and the app shell won't turn that into a swipe.
+
+## How far a press can wander and still count as a tap.
+const TAP_SLOP := 12.0
+## Hold this long without moving to pick something up.
+const LONG_PRESS := 0.35
+
+static var claimed := false

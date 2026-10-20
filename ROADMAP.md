@@ -25,9 +25,9 @@ This roadmap rebuilds the original Godot 4.3 prototype (`Paws-And-Progress`) as 
 | Focus walk: parallax scenes (lake, land, logs, rocks, trees, sky, fireflies), day/night | Keep and expand into multiple biomes with seamless procedural chunking |
 | Gifts on walks over 10 min (common / rare / epic, 3 per animal) | Expand to **common / rare / epic / legendary**; epic + legendary are wearable |
 | Character customisation (hat, hair, face, jumper, neckwear, handwear, walking stick, trousers, skin & hair tones) | Keep slots; cosmetics now come from gifts as well as defaults |
-| Completed projects notice board | Keep; add memorabilia polaroid of the animal + optional grade badge |
+| Completed projects notice board | Becomes a completed projects screen: a panel per project with its animal, time, gifts found and an optional GCSE / A-Level / university grade badge |
 | Stats: weekly total, weekly PB, longest focus, daily bar chart, past weeks | Keep; add per-project share, streaks, weekly records, all-time history |
-| Cosy room (curtains, fireplace, light levels, ambience) | Keep as the home screen hub |
+| Cosy room (curtains, fireplace, light levels, ambience) | Replaced by a four-sided layout that fits phones: a central focus screen with gifts, completed projects, profile and stats one swipe away on each side |
 | Local JSON save | Replace with versioned local save + optional cloud sync |
 
 ---
@@ -38,26 +38,27 @@ This roadmap rebuilds the original Godot 4.3 prototype (`Paws-And-Progress`) as 
 Goal: v1 feature parity on a clean, modern architecture.
 
 - [ ] New Godot 4.x project, mobile renderer, responsive layout for portrait phone, landscape tablet and desktop windows
+- [ ] Four-sided swipe navigation round the focus screen, with a minimap; shared UI components and one animation style app-wide
 - [ ] Data layer: `Project`, `Animal`, `Gift`, `Cosmetic`, `FocusSession`, `WeekStats` as typed Resources
 - [ ] Versioned save file with migrations; import of a v1 `gamedata.save`
 - [ ] Session timer based on start timestamps (survives backgrounding, sleep and app kill)
 - [ ] Project CRUD + animal assignment + animal recolouring
 - [ ] Focus walk scene: modular parallax biome system, animal walk cycles, pause / finish
-- [ ] End-of-walk screen with gift roll
-- [ ] Gift shelf
+- [ ] End-of-walk screen with gift roll (pet dives into a bush and brings the gift back)
+- [ ] Gift shelf (three favourites, drag and drop) and trade-ins up a rarity
 - [ ] Character customisation
-- [ ] Completion flow → notice board polaroid
+- [ ] Completion flow → completed projects panel + grade badge
 - [ ] Stats screen (weekly chart, totals, PBs)
-- [ ] Settings: sound, ambience, reduce motion, theme
+- [ ] Settings: sound, ambience, reduce motion, light/dark theme
 - [ ] Automated builds for desktop + Android in CI
 
 **Exit criteria:** a v1 user would happily switch.
 
 ### Phase 2 — Polish & progression
-- [ ] Four rarities with drop table tuned by walk length (e.g. legendary only possible on 45 min+ walks, small pity timer)
+- [ ] Four rarities with drop table tuned by walk length (e.g. legendary only possible on 45 min+ walks, small pity timer), plus guaranteed minimum rarities shown filling the walk's gift button
 - [ ] Epic + legendary gifts equippable as cosmetics on the walker (and optionally on the animal)
-- [ ] More biomes: lake, forest, beach, mountains, snowy village, autumn park, night sky; weather + time-of-day tied to the real clock
-- [ ] Biome unlocks via total hours walked
+- [ ] More places: lakeside, forest, jungle, tundra (snow and wind), desert, beach, moon (done, with placeholder art and the sky, sun and moon following the real clock); then mountains, snowy village, autumn park; weather tied to the real forecast
+- [ ] Place unlocks (and new animals) via XP levels: 1 XP a minute plus gift bonuses, rewards set in data
 - [ ] Animal bond levels (hours walked with that animal) unlocking extra idle animations / gifts
 - [ ] Streaks with gentle "rest day" tokens so a missed day doesn't punish you
 - [ ] Break reminders (Pomodoro-style optional mode: animal sits down for a drink)
@@ -88,7 +89,7 @@ Goal: v1 feature parity on a clean, modern architecture.
 ### Phase 5 — Schools, colleges & universities
 - [ ] **Step 1: LMS course import.** Sign in to the institution's LMS (Canvas, Moodle, Blackboard, Brightspace) via OAuth and import enrolled courses as projects
 - [ ] **Step 2: LTI 1.3 app.** Institutions install Paws & Progress as an LTI tool so students launch it from the LMS
-- [ ] **Step 3: Grades.** Read final grades where the LMS API allows, and auto-complete modules with a grade badge (e.g. bronze / silver / gold / first-class rosette)
+- [ ] **Step 3: Grades.** Read final grades where the LMS API allows, and auto-complete modules with the same grade badges players can already set by hand
 - [ ] Institution admin portal + per-institution leaderboards / study challenges
 - [ ] Target audience: **college and above (16+)**. Age gate at sign-up; no under-16 accounts, which keeps COPPA out of scope
 - [ ] Compliance: GDPR (UK/EU), FERPA (US), data processing agreements, minimal data retention
@@ -111,7 +112,7 @@ Goal: v1 feature parity on a clean, modern architecture.
 ```
 Godot 4.x client (GDScript)
 ├── core/        data models, save system, session timer, gift roller
-├── scenes/      home, projects, walk, end-walk, shelf, wardrobe, board, stats, friends
+├── scenes/      shell + panes (focus, gifts, completed, profile, stats), choose focus, walk, focus complete
 ├── biomes/      data-driven parallax chunks per biome
 ├── animals/     animal definitions + sprites + walk cycles
 ├── platform/    per-platform plugins: Steam, iOS (Live Activities, Game Center, IAP), Android

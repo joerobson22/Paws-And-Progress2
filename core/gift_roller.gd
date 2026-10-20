@@ -1,6 +1,7 @@
 class_name GiftRoller
 extends RefCounted
-## Rolls the end-of-walk gift from the data-driven drop table (data/drop_table.json).
+## Rolls the end-of-walk gift from the data-driven drop table (data/drop_table.json),
+## and trades gifts up a rarity.
 
 const RARITIES: Array[String] = ["common", "rare", "epic", "legendary"]
 
@@ -16,15 +17,41 @@ static func weights_for(seconds: int, table: Dictionary) -> Dictionary:
 	return best
 
 
-## Odds as whole percentages, for showing on the walk screen.
+## The lowest rarity a walk this long is sure to bring, or "" for no gift.
+static func min_rarity(seconds: int, table: Dictionary) -> String:
+	if seconds < int(table.get("min_seconds", 600)):
+		return ""
+	var floor_rarity := "common"
+	var guaranteed: Dictionary = table.get("guaranteed", {})
+	for r in RARITIES:
+		if guaranteed.has(r) and seconds >= int(guaranteed[r]):
+			floor_rarity = r
+	return floor_rarity
+
+
+## How far the walk is towards guaranteeing each rarity (0..1), measured from
+## the first gift. Drives the circles filling the walk screen's gift button.
+static func fill(seconds: int, table: Dictionary) -> Dictionary:
+	var start := int(table.get("min_seconds", 600))
+	var guaranteed: Dictionary = table.get("guaranteed", {})
+	var out := {}
+	for r in RARITIES:
+		if guaranteed.has(r):
+			var at := int(guaranteed[r])
+			out[r] = clampf(float(seconds - start) / maxf(1.0, at - start), 0.0, 1.0)
+	return out
+
+
+## Odds as whole percentages, with rarities below the guaranteed one at 0.
 static func percentages_for(seconds: int, table: Dictionary) -> Dictionary:
 	var w := weights_for(seconds, table)
+	var allowed := _from(min_rarity(seconds, table))
 	var out := {}
 	var total := 0.0
-	for r in RARITIES:
+	for r in allowed:
 		total += float(w.get(r, 0))
 	for r in RARITIES:
-		out[r] = 0 if total <= 0.0 else roundi(100.0 * float(w.get(r, 0)) / total)
+		out[r] = 0 if total <= 0.0 or not allowed.has(r) else roundi(100.0 * float(w.get(r, 0)) / total)
 	return out
 
 
@@ -42,11 +69,15 @@ static func roll(seconds: int, animal_id: String, walks_since_epic: int, table: 
 		return {}
 
 	var pity := is_pity_ready(seconds, walks_since_epic, table)
-	var candidates: Array[String] = RARITIES.duplicate()
-	if pity:
-		candidates = ["epic", "legendary"]
-		if float(weights.get("epic", 0)) + float(weights.get("legendary", 0)) <= 0.0:
-			weights = {"epic": 1}
+	var floor_rarity := min_rarity(seconds, table)
+	if pity and RARITIES.find(floor_rarity) < RARITIES.find("epic"):
+		floor_rarity = "epic"
+	var candidates := _from(floor_rarity)
+	var total := 0.0
+	for r in candidates:
+		total += float(weights.get(r, 0))
+	if total <= 0.0:
+		weights = {floor_rarity: 1}
 
 	var rarity := _weighted_pick(candidates, weights, rng)
 	var pool: Array = gifts.filter(func(g): return g["animal"] == animal_id and g["rarity"] == rarity)
@@ -63,6 +94,33 @@ static func next_pity_count(current: int, seconds: int, rolled_rarity: String, t
 	if seconds >= int(table.get("pity_min_seconds", 1800)):
 		return current + 1
 	return current
+
+
+## Swaps `cost` of a gift for one of the next rarity from the same animal,
+## changing `inventory`. Returns the new gift's id, or "" if it can't trade.
+static func trade(inventory: Dictionary, gift_id: String, gifts: Array, cost: int) -> String:
+	if cost <= 0 or int(inventory.get(gift_id, 0)) < cost:
+		return ""
+	var found: Array = gifts.filter(func(g): return g["id"] == gift_id)
+	if found.is_empty():
+		return ""
+	var g: Dictionary = found[0]
+	var i := RARITIES.find(str(g["rarity"]))
+	if i < 0 or i >= RARITIES.size() - 1:
+		return ""
+	var next: Array = gifts.filter(func(x): return x["animal"] == g["animal"] and x["rarity"] == RARITIES[i + 1])
+	if next.is_empty():
+		return ""
+	var new_id: String = next[0]["id"]
+	inventory[gift_id] = int(inventory[gift_id]) - cost
+	inventory[new_id] = int(inventory.get(new_id, 0)) + 1
+	return new_id
+
+
+## The rarities from `rarity` upwards.
+static func _from(rarity: String) -> Array[String]:
+	var i := maxi(0, RARITIES.find(rarity))
+	return RARITIES.slice(i)
 
 
 static func _weighted_pick(candidates: Array[String], weights: Dictionary, rng: RandomNumberGenerator) -> String:

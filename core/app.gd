@@ -1,14 +1,24 @@
 extends Node
 ## Autoload "App": owns the GameState, saves it, runs the walk lifecycle and
-## asks the main scene to change screens.
+## asks the app shell to move between screens.
 
+## Screens: the five panes ("focus", "gifts", "completed", "profile",
+## "stats"), the full-screen flows ("choose_focus", "walk", "finish"), and
+## "home", which closes any flow and returns to the focus pane.
 signal navigate(screen: String, params: Dictionary)
 signal state_changed
 
 var state: GameState
 var rng := RandomNumberGenerator.new()
-## Set when this launch imported a v1 save, so the home screen can say so.
+## Set when this launch imported a v1 save, so the app can say so.
 var imported_from_v1 := false
+## Friends for the leaderboard: [{name, weekly_seconds, walking, look}].
+## Filled by the friends service once accounts exist (roadmap phase 4);
+## never saved locally.
+var friends: Array = []
+
+var _xp := 0
+var _xp_key := ""
 
 
 func _ready() -> void:
@@ -41,6 +51,11 @@ func today() -> int:
 
 func set_setting(key: String, value) -> void:
 	state.settings[key] = value
+	_changed()
+
+
+func set_profile(key: String, value) -> void:
+	state.profile[key] = value
 	_changed()
 
 
@@ -86,6 +101,68 @@ func complete_project(id: String) -> void:
 		_changed()
 
 
+## `grade_ref` is "<scale>/<grade>" from data/grades.json, or "" for none.
+func set_grade(id: String, grade_ref: String) -> void:
+	var p := state.project(id)
+	if p:
+		p.grade = grade_ref
+		_changed()
+
+
+# --- Levels ------------------------------------------------------------------
+
+func xp() -> int:
+	# Summed from the walk log, so cached until the log changes.
+	var key := "%d:%d:%d" % [state.get_instance_id(), state.sessions.size(), int(state.profile.get("legacy_total_seconds", 0))]
+	if key != _xp_key:
+		_xp_key = key
+		_xp = Levels.total_xp(state.sessions, int(state.profile.get("legacy_total_seconds", 0)), Content.levels, Content.gift_rarity)
+	return _xp
+
+
+func level() -> int:
+	return Levels.level_for(xp(), Content.levels)
+
+
+## Whether an animal or place ("animal" / "place") is unlocked yet.
+func is_unlocked(type: String, id: String) -> bool:
+	return level() >= Levels.unlock_level(type, id, Content.levels)
+
+
+# --- Gifts -------------------------------------------------------------------
+
+## Trades gifts up a rarity. Returns the new gift's id, or "" if it can't.
+func trade_in(gift_id: String) -> String:
+	var g := Content.gift(gift_id)
+	if g.is_empty():
+		return ""
+	var new_id := GiftRoller.trade(state.inventory, gift_id, Content.gifts, Content.trade_cost(g["rarity"]))
+	if new_id != "":
+		state.tidy_gift_references()
+		_changed()
+	return new_id
+
+
+func place_on_shelf(gift_id: String, index: int) -> void:
+	state.place_on_shelf(gift_id, index)
+	_changed()
+
+
+func remove_from_shelf(index: int) -> void:
+	state.remove_from_shelf(index)
+	_changed()
+
+
+# --- Character ---------------------------------------------------------------
+
+## Saves a look from the customise popup: {skin_tone, hair_tone, cosmetics}.
+func set_look(look: Dictionary) -> void:
+	state.profile["skin_tone"] = int(look.get("skin_tone", 0))
+	state.profile["hair_tone"] = int(look.get("hair_tone", 0))
+	state.profile["cosmetics"] = (look.get("cosmetics", {}) as Dictionary).duplicate()
+	_changed()
+
+
 # --- Walks -------------------------------------------------------------------
 
 func start_walk(project_id: String, goal_seconds: int = -1, biome_id: String = "") -> void:
@@ -110,7 +187,7 @@ func resume_walk() -> void:
 
 
 ## Ends the walk, logs it, rolls the gift and returns a summary for the
-## end-of-walk screen: {session: FocusSession, gift: Dictionary}.
+## focus complete screen: {session: FocusSession, gift: Dictionary}.
 func finish_walk() -> Dictionary:
 	var clock := state.active
 	if clock == null:

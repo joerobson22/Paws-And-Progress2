@@ -3,7 +3,7 @@ extends RefCounted
 ## Versioned JSON save with migrations, atomic writes, a backup copy, and
 ## import of a v1 `gamedata.save`.
 
-const CURRENT_VERSION := 1
+const CURRENT_VERSION := 2
 const SAVE_PATH := "user://save.json"
 
 ## v1 animal order (global.gd `animals`), mapped to the v2 cast.
@@ -27,6 +27,12 @@ const V1_TO_V2 := {
 	"nigel": "black_cat",
 }
 const V1_RARITIES: Array[String] = ["common", "rare", "epic"]
+## v1's cosmetic slots in its save order, by their v2 names.
+const V1_COSMETIC_SLOTS: Array[String] = [
+	"hat", "hair", "face", "top", "neckwear", "gloves", "walking_stick", "trousers",
+]
+## Cosmetic slots renamed in save version 2.
+const RENAMED_SLOTS_V2 := {"jumper": "top", "handwear": "gloves"}
 
 
 # --- Serialisation -----------------------------------------------------------
@@ -59,6 +65,9 @@ static func from_dict(raw: Dictionary) -> GameState:
 	for k in ["created_unix", "skin_tone", "hair_tone", "walks_since_epic",
 			"legacy_total_seconds", "legacy_longest_seconds", "legacy_best_week_seconds"]:
 		state.profile[k] = int(state.profile[k])
+	state.profile["username"] = str(state.profile["username"])
+	state.profile["institution"] = str(state.profile["institution"])
+	state.profile["shelf"] = state.shelf()
 	for p in d.get("projects", []):
 		state.projects.append(ProjectData.from_dict(p))
 	for s in d.get("sessions", []):
@@ -78,13 +87,26 @@ static func migrate(d: Dictionary) -> Dictionary:
 	var version := int(out.get("version", 1))
 	while version < CURRENT_VERSION:
 		match version:
-			# Add a step per format change, e.g.:
-			# 1: out = _migrate_1_to_2(out)
+			1:
+				out = _migrate_1_to_2(out)
 			_:
 				pass
 		version += 1
 		out["version"] = version
 	return out
+
+
+## Version 2 renamed the jumper and handwear slots to top and gloves.
+static func _migrate_1_to_2(d: Dictionary) -> Dictionary:
+	var profile: Dictionary = d.get("profile", {})
+	var cosmetics: Dictionary = profile.get("cosmetics", {})
+	for old in RENAMED_SLOTS_V2:
+		if cosmetics.has(old):
+			var new_slot: String = RENAMED_SLOTS_V2[old]
+			if str(cosmetics.get(new_slot, "")) == "":
+				cosmetics[new_slot] = cosmetics[old]
+			cosmetics.erase(old)
+	return d
 
 
 # --- Files -------------------------------------------------------------------
@@ -161,9 +183,9 @@ static func _import_v1_player(g: Dictionary, state: GameState, now: int) -> void
 	# v1 stored cosmetics as style indices per slot; keep them as "v1:<index>"
 	# until the wardrobe maps them to real item ids.
 	var cosmetics: Array = g.get("cosmetics", [])
-	for i in mini(cosmetics.size(), GameState.COSMETIC_SLOTS.size()):
+	for i in mini(cosmetics.size(), V1_COSMETIC_SLOTS.size()):
 		if int(cosmetics[i]) > 0:
-			p["cosmetics"][GameState.COSMETIC_SLOTS[i]] = "v1:%d" % int(cosmetics[i])
+			p["cosmetics"][V1_COSMETIC_SLOTS[i]] = "v1:%d" % int(cosmetics[i])
 
 	# v1 gifts: a flat array of counts, index = animal * 3 + rarity.
 	var gifts: Array = g.get("gifts", [])
@@ -182,6 +204,7 @@ static func _import_v1_project(d: Dictionary, index: int, now: int) -> ProjectDa
 	var p := ProjectData.new()
 	p.id = "v1_%d" % index
 	p.name = str(d.get("projectName", "Project"))
+	p.pet_name = str(d.get("animalName", ""))
 	var animal_index := int(d.get("animal", 0))
 	p.animal_id = V1_TO_V2[V1_ANIMALS[clampi(animal_index, 0, V1_ANIMALS.size() - 1)]]
 	for part in ["part1", "part2", "part3"]:
