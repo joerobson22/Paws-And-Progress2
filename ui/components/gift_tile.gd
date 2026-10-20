@@ -5,7 +5,7 @@ extends PanelContainer
 ## In the collection it shades a little under the pointer; on the shelf
 ## (`plain`) it has no card or count, and grows with a glint instead.
 ## Where gifts can be dragged (the shelf editor), press and hold to pick one
-## up, or with `quick_drag` just start dragging (`lifted` either way).
+## up, or with `quick_drag` just start dragging too (`lifted` either way).
 
 signal tapped(gift_id: String)
 signal lifted(tile: GiftTile)
@@ -37,6 +37,8 @@ func _init(id: String, count: int, plain: bool = false) -> void:
 	_press.tapped.connect(func(): tapped.emit(gift_id))
 	_press.held.connect(func():
 		if draggable:
+			# Picked up by holding: moving afterwards mustn't pick it up again.
+			_armed = false
 			Motion.pop(self, 0.08)
 			lifted.emit(self))
 	mouse_filter = Control.MOUSE_FILTER_PASS

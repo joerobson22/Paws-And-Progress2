@@ -13,7 +13,7 @@ static func list(data: Dictionary, animals: Array, gifts: Array) -> Array:
 	for f in data.get("focus", []):
 		var hours := int(f["hours"])
 		out.append({"id": f["id"], "name": f["name"], "kind": "hours", "goal": hours, "icon": "clock", "animal": "",
-			"description": "Focus for %s hours in total" % _grouped(hours)})
+			"description": "Focus for %s hours in total" % grouped(hours)})
 	var all: Dictionary = data.get("all_gifts", {})
 	out.append({"id": all.get("id", "all_gifts"), "name": all.get("name", "Full collection"), "kind": "all_gifts",
 		"goal": gifts.size(), "icon": "gift", "animal": "", "description": "Find every gift"})
@@ -53,7 +53,7 @@ static func progress(achievements: Array, focused_seconds: int, found: Array, gi
 
 
 ## 10000 as "10,000".
-static func _grouped(n: int) -> String:
+static func grouped(n: int) -> String:
 	var s := str(n)
 	var out := ""
 	while s.length() > 3:

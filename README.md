@@ -54,22 +54,27 @@ the little map at the bottom, which shows where you are:
   while you fill that in the bottom buttons go, the × cancels and the + turns
   into a tick that adopts it. Debug builds (running from the editor) also show
   a switch in the top left that unlocks every animal and place.
-- **Gifts** (left): a shelf for your three favourites, every gift you've found
-  (filter by rarity, A–Z or animal; pick the same one again to reverse it;
-  only this collection scrolls), and trade-ins (10 commons for a rare, 5 rares
-  for an epic, 3 epics for a legendary). Shelf gifts grow and glint under the
-  pointer, and are greyed out in the collection, so you handle them from the
-  shelf. The pencil by the shelf opens a popup to arrange it: drag gifts onto
-  it, along it and off it. Putting a gift on a full shelf sets the shelf
-  wobbling: tap the gift to swap out, or anywhere else to cancel. Trading away
-  the last of a shelf gift takes it off the shelf.
+- **Gifts** (left): a shelf for your three favourites (they grow and glint
+  under the pointer; tap one for a closer look and its trade-in), and three
+  rings for how your collection's coming along: gifts discovered (green),
+  pets' gift tables completed (blue) and cosmetics unlocked from gifts
+  (purple). The pencil by the shelf opens the shelf editor, with every gift
+  you've found (filter by rarity, A–Z or animal; pick the same one again to
+  reverse it). There it's all drag and drop: onto an empty spot to put a gift
+  up, onto a full one to swap it in, along the shelf to rearrange, and off it
+  to take one down. Gifts on the shelf are greyed out in the collection. On a
+  phone, press and hold a gift first, as dragging scrolls the list. Tap any
+  gift for its trade-in (10 commons for a rare, 5 rares for an epic, 3 epics
+  for a legendary); trading away the last of a shelf gift takes it off the
+  shelf.
 - **Completed** (right): a panel per finished project. Tap the circled "?" in
   its corner to give it a GCSE, A-Level or university grade, and tap the grade
   to change it.
 - **Profile** (up): your character (the pencil customises it) with your level
   badge in the bottom left (it shines under the pointer; tap it for every
-  reward) and your XP along the bottom, account details, your time focused,
-  gifts and finished projects, and your achievements at the bottom: 10, 50,
+  reward) and your XP along the bottom, and your account details. Your
+  achievements fill the rest of the screen, as many as fit, so the page never
+  scrolls; tap them for the full list with how far along each one is: 10, 50,
   100, 500, 1,000 and 10,000 hours focused, every gift found, and a set for
   each animal's gifts (`data/achievements.json`). The settings are behind the
   gear in the top left.
@@ -137,9 +142,9 @@ godot --headless --path . -s tests/run_tests.gd   # unit tests
 godot --headless --path . -s tests/smoke.gd       # drives the whole app with sample data
 ```
 
-The smoke run draws every place, swipes between panes, arranges the shelf in
-its popup and swaps onto a full one, sorts and trades gifts, grades a project
-from its "?", opens every popup, picks a place (and tries a locked one),
+The smoke run draws every place, swipes between panes, arranges the shelf by
+dragging (on, swapped in, along and off), sorts and trades gifts, grades a
+project from its "?", opens every popup (achievements included), picks a place (and tries a locked one),
 adopts a pet, walks for "50 minutes" through to the gift and the
 XP bar, throws the gift for the pet to fetch, and switches to dark mode and
 back.
@@ -165,6 +170,7 @@ core/            game logic, no UI
   levels.gd        XP from the walk log, levels, and what each one unlocks
   stats.gd         weekly totals, records, streaks (from the session log)
   achievements.gd  achievements and how far along each one is
+  collection.gd    the gifts screen's rings: discovered, gift tables, cosmetics
   models/          ProjectData, FocusSession resources
 data/            all content: animals, gifts, drop table, places (biomes),
                  levels, cosmetics, grades, achievements, walk quotes,

@@ -1,13 +1,17 @@
 class_name ShelfEditor
 extends Control
 ## Arranging the shelf, in a popup from the pencil on the gifts screen: the
-## three spots stay along the top with every gift you have scrolling below.
-## Drag a gift onto a spot to put it there (swapping out what was there),
-## drag one along the shelf to swap places, or drag one off the shelf to
-## take it down. Shelf gifts move as soon as you drag them; collection gifts
-## need a press and hold first, so the list still scrolls. Every change
-## saves straight away. Being a popup, none of this can move the app
-## between screens.
+## three spots stay along the top with every gift you've found scrolling
+## below (in the order picked from "Filter by"). It's all drag and drop:
+## drag a gift onto an empty spot to put it there, onto a full one to swap
+## it in, along the shelf to move it, or off the shelf to take it down.
+## Gifts already on the shelf are greyed out below. On a computer, gifts
+## pick up as soon as you drag them; on a phone or tablet dragging scrolls
+## the list, so press and hold one first. Tap any gift for a closer look. Every change saves
+## straight away, and being a popup, none of it can move the app between
+## screens.
+
+const SORTS := [["rarity", "Rarity"], ["name", "A–Z"], ["animal", "Animal"]]
 
 var modal: Modal
 var _shelf_box: VBoxContainer
@@ -18,6 +22,7 @@ var _drag_id := ""
 var _drag_from := -1
 var _drag_source: Control
 var _hover := -1
+var _off_shelf := false
 ## The pointer while dragging, in viewport coordinates.
 var _pointer := Vector2.ZERO
 
@@ -29,7 +34,21 @@ static func open() -> Modal:
 	m.header.add_child(m.heading_row("Your shelf"))
 	editor._shelf_box = UI.vbox(0)
 	m.header.add_child(editor._shelf_box)
-	m.header.add_child(UI.para("Drag gifts onto the shelf or along it, and off it to take them down. Hold a gift below to pick it up.", 13, UI.INK_SOFT))
+	var how := "Drag gifts onto the shelf, along it and off it." if _quick() \
+		else "Hold a gift to pick it up, then drag it onto the shelf, along it or off it."
+	m.header.add_child(UI.para(how + " Tap one for a closer look.", 13, UI.INK_SOFT))
+	var head := UI.hbox(8)
+	var cap := UI.caption("Your collection")
+	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(cap)
+	head.add_child(UI.spacer())
+	var sort := Dropdown.new(SORTS, str(App.state.settings.get("gift_sort", "rarity")),
+		bool(App.state.settings.get("gift_sort_reversed", false)), "Filter by")
+	sort.chosen.connect(func(option: String, reversed: bool):
+		App.state.settings["gift_sort"] = option
+		App.set_setting("gift_sort_reversed", reversed))
+	head.add_child(sort)
+	m.header.add_child(head)
 	editor._grid = GridContainer.new()
 	editor._grid.add_theme_constant_override("h_separation", 10)
 	editor._grid.add_theme_constant_override("v_separation", 10)
@@ -42,6 +61,36 @@ static func open() -> Modal:
 	editor.refresh()
 	App.state_changed.connect(editor.refresh)
 	return m
+
+
+## Whether collection gifts pick up as soon as they're dragged: on a
+## computer, where the list scrolls with the wheel. (The app turns mouse
+## presses into touches, so it can't go by whether there's a touch screen.)
+static func _quick() -> bool:
+	return OS.has_feature("pc")
+
+
+## Rarity puts the rarest first; A–Z is by name; animal follows the cast,
+## commonest first within each. `reversed` flips the whole order.
+static func sort_gifts(ids: Array, by: String, reversed: bool) -> Array:
+	var order := {}
+	for i in Content.animals.size():
+		order[Content.animals[i]["id"]] = i
+	var key := func(id: String) -> Array:
+		var g := Content.gift(id)
+		var rarity := GiftRoller.RARITIES.find(g["rarity"])
+		match by:
+			"name":
+				return [str(g["name"]).to_lower()]
+			"animal":
+				return [order.get(g["animal"], 99), rarity]
+			_:
+				return [-rarity, str(g["name"]).to_lower()]
+	var out := ids.duplicate()
+	out.sort_custom(func(a, b): return key.call(a) < key.call(b))
+	if reversed:
+		out.reverse()
+	return out
 
 
 ## Rebuilds the shelf and the collection from the saved state.
@@ -63,6 +112,7 @@ func refresh() -> void:
 			tile.draggable = true
 			tile.quick_drag = true
 			tile.lifted.connect(_lift.bind(i))
+			tile.tapped.connect(GiftsPane.show_gift)
 			slot.add_child(tile)
 			slot.filled = true
 		row.add_child(slot)
@@ -73,21 +123,26 @@ func refresh() -> void:
 	_shelf_box.add_child(plank)
 
 	_grid.columns = 5 if modal.body.custom_minimum_size.x >= 420.0 else 4
+	# Found gifts you have at least one of: a traded-away gift can't go up.
 	var ids: Array = App.state.inventory.keys().filter(func(gift): return not Content.gift(gift).is_empty() and App.state.gift_count(gift) > 0)
-	for id in GiftsPane.sort_gifts(ids, str(App.state.settings.get("gift_sort", "rarity")), bool(App.state.settings.get("gift_sort_reversed", false))):
+	for id in sort_gifts(ids, str(App.state.settings.get("gift_sort", "rarity")), bool(App.state.settings.get("gift_sort_reversed", false))):
 		var tile := GiftTile.new(id, App.state.gift_count(id))
 		tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if shelf.has(id):
 			tile.set_on_shelf()
 		else:
 			tile.draggable = true
+			tile.quick_drag = _quick()
 			tile.lifted.connect(_lift.bind(-1))
+			tile.tapped.connect(GiftsPane.show_gift)
 		_grid.add_child(tile)
 
 
 # --- Dragging ----------------------------------------------------------------
 
 func _lift(tile: GiftTile, from: int) -> void:
+	if _drag_id != "":
+		return
 	_drag_id = tile.gift_id
 	_drag_from = from
 	_drag_source = tile
@@ -97,6 +152,7 @@ func _lift(tile: GiftTile, from: int) -> void:
 	_ghost.pivot_offset = _ghost.size * 0.5
 	add_child(_ghost)
 	_pointer = tile.press_point()
+	_off_shelf = false
 	_move_ghost()
 	Motion.pop(_ghost, 0.15)
 	Audio.play("pop", 0.85, -8.0)
@@ -112,7 +168,7 @@ func _input(e: InputEvent) -> void:
 		_move_ghost()
 		_update_hover()
 	elif e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and not e.pressed:
-		get_viewport().set_input_as_handled()
+		# The release carries on to the list too, so it stops drag-scrolling.
 		_pointer = e.position
 		_update_hover()
 		_drop()
@@ -122,6 +178,8 @@ func _move_ghost() -> void:
 	_ghost.position = get_global_transform_with_canvas().affine_inverse() * _pointer - _ghost.size * 0.5
 
 
+## Lights up the spot under the pointer. A shelf gift dragged away from the
+## shelf shrinks and fades, to show it'll come down if you let go.
 func _update_hover() -> void:
 	var hit := -1
 	for i in _slots.size():
@@ -133,6 +191,14 @@ func _update_hover() -> void:
 		_hover = hit
 		if hit >= 0:
 			_slots[hit].highlight = true
+	var off := _drag_from >= 0 and not _shelf_box.get_global_rect().grow(10.0).has_point(_pointer)
+	if off != _off_shelf:
+		_off_shelf = off
+		# The same key as dropping it, so a drop takes over from this.
+		var t := Motion.tween(_ghost, "ghost")
+		t.set_parallel(true)
+		t.tween_property(_ghost, "modulate:a", 0.5 if off else 1.0, Motion.time(Motion.FAST))
+		t.tween_property(_ghost, "scale", Vector2.ONE * (0.8 if off else 1.0), Motion.time(Motion.FAST))
 
 
 func _drop() -> void:
@@ -141,9 +207,11 @@ func _drop() -> void:
 	var from := _drag_from
 	_drag_id = ""
 	var ghost := _ghost
-	var t := Motion.tween(ghost, "drop")
+	var t := Motion.tween(ghost, "ghost")
 	t.set_parallel(true)
 	if _hover >= 0:
+		# Onto a spot: an empty one takes it, a full one swaps it in (its gift
+		# goes back to the collection, or along to where this one came from).
 		var slot := _slots[_hover]
 		var at := get_global_transform_with_canvas().affine_inverse() * slot.get_global_rect().get_center() - ghost.size * 0.5
 		var target := _hover
@@ -152,13 +220,14 @@ func _drop() -> void:
 			ghost.queue_free()
 			App.place_on_shelf(id, target))
 		Audio.play("pop", 1.1, -4.0)
-	elif from >= 0 and not _shelf_box.get_global_rect().has_point(_pointer):
+	elif from >= 0 and _off_shelf:
 		# Dragged off the shelf: take it down.
 		t.tween_property(ghost, "modulate:a", 0.0, Motion.time(Motion.FAST))
-		t.tween_property(ghost, "scale", Vector2.ONE * 0.6, Motion.time(Motion.FAST))
+		t.tween_property(ghost, "scale", Vector2.ONE * 0.5, Motion.time(Motion.FAST))
 		t.chain().tween_callback(func():
 			ghost.queue_free()
 			App.remove_from_shelf(from))
+		Audio.play("pop", 0.7, -8.0)
 	else:
 		# Dropped nowhere: float back to where it came from.
 		var source := _drag_source
@@ -172,6 +241,7 @@ func _drop() -> void:
 	if _hover >= 0:
 		_slots[_hover].highlight = false
 	_hover = -1
+	_off_shelf = false
 
 
 
