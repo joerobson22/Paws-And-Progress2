@@ -4,7 +4,7 @@ Walk your animals through beautiful scenery while you work. Every project or
 course module gets its own animal, every focus session is a walk, and every
 walk over 10 minutes ends with a gift.
 
-This is the v2 rebuild in **Godot 4.5** (GDScript), targeting iOS, Android,
+This is the v2 rebuild in **Godot 4.6** (GDScript), targeting iOS, Android,
 macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
 
 <p>
@@ -106,7 +106,7 @@ it, then flick it. Your pet will fetch it, wading in if it lands in the water.
 
 ## Running it
 
-1. Install Godot 4.5 (standard build, not .NET).
+1. Install Godot 4.6 (standard build, not .NET).
 2. In the project manager, **Import** and pick this folder's `project.godot`.
 3. Press **F5**. Resize the window narrow and tall to see the phone layout.
 
