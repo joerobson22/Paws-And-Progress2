@@ -1,5 +1,5 @@
 {
-	"_doc": "Each place is a stack of parallax layers drawn back to front. 'kind' picks a placeholder drawer: hills, mountains, trees, pines, broadleaf, canopy, palms, mesas, cacti, water, ground, reeds, fronds, drifts, planet. 'parallax' is how fast the layer scrolls relative to the ground (1.0). 'y' and 'height' are fractions of the screen height. Optional per layer: 'snow' (white tips), 'foam' (surf on water), 'path' (the path colour on ground), 'craters'. Per place: 'icon' for its button, 'ambience' (a sound name), 'fx' (snow, wind, fireflies, stars), 'sky' to fix the sky instead of following the time of day, and 'fixed_light' to ignore the time of day's tint. Which level unlocks each place is in levels.json. Real art will replace the drawers with sprite chunks per layer.",
+	"_doc": "Each place is a stack of parallax layers drawn back to front. 'kind' picks a placeholder drawer: hills, mountains, trees, pines, broadleaf, canopy, palms, mesas, cacti, water, ground, reeds, fronds, drifts, planet, and for growth right in front of the walker undergrowth (leaves up from the bottom edge), vines (hanging from the top) and stalks (tall leafy plants). 'parallax' is how fast the layer scrolls relative to the ground (1.0). 'y' and 'height' are fractions of the screen height. Optional per layer: 'snow' (white tips), 'foam' (surf on water), 'path' (the path colour on ground), 'craters', 'skip' (the share of slots left empty) and 'front' (drawn in front of the walker and pet). Per place: 'icon' for its button, 'ambience' (a sound name), 'fx' (snow, wind, fireflies, stars), 'sky' to fix the sky instead of following the clock (see day_cycle below), and 'fixed_light' to ignore the light's tint. Which level unlocks each place is in levels.json. Real art will replace the drawers with sprite chunks per layer.",
 	"biomes": [
 		{
 			"id": "lake",
@@ -28,7 +28,9 @@
 				{"kind": "pines", "parallax": 0.30, "y": 0.64, "height": 0.28, "colour": "#456f50", "spacing": 52, "seed": 13},
 				{"kind": "broadleaf", "parallax": 0.55, "y": 0.73, "height": 0.26, "colour": "#3f6e40", "spacing": 110, "seed": 14},
 				{"kind": "ground", "parallax": 1.0, "y": 0.72, "height": 0.28, "colour": "#6f9a4c", "path": "#c9b48a", "seed": 15},
-				{"kind": "fronds", "parallax": 1.4, "y": 0.97, "height": 0.09, "colour": "#4f7a3a", "spacing": 62, "seed": 16}
+				{"kind": "fronds", "parallax": 1.4, "y": 0.97, "height": 0.09, "colour": "#4f7a3a", "spacing": 62, "seed": 16},
+				{"kind": "undergrowth", "front": true, "parallax": 1.7, "y": 1.0, "height": 0.15, "colour": "#2f5a32", "spacing": 150, "skip": 0.5, "seed": 17},
+				{"kind": "stalks", "front": true, "parallax": 2.1, "y": 1.0, "height": 0.42, "colour": "#284b2b", "spacing": 560, "skip": 0.55, "seed": 18}
 			]
 		},
 		{
@@ -43,7 +45,10 @@
 				{"kind": "palms", "parallax": 0.38, "y": 0.70, "height": 0.34, "colour": "#2f6a40", "spacing": 150, "seed": 23},
 				{"kind": "canopy", "parallax": 0.55, "y": 0.73, "height": 0.30, "colour": "#24563a", "spacing": 170, "seed": 24},
 				{"kind": "ground", "parallax": 1.0, "y": 0.72, "height": 0.28, "colour": "#5b8a3a", "path": "#b49a6c", "seed": 25},
-				{"kind": "fronds", "parallax": 1.45, "y": 0.98, "height": 0.13, "colour": "#2f6b34", "spacing": 54, "seed": 26}
+				{"kind": "fronds", "parallax": 1.45, "y": 0.98, "height": 0.13, "colour": "#2f6b34", "spacing": 54, "seed": 26},
+				{"kind": "vines", "front": true, "parallax": 1.8, "y": 0.0, "height": 0.34, "colour": "#2c5e36", "spacing": 110, "skip": 0.25, "seed": 27},
+				{"kind": "stalks", "front": true, "parallax": 2.0, "y": 1.0, "height": 0.5, "colour": "#1d4a2a", "spacing": 240, "skip": 0.3, "seed": 28},
+				{"kind": "undergrowth", "front": true, "parallax": 1.75, "y": 1.0, "height": 0.18, "colour": "#1f4f2d", "spacing": 75, "skip": 0.1, "seed": 29}
 			]
 		},
 		{
@@ -106,10 +111,25 @@
 			]
 		}
 	],
-	"times_of_day": {
-		"morning": {"from_hour": 6,  "sky_top": "#f6d7b0", "sky_bottom": "#fbeedd", "tint": "#fff4e6"},
-		"day":     {"from_hour": 11, "sky_top": "#8ec3e6", "sky_bottom": "#d7ecf6", "tint": "#ffffff"},
-		"evening": {"from_hour": 17, "sky_top": "#e79a6f", "sky_bottom": "#f6c99a", "tint": "#f2d6c4"},
-		"night":   {"from_hour": 21, "sky_top": "#1c2340", "sky_bottom": "#3a3f63", "tint": "#7a80a8"}
+	"day_cycle": {
+		"_doc": "Places without fixed_light follow the real clock. Each key is the sky and light at that hour (in order); in between they blend, round the clock. 'dark' (0 day .. 1 night) brings out the stars, fireflies and the night chorus. The sun is up from sunrise to sunset; the moon rises moon_gap hours after sunset and sets moon_gap hours before sunrise.",
+		"sunrise": 6.0,
+		"sunset": 18.0,
+		"moon_gap": 0.5,
+		"keys": [
+			{"hour": 0.0,   "sky_top": "#121831", "sky_bottom": "#262c50", "tint": "#666c95", "dark": 1.0},
+			{"hour": 4.0,   "sky_top": "#19203c", "sky_bottom": "#333a5e", "tint": "#737aa2", "dark": 1.0},
+			{"hour": 5.25,  "sky_top": "#39457a", "sky_bottom": "#b88a95", "tint": "#9c9cbb", "dark": 0.65},
+			{"hour": 6.0,   "sky_top": "#7d8ec4", "sky_bottom": "#f3b48a", "tint": "#dcc4bd", "dark": 0.3},
+			{"hour": 7.25,  "sky_top": "#a3c4e6", "sky_bottom": "#f8dcc0", "tint": "#f4e7dc", "dark": 0.05},
+			{"hour": 9.0,   "sky_top": "#86bde6", "sky_bottom": "#dcecf4", "tint": "#fbf8f2", "dark": 0.0},
+			{"hour": 12.0,  "sky_top": "#6eb2e8", "sky_bottom": "#d0ebfa", "tint": "#ffffff", "dark": 0.0},
+			{"hour": 15.0,  "sky_top": "#82bce6", "sky_bottom": "#dceef5", "tint": "#fbf8f1", "dark": 0.0},
+			{"hour": 17.0,  "sky_top": "#a7b7d0", "sky_bottom": "#f2d3b0", "tint": "#f5e2cf", "dark": 0.0},
+			{"hour": 18.0,  "sky_top": "#d98a6c", "sky_bottom": "#f5b98c", "tint": "#e6c3b4", "dark": 0.15},
+			{"hour": 18.75, "sky_top": "#6c5a8c", "sky_bottom": "#e09a83", "tint": "#b5a2b4", "dark": 0.45},
+			{"hour": 19.75, "sky_top": "#2c3260", "sky_bottom": "#5b5580", "tint": "#8a88ae", "dark": 0.85},
+			{"hour": 21.0,  "sky_top": "#1c2340", "sky_bottom": "#3a3f63", "tint": "#7a80a8", "dark": 1.0}
+		]
 	}
 }

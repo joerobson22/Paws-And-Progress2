@@ -24,7 +24,7 @@ var _timer: Label
 var _pause: Button
 var _gift: GiftButton
 var _last_second := -1
-var _period_check := 0.0
+var _ambience_check := 0.0
 var _render_check := 0.0
 ## Scenery speed; eases down to 0 when the pet goes to fetch a gift.
 var _pace := 1.0
@@ -58,12 +58,14 @@ func _ready() -> void:
 	_animal.animal_id = _project.animal_id
 	_animal.colours = _project.colours
 	_actors.add_child(_animal)
+	# The jungle's leaves and vines pass in front of you both.
+	_scenery.front_into(self)
 
 	_build_hud(clock)
 	DisplayServer.screen_set_keep_on(App.state.settings.get("keep_screen_on", true))
 	resized.connect(_layout)
 	_layout()
-	_update_period()
+	_update_ambience()
 	_apply_paused(clock.is_paused())
 	_gift.set_seconds(clock.elapsed(App.now()))
 
@@ -167,9 +169,9 @@ func _process(delta: float) -> void:
 			_timer.text = SessionClock.format(elapsed)
 			_gift.set_seconds(elapsed)
 
-	_period_check -= delta
-	if _period_check <= 0.0:
-		_update_period()
+	_ambience_check -= delta
+	if _ambience_check <= 0.0:
+		_update_ambience()
 	_render_check -= delta
 	if _render_check <= 0.0:
 		_render_check = 0.5
@@ -192,10 +194,10 @@ func _draw_lead() -> void:
 	_actors.draw_polyline(pts, Color("#7a3b2e", _lead_alpha), 3.0 * _walker.scale.x, true)
 
 
-func _update_period() -> void:
-	_period_check = 30.0
-	var hour := int(Time.get_datetime_dict_from_system()["hour"])
-	_scenery.period = Content.time_of_day(hour)
+## The scenery follows the clock by itself; the sound catches up every
+## half a minute (birds give way to the night chorus after dark).
+func _update_ambience() -> void:
+	_ambience_check = 30.0
 	Audio.ambience(_scenery.ambience())
 
 
@@ -341,7 +343,7 @@ func _go_finish() -> void:
 	var params_out := _result.duplicate()
 	params_out["instant"] = true
 	params_out["scene"] = {
-		"biome": _scenery.biome.get("id", "lake"), "scroll": _scenery.scroll, "period": _scenery.period,
+		"biome": _scenery.biome.get("id", "lake"), "scroll": _scenery.scroll, "clock": _scenery.clock,
 		"walker": _walker.position, "animal": _animal.position, "unit": _unit(),
 	}
 	App.go("finish", params_out)

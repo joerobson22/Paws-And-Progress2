@@ -1,14 +1,16 @@
 extends Control
 ## Choose what to focus on, standing in the place you're about to walk.
-## The row of buttons at the top picks the place (locked ones are greyed out
-## with a padlock and the level that unlocks them). Swipe left and right
-## through your pets, which stand on the path (the one in the middle walks on
-## the spot), and tap one to head out. At the bottom, the red bin deletes that
-## pet and the green tick completes its project, each after a check. The +
-## at the top switches to adopting a new pet: say what it's for, give it a
-## name, scroll up and down through the animals (locked ones show the level
-## they unlock at) and pick its three colours; the red cross cancels and the
-## green + adopts it.
+## The row of buttons at the top picks the place, in the order they unlock
+## (locked ones are greyed out with a padlock and the level that unlocks
+## them). Under it are the project and the pet's name; swipe left and right
+## through your pets, which stand on the path with their kind and time
+## underneath (the one in the middle walks on the spot), and tap one to head
+## out. At the bottom, the red bin deletes that pet and the green tick
+## completes its project, each after a check. The + at the top switches to
+## adopting a new pet: say what it's for, give it a name, scroll up and down
+## through the animals (locked ones show the level they unlock at, and no
+## colours) and pick its three colours; the red cross cancels and the green +
+## adopts it.
 ## params: {"from": where the opening circle grew from}
 
 const COLOUR_ROLES := ["Primary", "Secondary", "Tertiary"]
@@ -40,13 +42,16 @@ var _places: Dictionary = {}  # place id -> its button
 var _place_name: Label
 var _words: VBoxContainer
 var _title: Label
-var _meta: Label
+var _pet_line: Label
+## Under the pet: its kind and how long you've focused with it.
+var _under: Label
 var _animals: Carousel
 var _animal_title: Label
 var _animal_hint: Label
 var _name_edit: LineEdit
 var _pet_edit: LineEdit
 var _swatches: Array[Button] = []
+var _swatch_row: Control
 var _back: Button
 var _left: Button
 var _right: Button
@@ -129,7 +134,6 @@ func _show_place(id: String, animate: bool = true) -> void:
 	var old := _scenery
 	_scenery = Scenery.new()
 	_scenery.biome = Content.biome(id)
-	_scenery.period = Content.time_of_day(int(Time.get_datetime_dict_from_system()["hour"]))
 	_scenery.scroll = old.scroll if old else App.rng.randf_range(0.0, 50000.0)
 	_scenery.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_scenery)
@@ -159,7 +163,7 @@ func _place_buttons() -> Control:
 	var row := UI.hbox(4)
 	panel.add_child(row)
 	_places.clear()
-	for b in Content.biomes:
+	for b in _places_in_order():
 		var id: String = b["id"]
 		var cell := UI.vbox(0)
 		var button := Button.new()
@@ -180,6 +184,13 @@ func _place_buttons() -> Control:
 		row.add_child(cell)
 	_refresh_places()
 	return panel
+
+
+## The places in the order they unlock.
+static func _places_in_order() -> Array:
+	var out: Array = Content.biomes.duplicate()
+	out.sort_custom(func(a, b): return Levels.unlock_level("place", a["id"], Content.levels) < Levels.unlock_level("place", b["id"], Content.levels))
+	return out
 
 
 func _refresh_places() -> void:
@@ -239,9 +250,12 @@ func _build_pick(select_id: String = "") -> void:
 	_title = _shadowed(UI.label("", 32, UI.ON_DARK, true, 600))
 	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_words.add_child(_title)
-	_meta = _shadowed(UI.label("", 15, UI.ON_DARK, false, 800))
-	_words.add_child(_meta)
+	_pet_line = _shadowed(UI.label("", 22, UI.ON_DARK, true, 500))
+	_words.add_child(_pet_line)
 	_words.add_child(_shadowed(UI.label("Tap your pet to start walking", 13, UI.ON_DARK_SOFT, false, 700)))
+	_under = _shadowed(UI.label("", 14, UI.ON_DARK, false, 800))
+	_under.name = "Under"
+	_pick.add_child(_under)
 
 	_pets = Carousel.new()
 	_pets.spacing = clampf(size.x * 0.44, 170.0, 300.0)
@@ -271,13 +285,15 @@ func _layout() -> void:
 		places.size = places.get_combined_minimum_size()
 		places.position = Vector2((size.x - places.size.x) * 0.5, 72.0 + insets["top"])
 	var path := _scenery.path_y()
-	var pet_top := path - PET_HEIGHT * 0.86
 	if is_instance_valid(_words):
 		var w := minf(520.0, size.x - 40.0)
 		_words.size = Vector2(w, 0)
 		_words.size = Vector2(w, _words.get_combined_minimum_size().y)
-		var below_places := (places.position.y + places.size.y + 16.0) if places else 140.0
-		_words.position = Vector2((size.x - w) * 0.5, maxf(below_places, (below_places + pet_top) * 0.5 - _words.size.y * 0.5))
+		# Just under the place buttons.
+		_words.position = Vector2((size.x - w) * 0.5, (places.position.y + places.size.y + 12.0) if places else 140.0)
+	if is_instance_valid(_under):
+		_under.size = Vector2(size.x, _under.get_combined_minimum_size().y)
+		_under.position = Vector2(0, path + 16.0)
 	if is_instance_valid(_pets):
 		var band := PET_HEIGHT * 1.15
 		_pets.size = Vector2(size.x, band)
@@ -290,8 +306,10 @@ func _on_pet_changed(i: int) -> void:
 	var p := _projects[i]
 	_remembered = p.id
 	_title.text = p.name
-	_meta.text = "%s · %s focused" % [Content.pet_label(p), Stats.format_duration(App.state.project_seconds(p.id))]
+	_pet_line.text = Content.pet_called(p, true)
+	_under.text = "%s · %s focused" % [Content.animal(p.animal_id).get("name", ""), Stats.format_duration(App.state.project_seconds(p.id))]
 	Motion.pop(_title, 0.04, 0.25)
+	_layout()
 
 
 func _start_walk(i: int) -> void:
@@ -437,6 +455,7 @@ func _build_adopt() -> void:
 		row.add_child(cell)
 		_swatches.append(b)
 	v.add_child(row)
+	_swatch_row = row
 
 	var items: Array[Control] = []
 	var first_open := -1
@@ -475,8 +494,12 @@ func _on_animal_changed(i: int) -> void:
 		_animal_hint.text = "Unlocks at level %d" % Levels.unlock_level("animal", a["id"], Content.levels)
 		_animal_hint.add_theme_color_override("font_color", UI.INK_SOFT)
 	_right.disabled = not open
+	# A locked animal can't be coloured in: the colour buttons fade away, but
+	# keep their space so the scroller above doesn't jump.
 	for b in _swatches:
 		b.disabled = not open
+		b.mouse_filter = Control.MOUSE_FILTER_STOP if open else Control.MOUSE_FILTER_IGNORE
+	Motion.fade(_swatch_row, 1.0 if open else 0.0, Motion.FAST)
 	_refresh_swatches()
 
 

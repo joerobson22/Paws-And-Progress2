@@ -57,7 +57,7 @@ Goal: v1 feature parity on a clean, modern architecture.
 ### Phase 2 — Polish & progression
 - [ ] Four rarities with drop table tuned by walk length (e.g. legendary only possible on 45 min+ walks, small pity timer), plus guaranteed minimum rarities shown filling the walk's gift button
 - [ ] Epic + legendary gifts equippable as cosmetics on the walker (and optionally on the animal)
-- [ ] More places: lakeside, forest, jungle, tundra (snow and wind), desert, beach, moon; then mountains, snowy village, autumn park; weather + time-of-day tied to the real clock
+- [ ] More places: lakeside, forest, jungle, tundra (snow and wind), desert, beach, moon (done, with placeholder art and the sky, sun and moon following the real clock); then mountains, snowy village, autumn park; weather tied to the real forecast
 - [ ] Place unlocks (and new animals) via XP levels: 1 XP a minute plus gift bonuses, rewards set in data
 - [ ] Animal bond levels (hours walked with that animal) unlocking extra idle animations / gifts
 - [ ] Streaks with gentle "rest day" tokens so a missed day doesn't punish you

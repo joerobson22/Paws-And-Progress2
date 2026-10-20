@@ -7,7 +7,8 @@ var gifts: Array = []
 var rarities: Array = []
 var drop_table: Dictionary = {}
 var biomes: Array = []
-var times_of_day: Dictionary = {}
+## The sky and light round the clock (see DayCycle).
+var day_cycle: Dictionary = {}
 var grade_scales: Array = []
 var quotes: Array = []
 ## Home screen lines: {morning, afternoon, evening, night, anytime}.
@@ -36,7 +37,9 @@ func _init() -> void:
 	drop_table = _load("res://data/drop_table.json")
 	var b := _load("res://data/biomes.json")
 	biomes = b.get("biomes", [])
-	times_of_day = b.get("times_of_day", {})
+	day_cycle = b.get("day_cycle", {})
+	var keys: Array = day_cycle.get("keys", [])
+	keys.sort_custom(func(x, y): return float(x["hour"]) < float(y["hour"]))
 	grade_scales = _load("res://data/grades.json").get("scales", [])
 	quotes = _load("res://data/quotes.json").get("quotes", [])
 	greetings = _load("res://data/greetings.json")
@@ -124,24 +127,6 @@ func biome(id: String) -> Dictionary:
 		if b["id"] == id:
 			return b
 	return biomes[0] if not biomes.is_empty() else {}
-
-
-## Which time-of-day palette applies at this local hour.
-func time_of_day(hour: int) -> String:
-	var best := ""
-	var best_from := -1
-	var latest := ""
-	var latest_from := -1
-	for key in times_of_day:
-		var from := int(times_of_day[key]["from_hour"])
-		if from <= hour and from > best_from:
-			best = key
-			best_from = from
-		if from > latest_from:
-			latest = key
-			latest_from = from
-	# Before the earliest start (e.g. 3am) it's still the latest period (night).
-	return best if best != "" else latest
 
 
 # --- Grades ------------------------------------------------------------------

@@ -47,6 +47,7 @@ var _target := Vector2i.ZERO
 var _progress := 0.0
 var _velocity := 0.0
 var _last_time := 0
+var _press_time := 0
 var _synthetic := false
 
 
@@ -242,6 +243,8 @@ func _close_flows() -> void:
 		if f != top:
 			f.queue_free()
 	_flows.clear()
+	# The places' sounds stay with them.
+	Audio.ambience("")
 	if _at != Vector2i.ZERO:
 		_at = Vector2i.ZERO
 		_minimap.show_cell(_at, true)
@@ -290,6 +293,7 @@ func _input(e: InputEvent) -> void:
 			_press = true
 			_swiping = false
 			_press_pos = e.position
+			_press_time = Time.get_ticks_usec()
 			Gestures.claimed = false
 		else:
 			if _swiping:
@@ -338,7 +342,6 @@ func _try_swipe(pos: Vector2) -> void:
 	_swiping = true
 	_target = target
 	_progress = 0.0
-	_velocity = 0.0
 	_last_time = Time.get_ticks_usec()
 	_cancel_gui_press()
 	get_viewport().set_input_as_handled()
@@ -347,6 +350,9 @@ func _try_swipe(pos: Vector2) -> void:
 	if not pane.shown:
 		pane.show_pane()
 	_update_swipe(pos)
+	# The speed so far is the distance since the press over the time since;
+	# measuring it from this instant instead would make every swipe a flick.
+	_velocity = _progress / maxf((_last_time - _press_time) / 1000000.0, 0.016)
 
 
 func _update_swipe(pos: Vector2) -> void:

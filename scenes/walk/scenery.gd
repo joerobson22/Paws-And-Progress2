@@ -5,27 +5,43 @@ extends Control
 ## once when it scrolls into view and freed once it has scrolled off, so a
 ## long walk costs little more than moving a handful of nodes each frame;
 ## only the few animated layers (water, reeds, fronds) redraw as they move.
-## Weather (snow, wind, stars, fireflies) is a thin layer on top. Real art
-## will replace each layer's drawer with sprite chunks; the data stays.
+## Weather (snow, wind, stars, fireflies) is a thin layer on top. Layers
+## marked "front" (the jungle's big leaves and vines) go in `front`, which a
+## host can lift in front of its walker and pet with front_into().
+##
+## The light follows the real clock (see DayCycle): the sky brightens until
+## midday and darkens after, the sun and then the moon cross it, and every
+## layer is tinted to match through its node's modulate, so a change of
+## light costs no redrawing. Real art will replace each layer's drawer with
+## sprite chunks; the data stays.
 
 const CHUNK := 384.0
 ## Layers that move with the time and so redraw every frame.
-const ANIMATED := ["water", "reeds", "fronds"]
+const ANIMATED := ["water", "reeds", "fronds", "undergrowth", "vines", "stalks"]
+## How often the light catches up with the clock, in seconds.
+const LIGHT_EVERY := 5.0
 
 ## Ground-layer pixels walked so far; every layer scrolls by this × its parallax.
 var scroll: float = 0.0
 var biome: Dictionary = {}
-var period: String = "day":
+## The hour shown (14.5 is half past two), or -1 to follow the real clock.
+var clock: float = -1.0:
 	set(v):
-		if v != period:
-			period = v
-			_redraw_all()
+		clock = v
+		_update_light()
 
 var _time: float = 0.0
+## DayCycle.at() for the hour shown.
+var _light: Dictionary = {}
+var _light_check := 0.0
 ## One entry per layer: {data, node, chunks: {index: _Chunk}, animated}.
 var _layers: Array = []
 var _sky: _Sky
 var _fx: _Fx
+## The growth in front of everything else. It's the scenery's own top child
+## until a host moves it with front_into(); it then keeps following the
+## scenery's place, size and fade.
+var front: Control
 
 
 func _ready() -> void:
@@ -34,22 +50,68 @@ func _ready() -> void:
 	_sky = _Sky.new()
 	_sky.scenery = self
 	add_child(_sky)
+	front = Control.new()
+	front.name = "SceneryFront"
+	front.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	front.clip_contents = true
 	for layer in biome.get("layers", []):
 		if layer["kind"] == "planet":
 			continue  # drawn with the sky
 		var node := Node2D.new()
-		add_child(node)
+		if layer.get("front", false):
+			front.add_child(node)
+		else:
+			add_child(node)
 		_layers.append({"data": layer, "node": node, "chunks": {}, "animated": ANIMATED.has(str(layer["kind"]))})
 	_fx = _Fx.new()
 	_fx.scenery = self
 	add_child(_fx)
+	add_child(front)
 	resized.connect(_rebuild)
+	_update_light()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and is_instance_valid(front) and front.get_parent() != self:
+		front.queue_free()
+
+
+## Moves the front growth into `parent` (the scenery's own parent, or one
+## standing in the same place) as its last child, so it's drawn over
+## whatever was added before it, like the walker and the pet.
+func front_into(parent: Node) -> void:
+	front.reparent(parent, false)
 
 
 func _process(delta: float) -> void:
 	_time += delta
+	_light_check -= delta
+	if _light_check <= 0.0:
+		_update_light()
 	_place_chunks()
 	_fx.queue_redraw()
+	if front.get_parent() != self:
+		front.position = position
+		front.size = size
+		front.modulate = modulate
+		front.visible = visible
+	else:
+		front.size = size
+
+
+## The hour of the day shown.
+func hour() -> float:
+	return clock if clock >= 0.0 else DayCycle.hour_now()
+
+
+func _update_light() -> void:
+	_light_check = LIGHT_EVERY
+	_light = DayCycle.at(hour(), Content.day_cycle)
+	var t := tint()
+	for layer in _layers:
+		layer["node"].modulate = t
+	if _sky:
+		_sky.queue_redraw()
 
 
 ## Screen y of the walking path (where feet go).
@@ -82,16 +144,22 @@ func water_colour() -> Color:
 	return Color.SKY_BLUE
 
 
-## How the time of day colours everything (white for places with their own light).
+## How the light colours everything now (white for places with their own light).
 func tint() -> Color:
-	if biome.get("fixed_light", false):
+	if biome.get("fixed_light", false) or _light.is_empty():
 		return Color.WHITE
-	var tod: Dictionary = Content.times_of_day.get(period, {})
-	return Color.from_string(tod.get("tint", "#ffffff"), Color.WHITE)
+	return _light["tint"]
+
+
+## 0 in broad daylight, 1 at night (always 1 under a fixed black sky).
+func darkness() -> float:
+	if biome.has("sky"):
+		return 1.0
+	return float(_light.get("dark", 0.0))
 
 
 func is_dark() -> bool:
-	return period == "night" or biome.has("sky")
+	return darkness() >= 0.5
 
 
 func time() -> float:
@@ -102,7 +170,7 @@ func time() -> float:
 ## way to the night chorus after dark; wind and silence (the Moon) stay put.
 func ambience() -> String:
 	var own := str(biome.get("ambience", "day"))
-	if period == "night" and own in ["lake", "day"]:
+	if darkness() >= 0.6 and own in ["lake", "day"]:
 		return "night"
 	return own
 
@@ -143,16 +211,6 @@ func _rebuild() -> void:
 	_place_chunks()
 
 
-func _redraw_all() -> void:
-	if _sky:
-		_sky.queue_redraw()
-	for layer in _layers:
-		for chunk in layer["chunks"].values():
-			chunk.queue_redraw()
-	if _fx:
-		_fx.queue_redraw()
-
-
 static func _noise(t: float, sd: float) -> float:
 	return 0.55 * sin(t * TAU + sd) + 0.3 * sin(t * TAU * 2.3 + sd * 1.7) + 0.15 * sin(t * TAU * 5.1 + sd * 2.9)
 
@@ -170,7 +228,7 @@ class _Chunk extends Node2D:
 
 	func _draw() -> void:
 		var size := scenery.size
-		var colour := Color.from_string(layer["colour"], Color.WHITE) * scenery.tint()
+		var colour := Color.from_string(layer["colour"], Color.WHITE)
 		var y := size.y * float(layer["y"])
 		var h := size.y * float(layer["height"])
 		var sd := float(layer.get("seed", 0))
@@ -207,6 +265,12 @@ class _Chunk extends Node2D:
 				_slots(x0, spacing, sd, 0.35, func(x, r, _i): _cactus(x, y, h * (0.55 + 0.5 * r), colour, r))
 			"drifts":
 				_slots(x0, spacing, sd, 0.3, func(x, r, _i): _drift(x, size.y, h * (0.5 + r), colour))
+			"undergrowth":
+				_slots(x0, spacing, sd, float(layer.get("skip", 0.15)), func(x, r, i): _undergrowth(x, y, h * (0.6 + 0.5 * r), colour.darkened(0.15 * Scenery._hash(i + 4, sd)), r))
+			"vines":
+				_slots(x0, spacing, sd, float(layer.get("skip", 0.3)), func(x, r, _i): _vine(x, y, h * (0.4 + 0.7 * r), colour, r))
+			"stalks":
+				_slots(x0, spacing, sd, float(layer.get("skip", 0.4)), func(x, r, i): _stalk(x, y, h * (0.7 + 0.4 * r), colour.darkened(0.1 * Scenery._hash(i + 6, sd)), r))
 
 	## Calls `item(x, r, i)` for each slot starting in this chunk, skipping
 	## a share `skip` of them; `r` is the slot's random 0..1. An item belongs
@@ -236,7 +300,7 @@ class _Chunk extends Node2D:
 
 	func _water(x0: float, y: float, h: float, sd: float, colour: Color) -> void:
 		draw_rect(Rect2(-1.0, y, CHUNK + 2.0, h), colour)
-		var shimmer := Color(1, 1, 1, 0.35) * scenery.tint()
+		var shimmer := Color(1, 1, 1, 0.35)
 		var spacing := 38.0
 		var t := scenery.time()
 		for i in range(floori(x0 / spacing), floori((x0 + CHUNK) / spacing) + 1):
@@ -253,7 +317,7 @@ class _Chunk extends Node2D:
 			while x <= CHUNK + 0.5:
 				pts.append(Vector2(x, y + h - 3.0 + reach + 3.0 * Scenery._noise((x0 + x) / 90.0, sd + t * 0.05)))
 				x += 12.0
-			draw_polyline(pts, Color(1, 1, 1, 0.8) * scenery.tint(), 4.0, true)
+			draw_polyline(pts, Color(1, 1, 1, 0.8), 4.0, true)
 
 	func _ground(x0: float, y: float, h: float, sd: float, colour: Color, size: Vector2) -> void:
 		# A bank with a gently uneven top edge, then the path.
@@ -268,7 +332,7 @@ class _Chunk extends Node2D:
 		pts.append(Vector2(-1.0, size.y))
 		draw_colored_polygon(pts, colour)
 		var py := scenery.path_y()
-		var path_colour := Color.from_string(layer.get("path", "#d9c49a"), Color.TAN) * scenery.tint()
+		var path_colour := Color.from_string(layer.get("path", "#d9c49a"), Color.TAN)
 		draw_rect(Rect2(-1.0, py - h * 0.1, CHUNK + 2.0, h * 0.2), path_colour)
 		if layer.get("craters", false):
 			for i in range(floori(x0 / 140.0), floori((x0 + CHUNK) / 140.0) + 1):
@@ -318,7 +382,7 @@ class _Chunk extends Node2D:
 			var half := w * (0.5 - 0.12 * k)
 			draw_colored_polygon(PackedVector2Array([Vector2(x - half, bottom), Vector2(x, top), Vector2(x + half, bottom)]), colour)
 			if snow:
-				var s := Color(0.95, 0.97, 1.0) * scenery.tint()
+				var s := Color(0.95, 0.97, 1.0)
 				draw_colored_polygon(PackedVector2Array([Vector2(x - half * 0.45, top + (bottom - top) * 0.45), Vector2(x, top), Vector2(x + half * 0.45, top + (bottom - top) * 0.45)]), s)
 
 	## A round-topped deciduous tree.
@@ -347,7 +411,7 @@ class _Chunk extends Node2D:
 		for k in 9:
 			var t := k / 8.0
 			trunk.append(Vector2(x, y).lerp(top, t) + Vector2(sin(t * PI) * th * 0.05, 0))
-		draw_polyline(trunk, Color("#8a6a45") * scenery.tint(), maxf(3.0, th * 0.05), true)
+		draw_polyline(trunk, Color("#8a6a45"), maxf(3.0, th * 0.05), true)
 		for k in 7:
 			var angle := -PI + PI * k / 6.0 + 0.15 * sin(scenery.time() * 0.6 + r * 4.0)
 			# Each frond arcs up then droops at the tip.
@@ -359,14 +423,14 @@ class _Chunk extends Node2D:
 			var shade := colour.darkened(0.08 * (k % 2))
 			draw_polyline(PackedVector2Array([top, mid, tip]), shade, th * 0.075, true)
 			draw_polyline(PackedVector2Array([top.lerp(mid, 0.5), mid, mid.lerp(tip, 0.6)]), shade, th * 0.11, true)
-		draw_circle(top, th * 0.035, Color("#6b4f33") * scenery.tint(), true, -1.0, true)
+		draw_circle(top, th * 0.035, Color("#6b4f33"), true, -1.0, true)
 
 	func _mountain(x: float, y: float, th: float, w: float, colour: Color, snow: bool) -> void:
 		var peak := Vector2(x, y - th)
 		draw_colored_polygon(PackedVector2Array([Vector2(x - w * 0.6, y + 2.0), peak, Vector2(x + w * 0.6, y + 2.0)]), colour)
 		draw_colored_polygon(PackedVector2Array([peak, Vector2(x + w * 0.6, y + 2.0), Vector2(x + w * 0.12, y + 2.0)]), colour.darkened(0.1))
 		if snow:
-			var s := Color(0.96, 0.98, 1.0) * scenery.tint()
+			var s := Color(0.96, 0.98, 1.0)
 			var k := 0.3
 			# A jagged lower edge, with every point inside the slopes so the
 			# outline never crosses itself.
@@ -392,6 +456,74 @@ class _Chunk extends Node2D:
 		draw_rect(Rect2(x + w * 0.3, arm_y + th * 0.02, w * 1.2, w * 0.6), colour)
 
 	## A low mound along the bottom edge (snow drifts, moon dust).
+	## A leaf from `base` along `angle`, `length` long and `width` across at
+	## its widest, curving sideways by `bend` (a share of its length). Both
+	## edges run steadily from base to tip, so the outline never crosses.
+	func _leaf(base: Vector2, angle: float, length: float, width: float, bend: float, colour: Color) -> void:
+		var dir := Vector2(cos(angle), sin(angle))
+		var side := Vector2(-dir.y, dir.x)
+		var left := PackedVector2Array()
+		var right := PackedVector2Array()
+		var spine := PackedVector2Array([base])
+		for k in range(1, 8):
+			var t := k / 8.0
+			var c := base + dir * length * t + side * length * bend * t * t
+			var half := width * 0.5 * sin(t * PI) * (1.0 - 0.25 * t)
+			left.append(c + side * half)
+			right.append(c - side * half)
+			spine.append(c)
+		var tip := base + dir * length + side * length * bend
+		spine.append(tip)
+		var pts := PackedVector2Array([base])
+		pts.append_array(left)
+		pts.append(tip)
+		right.reverse()
+		pts.append_array(right)
+		draw_colored_polygon(pts, colour)
+		draw_polyline(spine, colour.lightened(0.16), maxf(1.0, width * 0.05), true)
+
+	## A clump of big leaves fanning up from the bottom edge.
+	func _undergrowth(x: float, bottom: float, h: float, colour: Color, r: float) -> void:
+		var t := scenery.time()
+		var count := 4 + int(r * 3.0)
+		for k in count:
+			var share := (k + 0.5) / count - 0.5
+			var sway := sin(t * 0.9 + r * 5.0 + k * 1.3) * 0.06
+			var length := h * (0.75 + 0.35 * Scenery._hash(k, r * 10.0))
+			_leaf(Vector2(x + share * h * 0.5, bottom + h * 0.08), -PI * 0.5 + share * 1.9 + sway, length, length * 0.4, share * 0.25,
+				colour.darkened(0.08 * (k % 2)))
+
+	## A vine hanging from the top edge with leaves down its length.
+	func _vine(x: float, top: float, length: float, colour: Color, r: float) -> void:
+		var sway := sin(scenery.time() * 0.7 + r * 4.0) * length * 0.05
+		var pts := PackedVector2Array()
+		for k in 13:
+			var t := k / 12.0
+			pts.append(Vector2(x + sin(t * 3.0 + r * 6.0) * length * 0.05 + sway * t * t, top - 2.0 + length * t))
+		draw_polyline(pts, colour.darkened(0.2), maxf(2.0, length * 0.012), true)
+		var leaf := clampf(length * 0.14, 14.0, 48.0)
+		for k in range(2, 13, 2):
+			var out := 1.0 if k % 4 == 0 else -1.0
+			_leaf(pts[k], PI * 0.5 - out * 0.95, leaf, leaf * 0.48, out * 0.1, colour.darkened(0.06 * (k % 3)))
+		_leaf(pts[12], PI * 0.5 + 0.3, leaf * 1.1, leaf * 0.5, -0.08, colour)
+		_leaf(pts[12], PI * 0.5 - 0.35, leaf, leaf * 0.48, 0.08, colour.darkened(0.08))
+
+	## A tall leafy plant growing up from the bottom edge, close enough to
+	## pass in front of the walker.
+	func _stalk(x: float, bottom: float, h: float, colour: Color, r: float) -> void:
+		var lean := (r - 0.5) * h * 0.3 + sin(scenery.time() * 0.8 + r * 5.0) * h * 0.03
+		var stem := PackedVector2Array()
+		for k in 11:
+			var t := k / 10.0
+			stem.append(Vector2(x + lean * t * t, bottom + 10.0 - (h + 10.0) * t))
+		draw_polyline(stem, colour.darkened(0.15), maxf(4.0, h * 0.025), true)
+		for k in 4:
+			var at := stem[3 + k * 2]
+			var out := 1.0 if k % 2 == 0 else -1.0
+			var length := h * (0.34 - 0.04 * k)
+			_leaf(at, -PI * 0.5 + out * (1.15 - 0.1 * k), length, length * 0.42, out * 0.14, colour.darkened(0.05 * k))
+		_leaf(stem[10], -PI * 0.5 + (r - 0.5) * 0.5, h * 0.22, h * 0.09, 0.05, colour)
+
 	func _drift(x: float, bottom: float, h: float, colour: Color) -> void:
 		draw_set_transform(Vector2(x, bottom), 0.0, Vector2(1.0, h / 40.0))
 		draw_circle(Vector2.ZERO, 40.0, colour, true, -1.0, true)
@@ -400,23 +532,61 @@ class _Chunk extends Node2D:
 
 
 
-## The sky gradient behind everything: redrawn only when the size or time of
-## day changes. A place with its own sky (the Moon) ignores the time of day.
+## The sky behind everything, with the sun or moon on its way across:
+## redrawn only when the size or the light changes (every few seconds). A
+## place with its own sky (the Moon) keeps it whatever the time.
 class _Sky extends Node2D:
 	var scenery: Scenery
 
 	func _draw() -> void:
 		var size := scenery.size
 		var sky: Dictionary = scenery.biome.get("sky", {})
-		var tod: Dictionary = Content.times_of_day.get(scenery.period, {})
-		var top := Color.from_string(sky.get("top", tod.get("sky_top", "#8ec3e6")), Color.SKY_BLUE)
-		var bottom := Color.from_string(sky.get("bottom", tod.get("sky_bottom", "#d7ecf6")), Color.WHITE)
+		var light := scenery._light
+		var top: Color = Color.from_string(sky["top"], Color.BLACK) if sky.has("top") else light.get("sky_top", Color("#8ec3e6"))
+		var bottom: Color = Color.from_string(sky["bottom"], Color.BLACK) if sky.has("bottom") else light.get("sky_bottom", Color("#d7ecf6"))
 		draw_polygon(
 			PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0), Vector2(size.x, size.y), Vector2(0, size.y)]),
 			PackedColorArray([top, top, bottom, bottom]))
+		if not sky.has("top"):
+			var r := clampf(size.y * 0.045, 16.0, 40.0)
+			if float(light.get("sun", -1.0)) >= 0.0:
+				_sun(_on_arc(float(light["sun"]), r, size), r, float(light["sun"]))
+			if float(light.get("moon", -1.0)) >= 0.0:
+				_moon(_on_arc(float(light["moon"]), r, size), r * 0.8)
 		for layer in scenery.biome.get("layers", []):
 			if layer["kind"] == "planet":
 				_planet(Vector2(size.x * 0.72, size.y * float(layer["y"])), size.y * float(layer["height"]), Color.from_string(layer["colour"], Color.ROYAL_BLUE))
+
+	## Where something `progress` of the way across the sky is: it comes up
+	## from behind the furthest hills on the left, peaks in the middle (below
+	## the words at the top of the screen) and goes down behind them on the
+	## right.
+	func _on_arc(progress: float, r: float, size: Vector2) -> Vector2:
+		var horizon := size.y * 0.5
+		for layer in scenery.biome.get("layers", []):
+			if layer["kind"] != "planet":
+				horizon = size.y * float(layer["y"])
+				break
+		var high := minf(size.y * 0.2 + r, horizon - r * 2.0)
+		return Vector2(lerpf(size.x * 0.06, size.x * 0.94, progress), lerpf(horizon + r * 1.2, high, sin(progress * PI)))
+
+	## Warm and orange near the horizon, pale yellow when it's high.
+	func _sun(c: Vector2, r: float, progress: float) -> void:
+		var high := sin(progress * PI)
+		var colour := Color("#ff9b54").lerp(Color("#fff3b0"), clampf(high * 1.6, 0.0, 1.0))
+		draw_circle(c, r * 3.2, Color(colour, 0.08), true, -1.0, true)
+		draw_circle(c, r * 1.9, Color(colour, 0.16), true, -1.0, true)
+		draw_circle(c, r, colour, true, -1.0, true)
+
+	func _moon(c: Vector2, r: float) -> void:
+		var colour := Color("#f2efe0")
+		draw_circle(c, r * 2.6, Color(colour, 0.06), true, -1.0, true)
+		draw_circle(c, r * 1.6, Color(colour, 0.1), true, -1.0, true)
+		draw_circle(c, r, colour, true, -1.0, true)
+		var shade := Color("#cfcab6")
+		draw_circle(c + Vector2(-r * 0.3, -r * 0.2), r * 0.22, shade, true, -1.0, true)
+		draw_circle(c + Vector2(r * 0.35, r * 0.15), r * 0.16, shade, true, -1.0, true)
+		draw_circle(c + Vector2(-r * 0.05, r * 0.45), r * 0.12, shade, true, -1.0, true)
 
 	## A big blue planet hanging still in the sky (the Earth, seen from the Moon).
 	func _planet(c: Vector2, r: float, colour: Color) -> void:
@@ -428,8 +598,9 @@ class _Sky extends Node2D:
 		draw_arc(c, r * 0.8, PI * 0.1, PI * 0.9, 16, Color(0, 0, 0, 0.18), r * 0.45, true)
 
 
-## Weather on top of the scenery: stars after dark, fireflies in the evening,
-## snow and gusts of wind in the tundra. A few dozen dots and lines a frame.
+## Weather on top of the scenery: stars coming out as it gets dark,
+## fireflies at dusk and overnight, snow and gusts of wind in the tundra.
+## A few dozen dots and lines a frame.
 class _Fx extends Node2D:
 	var scenery: Scenery
 
@@ -437,17 +608,24 @@ class _Fx extends Node2D:
 		var fx: Array = scenery.biome.get("fx", [])
 		var size := scenery.size
 		var t := scenery.time()
-		var p := scenery.period
-		if fx.has("stars") and scenery.is_dark():
+		var dark := scenery.darkness()
+		# Stars fade in from dusk; the brightest come out first.
+		var stars := clampf((dark - 0.3) / 0.6, 0.0, 1.0)
+		if fx.has("stars") and stars > 0.0:
 			for i in 70:
+				var bright := Scenery._hash(i, 3.0)
+				var shown := clampf(stars * 2.0 - (1.0 - bright), 0.0, 1.0)
+				if shown <= 0.0:
+					continue
 				var at := Vector2(Scenery._hash(i, 1.0) * size.x, Scenery._hash(i, 2.0) * size.y * 0.45)
 				var twinkle := 0.5 + 0.5 * sin(t * 2.0 + i)
-				draw_circle(at, 1.0 + Scenery._hash(i, 3.0) * 1.2, Color(1, 1, 0.9, 0.4 + 0.5 * twinkle))
-		if fx.has("fireflies") and (p == "night" or p == "evening"):
+				draw_circle(at, 1.0 + bright * 1.2, Color(1, 1, 0.9, (0.4 + 0.5 * twinkle) * shown))
+		var flies := clampf((dark - 0.15) / 0.4, 0.0, 1.0)
+		if fx.has("fireflies") and flies > 0.0:
 			for i in 18:
 				var base := Vector2(Scenery._hash(i, 4.0) * size.x, size.y * (0.6 + 0.3 * Scenery._hash(i, 5.0)))
 				var drift := Vector2(sin(t * 0.6 + i) * 18.0, cos(t * 0.8 + i * 1.3) * 12.0)
-				var glow := 0.4 + 0.6 * absf(sin(t * 1.3 + i * 2.1))
+				var glow := (0.4 + 0.6 * absf(sin(t * 1.3 + i * 2.1))) * flies
 				draw_circle(base + drift, 6.0, Color(1.0, 0.92, 0.5, 0.15 * glow))
 				draw_circle(base + drift, 2.2, Color(1.0, 0.95, 0.6, glow))
 		var gust := 0.6 + 0.4 * sin(t * 0.45)

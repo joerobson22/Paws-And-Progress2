@@ -10,7 +10,7 @@ extends Control
 ## with a flick to throw it (up the screen throws it into the distance, to
 ## the sides off the screen). Your pet runs after it, wading if it lands in
 ## water, and brings it back. You can take it again once they're home.
-## params: {"session", "gift", "scene": {biome, scroll, period, walker, animal, unit}}
+## params: {"session", "gift", "scene": {biome, scroll, clock, walker, animal, unit}}
 
 var params := {}
 
@@ -68,11 +68,12 @@ func _ready() -> void:
 	add_child(_stage)
 	_scenery = Scenery.new()
 	_scenery.biome = Content.biome(str(scene.get("biome", App.state.settings.get("walk_biome", "lake"))))
-	_scenery.period = str(scene.get("period", Content.time_of_day(int(Time.get_datetime_dict_from_system()["hour"]))))
+	_scenery.clock = float(scene.get("clock", -1.0))
 	_scenery.scroll = float(scene.get("scroll", 0.0))
 	_scenery.size = size
 	_stage.add_child(_scenery)
 	_stage.add_child(_back_actors)
+	_scenery.front_into(_stage)
 	_sheet.color = Color(0, 0, 0, 0)
 	_sheet.size = size
 	_sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE

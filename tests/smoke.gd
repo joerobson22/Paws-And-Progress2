@@ -26,6 +26,14 @@ func _content() -> Node:
 	return root.get_node("Content")
 
 
+func _audio() -> Node:
+	return root.get_node("Audio")
+
+
+func _levels() -> GDScript:
+	return _class("res://core/levels.gd")
+
+
 func _main() -> Node:
 	return current_scene
 
@@ -40,18 +48,39 @@ func _run() -> void:
 	await _wait(20)
 	await _shot("focus")
 
-	# Every place draws cleanly, by day and night, along a stretch of walk.
+	# Every place draws cleanly round the clock, along a stretch of walk,
+	# its front growth included.
 	for b in _content().biomes:
-		for period in ["day", "night"]:
-			var scenery: Control = _class("res://scenes/walk/scenery.gd").new()
-			scenery.biome = b
-			scenery.period = period
-			root.add_child(scenery)
-			scenery.size = main.size
+		var scenery: Control = _class("res://scenes/walk/scenery.gd").new()
+		scenery.biome = b
+		root.add_child(scenery)
+		scenery.size = main.size
+		for hour in [6.2, 12.0, 18.4, 23.0]:
+			scenery.clock = hour
 			for scroll in [1234.0, 40000.0, 91000.0]:
 				scenery.scroll = scroll
 				await process_frame
-			scenery.queue_free()
+			if hour == 12.0 or b["id"] == "jungle":
+				await _shot("place_%s_%02d" % [b["id"], int(hour)])
+		check(scenery.darkness() > 0.9, "%s is dark at 11pm" % b["id"])
+		scenery.clock = 12.0
+		check(scenery.darkness() == (1.0 if b.has("sky") else 0.0), "%s is light at midday unless it has its own sky" % b["id"])
+		check(scenery.tint() == Color.WHITE, "%s is in full light at midday" % b["id"])
+		if b["id"] == "jungle":
+			check(scenery.front.get_child_count() >= 3, "the jungle has growth in front")
+		scenery.queue_free()
+	await process_frame
+	# The lake through a day, for the docs.
+	var day: Control = _class("res://scenes/walk/scenery.gd").new()
+	day.biome = _content().biome("lake")
+	root.add_child(day)
+	day.size = main.size
+	day.scroll = 5000.0
+	for hour in [5.5, 7.0, 12.0, 17.5, 18.6, 23.0]:
+		day.clock = hour
+		await _wait(2)
+		await _shot("day_%04.1f" % hour)
+	day.queue_free()
 	await process_frame
 
 	# A real swipe: dragging right from the middle brings in the gifts on the left.
@@ -170,6 +199,16 @@ func _run() -> void:
 	await _wait(40)
 	await _shot("choose_focus")
 	var chooser: Node = main._flows.back().get_child(0)
+	# Places in the order they unlock; the project, then the pet, then a hint,
+	# with its kind and time under the pet.
+	var order: Array = chooser._places.keys()
+	check(order[0] == "lake" and order.size() == _content().biomes.size(), "places start at the lakeside")
+	for i in range(1, order.size()):
+		check(_levels().unlock_level("place", order[i], _content().levels) >= _levels().unlock_level("place", order[i - 1], _content().levels), "places in unlock order")
+	check(chooser._words.get_child(0) == chooser._title and chooser._title.text != "", "project title first")
+	if main.size.y >= 600.0:
+		check(chooser._words.get_rect().end.y < chooser._scenery.path_y() - chooser.PET_HEIGHT * 0.86, "words above the pets")
+	check(chooser._under.text.contains("focused") and chooser._under.position.y > chooser._scenery.path_y(), "kind and time under the pet")
 	var level: int = app.level()
 	check(level > 1 and level < 15, "sample player is part way up (level %d)" % level)
 	chooser._pick_place("beach")
@@ -199,9 +238,11 @@ func _run() -> void:
 	chooser._animals.go_to(locked)
 	await _wait(25)
 	check(chooser._right.disabled, "a locked animal can't be adopted")
+	check(chooser._swatch_row.modulate.a < 0.05, "a locked animal hides the colour buttons")
 	await _shot("new_pet_locked")
 	chooser._animals.go_to(1)
 	await _wait(25)
+	check(chooser._swatch_row.modulate.a > 0.95, "an open animal shows them again")
 	chooser._name_edit.text = "Chemistry"
 	chooser._pet_edit.text = "Bramble"
 	await _shot("new_pet_named")
@@ -219,11 +260,19 @@ func _run() -> void:
 	app.start_walk(app.state.projects[1].id)
 	app.go("walk", {"from": main.size * 0.5})
 	await _wait(60)
+	var walk: Node = main._flows.back().get_child(0)
+	walk._scenery.clock = 10.5
+	await _wait(2)
 	await _shot("walk")
+	# Late in the evening the moon is out and the stars come through.
+	walk._scenery.clock = 22.5
+	await _wait(2)
+	check(walk._scenery.is_dark() and walk._scenery.ambience() == "night", "the night chorus after dark")
+	await _shot("walk_night")
+	walk._scenery.clock = 10.5
 	app.state.active.start_unix -= 50 * 60
 	await _wait(30)
 	await _shot("walk_50min")
-	var walk: Node = main._flows.back().get_child(0)
 	check(walk._gift.level() == 1, "50 minutes guarantees a rare gift")
 	walk._on_gift_pressed()
 	await _wait(80)
@@ -255,6 +304,22 @@ func _run() -> void:
 	app.go("home")
 	await _wait(60)
 	check(main._flows.is_empty() and main._at == Vector2i.ZERO, "home closes the flow")
+
+	# In the jungle the leaves pass in front of you and your pet.
+	app.start_walk(app.state.projects[0].id, -1, "jungle")
+	app.go("walk", {"from": main.size * 0.5})
+	await _wait(60)
+	var jungle_walk: Node = main._flows.back().get_child(0)
+	jungle_walk._scenery.clock = 10.5
+	var front: Control = jungle_walk._scenery.front
+	check(front.get_parent() == jungle_walk and front.get_index() > jungle_walk._actors.get_index(), "the jungle's growth is in front of the walker")
+	await _wait(2)
+	await _shot("walk_jungle")
+	app.cancel_walk()
+	app.go("home")
+	await _wait(60)
+	check(main._flows.is_empty(), "back home from the jungle")
+	check(_audio().current_ambience() == "", "the jungle's sounds stop at home")
 
 	# Dark mode: the sun in the corner switches the whole app.
 	var toggle: Node = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "theme_toggle.gd"))
