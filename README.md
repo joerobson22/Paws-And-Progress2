@@ -22,10 +22,16 @@ macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
   <img src="docs/screenshots/walk-night-phone.png" width="160" alt="A walk at night under the moon">
 </p>
 
+<p>
+  <img src="docs/screenshots/weather.png" width="600" alt="Weather at the lakeside: sun and cloud, cloud, rain and a storm, then snow in the forest and a blizzard in the tundra">
+  <img src="docs/screenshots/focus-ended-phone.png" width="160" alt="Focus ended: the walker and pet hang their heads after the app was closed mid-walk">
+</p>
+
 ## How it's laid out
 
-The app is five screens arranged like a plus sign. Swipe between them (or use
-the arrow keys, or tap the little map at the bottom):
+The app is five screens arranged like a plus sign. Swipe between them, or use
+the arrow keys on a keyboard (Esc comes back to the middle). The little map at
+the bottom shows where you are:
 
 ```
                  Profile
@@ -36,13 +42,16 @@ the arrow keys, or tap the little map at the bottom):
 ```
 
 - **Focus** (middle): a greeting (from a long list in `data/greetings.json`)
-  above the orb, and the sun/moon switch for dark mode. Tap the orb and the
-  choose focus screen grows out of it, set in the place you'll walk: pick the
-  place from the row at the top (in the order they unlock), with the project
-  and the pet's name under it. Swipe through your pets (each one's kind and
-  time focused is under it), tap one to start a walk, adopt a new one with
-  the + (what it's for, the pet's name, its animal and three colours; a locked
-  animal hides the colours), or complete or delete one.
+  above the orb (it grows under the pointer), and the sun/moon switch for dark
+  mode. Tap the orb and the choose focus screen grows out of it, set in the
+  place you'll walk (holding still, with the place's growth in front of your
+  pets): pick the place from the row at the top (in the order they unlock),
+  with the project and the pet's name under it. Swipe through your pets (each
+  one's kind and time focused is under it), tap one to start a walk, adopt a
+  new one with the + (what it's for, the pet's name, its animal and three
+  colours; a locked animal hides the colours), or complete or delete one.
+  Debug builds (running from the editor) also show a debug bar in the top
+  left: a switch that unlocks every animal and place, and a weather picker.
 - **Gifts** (left): a shelf for your three favourites (press and hold a gift to
   drag it up), every gift you've found (filter by rarity, A–Z or animal; pick
   the same one again to reverse it), and trade-ins (10 commons for a rare,
@@ -76,6 +85,21 @@ The light at each hour is set in `data/biomes.json` (`day_cycle`) and blended
 in between (`core/day_cycle.gd`). In the jungle, big leaves, hanging vines and
 tall plants keep passing in front of you and your pet; in the forest, now and
 then.
+
+**Weather.** Once you allow it (the app asks once; it's in settings too),
+the sunrise and sunset are the real ones where you are (worked out on the
+device, `core/sun_times.gd`), and the real weather comes along on your walks,
+checked every half hour (`core/outdoors.gd`). Each place shows it its own way
+(`data/biomes.json`): sun and cloud, cloud, rain, storms with lightning and
+thunder, and snow; in the tundra rain falls as snow and a storm is a blizzard,
+it never rains or snows in the desert, the jungle doesn't get snow, and the
+moon has no weather at all. Your rough location comes from your internet
+connection (get.geojs.io) and the weather from Open-Meteo; nothing else is
+sent anywhere.
+
+**Closing the app ends your walk.** Next time you open it, a focus ended screen
+shows you and your pet with your heads hung. The time up to when you closed it
+still counts, but there's no gift.
 
 **Easter egg.** On the focus complete screen, press and hold the gift to take
 it, then flick it. Your pet will fetch it, wading in if it lands in the water.
@@ -111,8 +135,12 @@ CI runs all three on every push (`.github/workflows/ci.yml`). With a display,
 core/            game logic, no UI
   app.gd           autoload "App": state, saving, walks, trades, navigation
   content.gd       autoload "Content": loads data/*.json
+  outdoors.gd      autoload "Outdoors": location (with permission), weather
+  day_cycle.gd     the sky and light at any hour
+  sun_times.gd     sunrise and sunset anywhere, worked out on the device
+  weather.gd       weather kinds, and how each place shows them
   audio.gd         autoload "Audio": sounds and ambience
-  synth.gd         placeholder sounds made in code (bong, pops, rustle, chime)
+  synth.gd         placeholder sounds made in code (bong, pops, rain, thunder)
   game_state.gd    everything that's saved
   save_system.gd   versioned JSON save, migrations, backup, v1 import
   session_clock.gd timestamp-based focus timer
@@ -126,7 +154,7 @@ scenes/
   main.gd          the app shell: panes, swiping, minimap, flows, popups
   panes/           focus, gifts, completed, profile, stats (and their base, Pane)
   choose_focus/    choosing and adopting pets
-  walk/            the walk, its chunked scenery, and focus complete
+  walk/            the walk, its chunked scenery, focus complete, focus ended
   customise/       the character popup
 ui/
   ui.gd            palette, type, theme and builders every screen uses
@@ -176,18 +204,20 @@ exist:
 - Character: `ui/components/character_view.gd`, one look per cosmetic `style`.
 - Gifts: `ui/components/gift_art.gd` (every screen showing a gift uses it).
 - Scenery: `scenes/walk/scenery.gd` draws each place's layers in chunks,
-  the sun and moon, the growth in front of the walker, and the weather (snow
-  and wind in the tundra, stars, fireflies). The light tints each layer
-  through its node, so the clock moving on costs no redrawing.
-- Sounds: the bong, pops, rustle, chime, level-up, splash and wind are
-  generated by `core/synth.gd`.
+  the sun and moon, the growth in front of the walker, and the weather
+  (clouds, rain, lightning, snow, blizzards, the tundra's wind, stars,
+  fireflies). The light tints each layer through its node, so the clock
+  moving on costs no redrawing.
+- Sounds: the bong, pops, rustle, chime, level-up, splash, wind, rain and
+  thunder are generated by `core/synth.gd`.
   Drop an `.mp3` with the same name into `assets/sounds/` and it's used instead.
 
 ## Key decisions
 
 - **Honest time.** Walk length is always `now - start - paused`, from saved
-  timestamps, so backgrounding, sleep or a killed app can't corrupt it. A walk
-  left running is capped at 12 hours.
+  timestamps, so backgrounding or sleep can't corrupt it. While you walk, the
+  app notes every 30 seconds that it's still open; if it's closed or killed
+  mid-walk, the walk ends at the last of those (and never runs past 12 hours).
 - **Stats from the log.** Every finished walk is stored; weekly totals, best
   week and streaks are computed from it, never kept as running counters.
 - **Saves** are written to a temp file and swapped in, with the previous save

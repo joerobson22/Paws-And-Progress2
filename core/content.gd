@@ -9,6 +9,8 @@ var drop_table: Dictionary = {}
 var biomes: Array = []
 ## The sky and light round the clock (see DayCycle).
 var day_cycle: Dictionary = {}
+## How each kind of weather looks (see Weather).
+var weathers: Dictionary = {}
 var grade_scales: Array = []
 var quotes: Array = []
 ## Home screen lines: {morning, afternoon, evening, night, anytime}.
@@ -38,6 +40,7 @@ func _init() -> void:
 	var b := _load("res://data/biomes.json")
 	biomes = b.get("biomes", [])
 	day_cycle = b.get("day_cycle", {})
+	weathers = b.get("weathers", {})
 	var keys: Array = day_cycle.get("keys", [])
 	keys.sort_custom(func(x, y): return float(x["hour"]) < float(y["hour"]))
 	grade_scales = _load("res://data/grades.json").get("scales", [])

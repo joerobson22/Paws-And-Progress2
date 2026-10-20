@@ -9,10 +9,13 @@ extends Control
 ## marked "front" (the jungle's big leaves and vines) go in `front`, which a
 ## host can lift in front of its walker and pet with front_into().
 ##
-## The light follows the real clock (see DayCycle): the sky brightens until
-## midday and darkens after, the sun and then the moon cross it, and every
-## layer is tinted to match through its node's modulate, so a change of
-## light costs no redrawing. Real art will replace each layer's drawer with
+## The light follows the real clock (see DayCycle), with the real sunrise
+## and sunset where you are once you've allowed it (Outdoors): the sky
+## brightens until midday and darkens after, the sun and then the moon
+## cross it, and every layer is tinted to match through its node's
+## modulate, so a change of light costs no redrawing. The real weather
+## shows too, the way this place shows it (Weather): clouds, rain and
+## lightning, snow, a blizzard. Real art will replace each layer's drawer with
 ## sprite chunks; the data stays.
 
 const CHUNK := 384.0
@@ -20,6 +23,10 @@ const CHUNK := 384.0
 const ANIMATED := ["water", "reeds", "fronds", "undergrowth", "vines", "stalks"]
 ## How often the light catches up with the clock, in seconds.
 const LIGHT_EVERY := 5.0
+## Every scenery's front growth is in this group, wherever it's been moved.
+const FRONT_GROUP := "scenery_front"
+## A storm flashes about this often, in seconds.
+const STORM_EVERY := 7.0
 
 ## Ground-layer pixels walked so far; every layer scrolls by this × its parallax.
 var scroll: float = 0.0
@@ -29,19 +36,41 @@ var clock: float = -1.0:
 	set(v):
 		clock = v
 		_update_light()
+## A weather kind to show here instead of the real one (see Weather.KINDS);
+## "" follows Outdoors.
+var weather := "":
+	set(v):
+		weather = v
+		_update_light()
 
 var _time: float = 0.0
-## DayCycle.at() for the hour shown.
+## DayCycle.at() for the hour shown, with the weather's cloud cover, plus
+## "glow": how much of the sun or moon shows through it.
 var _light: Dictionary = {}
 var _light_check := 0.0
+## The weather as this place shows it, and how that looks (Weather.look).
+var _weather_kind := "sunny"
+var _look: Dictionary = {}
+## A storm's lightning: how bright the flash is now, which flash is drawing
+## its bolt (-1 for none), and the last one thunder was played for.
+var _flash := 0.0
+var _bolt := -1
+var _thunder_for := -1
 ## One entry per layer: {data, node, chunks: {index: _Chunk}, animated}.
 var _layers: Array = []
 var _sky: _Sky
+var _clouds: _Clouds
 var _fx: _Fx
 ## The growth in front of everything else. It's the scenery's own top child
 ## until a host moves it with front_into(); it then keeps following the
 ## scenery's place, size and fade.
 var front: Control
+## Multiplied into the front growth's colour, e.g. to darken it along with a
+## sheet laid over the rest of the scene, or to fade it on its own.
+var front_tint := Color.WHITE
+## A stretch of the screen (from x, to x) kept clear of tall plants, so one
+## never stands in front of the pet everyone's looking at. Empty: none.
+var front_gap := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -50,8 +79,12 @@ func _ready() -> void:
 	_sky = _Sky.new()
 	_sky.scenery = self
 	add_child(_sky)
+	_clouds = _Clouds.new()
+	_clouds.scenery = self
+	add_child(_clouds)
 	front = Control.new()
 	front.name = "SceneryFront"
+	front.add_to_group(FRONT_GROUP)
 	front.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	front.clip_contents = true
 	for layer in biome.get("layers", []):
@@ -68,6 +101,7 @@ func _ready() -> void:
 	add_child(_fx)
 	add_child(front)
 	resized.connect(_rebuild)
+	Outdoors.changed.connect(_update_light)
 	_update_light()
 
 
@@ -89,14 +123,22 @@ func _process(delta: float) -> void:
 	if _light_check <= 0.0:
 		_update_light()
 	_place_chunks()
+	if bool(_look.get("lightning", false)):
+		_storm()
+	elif _flash > 0.0 or _bolt >= 0:
+		_flash = 0.0
+		_bolt = -1
 	_fx.queue_redraw()
+	if not is_instance_valid(front):
+		return
 	if front.get_parent() != self:
 		front.position = position
 		front.size = size
-		front.modulate = modulate
+		front.modulate = modulate * front_tint
 		front.visible = visible
 	else:
 		front.size = size
+		front.modulate = front_tint
 
 
 ## The hour of the day shown.
@@ -106,12 +148,53 @@ func hour() -> float:
 
 func _update_light() -> void:
 	_light_check = LIGHT_EVERY
-	_light = DayCycle.at(hour(), Content.day_cycle)
+	_weather_kind = Weather.for_place(weather if weather != "" else Outdoors.weather(), biome)
+	_look = Weather.look(_weather_kind, Content.weathers)
+	var sun := Outdoors.sun_hours()
+	_light = DayCycle.at(DayCycle.solar_hour(hour(), sun.x, sun.y, Content.day_cycle), Content.day_cycle)
+	# Cloud cover greys the sky, dims the light and hides the sun and moon.
+	var o := float(_look["overcast"])
+	if o > 0.0:
+		for name in ["sky_top", "sky_bottom"]:
+			var c: Color = _light[name]
+			var grey := c.get_luminance() * 0.92
+			_light[name] = c.lerp(Color(grey * 0.96, grey, grey * 1.04), o * 0.85).darkened(o * 0.2)
+		_light["tint"] = (_light["tint"] as Color).lerp((_light["tint"] as Color) * Color(0.8, 0.82, 0.86), o)
+	_light["glow"] = 1.0 - clampf(o * 1.15, 0.0, 1.0)
 	var t := tint()
 	for layer in _layers:
 		layer["node"].modulate = t
 	if _sky:
 		_sky.queue_redraw()
+	if _clouds:
+		_clouds.queue_redraw()
+
+
+## The weather as this place shows it now (see Weather.KINDS; "blizzard"
+## in the tundra).
+func weather_kind() -> String:
+	return _weather_kind
+
+
+## Lightning every few seconds in a storm: a double flicker, then a fading
+## glow, and thunder a moment later.
+func _storm() -> void:
+	var k := floori(_time / STORM_EVERY)
+	var since := _time - (k * STORM_EVERY + _hash(k, 31.0) * 4.0)
+	if since < 0.0 or since >= 0.6:
+		_flash = 0.0
+		_bolt = -1
+		return
+	if since < 0.06:
+		_flash = 0.55
+	elif since < 0.12:
+		_flash = 0.12
+	else:
+		_flash = 0.45 * (1.0 - (since - 0.12) / 0.48)
+	_bolt = k if since < 0.25 else -1
+	if k != _thunder_for and is_visible_in_tree():
+		_thunder_for = k
+		get_tree().create_timer(0.7 + _hash(k, 32.0)).timeout.connect(Audio.play.bind("thunder", 0.85 + 0.3 * _hash(k, 33.0), -3.0))
 
 
 ## Screen y of the walking path (where feet go).
@@ -127,6 +210,15 @@ func ground_layer() -> Dictionary:
 		if layer["kind"] == "ground":
 			return layer
 	return {}
+
+
+## Screen y of the far horizon: the foot of the furthest layer of hills,
+## where the sun and moon come up from and the clouds sit above.
+func horizon_y() -> float:
+	for layer in biome.get("layers", []):
+		if layer["kind"] != "planet":
+			return size.y * float(layer["y"])
+	return size.y * 0.5
 
 
 ## The water band on screen (top y, bottom y), or an empty Vector2 if there's none.
@@ -152,6 +244,7 @@ func tint() -> Color:
 
 
 ## 0 in broad daylight, 1 at night (always 1 under a fixed black sky).
+## Cloud doesn't count: an overcast noon is dull, not dark.
 func darkness() -> float:
 	if biome.has("sky"):
 		return 1.0
@@ -170,6 +263,10 @@ func time() -> float:
 ## way to the night chorus after dark; wind and silence (the Moon) stay put.
 func ambience() -> String:
 	var own := str(biome.get("ambience", "day"))
+	if int(_look.get("rain", 0)) > 0:
+		return "rain"
+	if float(_look.get("haze", 0.0)) > 0.0:
+		return "wind"
 	if darkness() >= 0.6 and own in ["lake", "day"]:
 		return "night"
 	return own
@@ -456,6 +553,15 @@ class _Chunk extends Node2D:
 		draw_rect(Rect2(x + w * 0.3, arm_y + th * 0.02, w * 1.2, w * 0.6), colour)
 
 	## A low mound along the bottom edge (snow drifts, moon dust).
+	## Whether something at `x` (this chunk's space), `reach` wide either
+	## side, would stand in the scenery's front_gap.
+	func _in_gap(x: float, reach: float) -> bool:
+		var gap := scenery.front_gap
+		if gap.y <= gap.x:
+			return false
+		var at := position.x + x
+		return at + reach > gap.x and at - reach < gap.y
+
 	## A leaf from `base` along `angle`, `length` long and `width` across at
 	## its widest, curving sideways by `bend` (a share of its length). Both
 	## edges run steadily from base to tip, so the outline never crosses.
@@ -509,8 +615,10 @@ class _Chunk extends Node2D:
 		_leaf(pts[12], PI * 0.5 - 0.35, leaf, leaf * 0.48, 0.08, colour.darkened(0.08))
 
 	## A tall leafy plant growing up from the bottom edge, close enough to
-	## pass in front of the walker.
+	## pass in front of the walker (but never inside the front_gap).
 	func _stalk(x: float, bottom: float, h: float, colour: Color, r: float) -> void:
+		if _in_gap(x, h * 0.45):
+			return
 		var lean := (r - 0.5) * h * 0.3 + sin(scenery.time() * 0.8 + r * 5.0) * h * 0.03
 		var stem := PackedVector2Array()
 		for k in 11:
@@ -547,12 +655,13 @@ class _Sky extends Node2D:
 		draw_polygon(
 			PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0), Vector2(size.x, size.y), Vector2(0, size.y)]),
 			PackedColorArray([top, top, bottom, bottom]))
-		if not sky.has("top"):
+		var glow := float(light.get("glow", 1.0))
+		if not sky.has("top") and glow > 0.01:
 			var r := clampf(size.y * 0.045, 16.0, 40.0)
 			if float(light.get("sun", -1.0)) >= 0.0:
-				_sun(_on_arc(float(light["sun"]), r, size), r, float(light["sun"]))
+				_sun(_on_arc(float(light["sun"]), r, size), r, float(light["sun"]), glow)
 			if float(light.get("moon", -1.0)) >= 0.0:
-				_moon(_on_arc(float(light["moon"]), r, size), r * 0.8)
+				_moon(_on_arc(float(light["moon"]), r, size), r * 0.8, glow)
 		for layer in scenery.biome.get("layers", []):
 			if layer["kind"] == "planet":
 				_planet(Vector2(size.x * 0.72, size.y * float(layer["y"])), size.y * float(layer["height"]), Color.from_string(layer["colour"], Color.ROYAL_BLUE))
@@ -562,28 +671,25 @@ class _Sky extends Node2D:
 	## the words at the top of the screen) and goes down behind them on the
 	## right.
 	func _on_arc(progress: float, r: float, size: Vector2) -> Vector2:
-		var horizon := size.y * 0.5
-		for layer in scenery.biome.get("layers", []):
-			if layer["kind"] != "planet":
-				horizon = size.y * float(layer["y"])
-				break
+		var horizon := scenery.horizon_y()
 		var high := minf(size.y * 0.2 + r, horizon - r * 2.0)
 		return Vector2(lerpf(size.x * 0.06, size.x * 0.94, progress), lerpf(horizon + r * 1.2, high, sin(progress * PI)))
 
-	## Warm and orange near the horizon, pale yellow when it's high.
-	func _sun(c: Vector2, r: float, progress: float) -> void:
+	## Warm and orange near the horizon, pale yellow when it's high; `glow`
+	## is how much shows through the cloud.
+	func _sun(c: Vector2, r: float, progress: float, glow: float) -> void:
 		var high := sin(progress * PI)
 		var colour := Color("#ff9b54").lerp(Color("#fff3b0"), clampf(high * 1.6, 0.0, 1.0))
-		draw_circle(c, r * 3.2, Color(colour, 0.08), true, -1.0, true)
-		draw_circle(c, r * 1.9, Color(colour, 0.16), true, -1.0, true)
-		draw_circle(c, r, colour, true, -1.0, true)
+		draw_circle(c, r * 3.2, Color(colour, 0.08 * glow), true, -1.0, true)
+		draw_circle(c, r * 1.9, Color(colour, 0.16 * glow), true, -1.0, true)
+		draw_circle(c, r, Color(colour, glow), true, -1.0, true)
 
-	func _moon(c: Vector2, r: float) -> void:
+	func _moon(c: Vector2, r: float, glow: float) -> void:
 		var colour := Color("#f2efe0")
-		draw_circle(c, r * 2.6, Color(colour, 0.06), true, -1.0, true)
-		draw_circle(c, r * 1.6, Color(colour, 0.1), true, -1.0, true)
-		draw_circle(c, r, colour, true, -1.0, true)
-		var shade := Color("#cfcab6")
+		draw_circle(c, r * 2.6, Color(colour, 0.06 * glow), true, -1.0, true)
+		draw_circle(c, r * 1.6, Color(colour, 0.1 * glow), true, -1.0, true)
+		draw_circle(c, r, Color(colour, glow), true, -1.0, true)
+		var shade := Color("#cfcab6", glow)
 		draw_circle(c + Vector2(-r * 0.3, -r * 0.2), r * 0.22, shade, true, -1.0, true)
 		draw_circle(c + Vector2(r * 0.35, r * 0.15), r * 0.16, shade, true, -1.0, true)
 		draw_circle(c + Vector2(-r * 0.05, r * 0.45), r * 0.12, shade, true, -1.0, true)
@@ -598,9 +704,52 @@ class _Sky extends Node2D:
 		draw_arc(c, r * 0.8, PI * 0.1, PI * 0.9, 16, Color(0, 0, 0, 0.18), r * 0.45, true)
 
 
-## Weather on top of the scenery: stars coming out as it gets dark,
-## fireflies at dusk and overnight, snow and gusts of wind in the tundra.
-## A few dozen dots and lines a frame.
+## Clouds drifting across the sky: in front of the sun and moon, behind the
+## hills. A few white puffs on a fair day; more, greyer and under a dull
+## blanket as it clouds over; dark and quick in a storm.
+class _Clouds extends Node2D:
+	var scenery: Scenery
+
+	func _process(_delta: float) -> void:
+		if int(scenery._look.get("clouds", 0)) > 0:
+			queue_redraw()
+
+	func _draw() -> void:
+		var look := scenery._look
+		var count := int(look.get("clouds", 0))
+		if count <= 0:
+			return
+		var size := scenery.size
+		var o := float(look.get("overcast", 0.0))
+		var t := scenery.time()
+		var unit := minf(size.x, size.y) / 720.0
+		var colour := Color.WHITE.lerp(Color(0.6, 0.63, 0.68), clampf((o - 0.3) / 0.6, 0.0, 1.0)) * scenery.tint()
+		if o >= 0.4:
+			var a := (o - 0.3) * 0.9
+			var low := scenery.horizon_y()
+			draw_polygon(
+				PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0), Vector2(size.x, low), Vector2(0, low)]),
+				PackedColorArray([Color(colour, a), Color(colour, a), Color(colour, 0.0), Color(colour, 0.0)]))
+		var wind := 1.0 + float(look.get("wind", 0.0)) * 2.5
+		var span := size.x + 400.0 * unit
+		for i in count:
+			var s := (0.6 + 0.7 * Scenery._hash(i, 21.0)) * unit
+			var speed := (6.0 + 10.0 * Scenery._hash(i, 22.0)) * wind * unit
+			var x := fposmod(Scenery._hash(i, 23.0) * span + t * speed + scenery.scroll * 0.02, span) - 200.0 * unit
+			var y := scenery.horizon_y() * (0.08 + 0.62 * Scenery._hash(i, 24.0))
+			_cloud(Vector2(x, y), s, colour.darkened(0.1 * Scenery._hash(i, 25.0)))
+
+	## One cloud: overlapping puffs on a flat base.
+	func _cloud(at: Vector2, s: float, colour: Color) -> void:
+		for p in [[-60, 0, 30], [-24, -18, 42], [20, -22, 46], [58, -4, 34], [0, -10, 40]]:
+			draw_circle(at + Vector2(p[0], p[1]) * s, p[2] * s, colour, true, -1.0, true)
+		draw_rect(Rect2(at + Vector2(-60, 0) * s, Vector2(118, 30) * s), colour)
+
+
+## Weather on top of the scenery: stars coming out as it gets dark (unless
+## it's cloudy), fireflies at dusk and overnight, the tundra's snow and
+## wind, and the real weather's rain, lightning, snow and white-outs. A few
+## hundred dots and lines a frame at most.
 class _Fx extends Node2D:
 	var scenery: Scenery
 
@@ -609,8 +758,9 @@ class _Fx extends Node2D:
 		var size := scenery.size
 		var t := scenery.time()
 		var dark := scenery.darkness()
-		# Stars fade in from dusk; the brightest come out first.
-		var stars := clampf((dark - 0.3) / 0.6, 0.0, 1.0)
+		var look := scenery._look
+		# Stars fade in from dusk, the brightest first, unless it's cloudy.
+		var stars := clampf((dark - 0.3) / 0.6, 0.0, 1.0) * (1.0 - float(look.get("overcast", 0.0)))
 		if fx.has("stars") and stars > 0.0:
 			for i in 70:
 				var bright := Scenery._hash(i, 3.0)
@@ -629,17 +779,55 @@ class _Fx extends Node2D:
 				draw_circle(base + drift, 6.0, Color(1.0, 0.92, 0.5, 0.15 * glow))
 				draw_circle(base + drift, 2.2, Color(1.0, 0.95, 0.6, glow))
 		var gust := 0.6 + 0.4 * sin(t * 0.45)
-		if fx.has("snow"):
-			# Flakes fall and are blown sideways, harder in the gusts.
-			for i in 90:
-				var speed := 30.0 + 50.0 * Scenery._hash(i, 6.0)
-				var fall := fposmod(Scenery._hash(i, 7.0) * size.y + t * speed, size.y + 20.0) - 10.0
-				var blown := fposmod(Scenery._hash(i, 8.0) * size.x - t * (60.0 + 90.0 * gust) - fall * 0.4, size.x + 20.0) - 10.0
-				draw_circle(Vector2(blown, fall), 1.2 + 2.0 * Scenery._hash(i, 9.0), Color(1, 1, 1, 0.85))
-		if fx.has("wind"):
-			for i in 10:
+		var area := clampf(size.x * size.y / (720.0 * 720.0), 0.5, 3.0)
+		var unit := minf(size.x, size.y) / 720.0
+		var wind := float(look.get("wind", 0.0)) + (0.6 if fx.has("wind") else 0.0)
+		var light := scenery.tint()
+		if bool(look.get("lightning", false)):
+			_lightning(size)
+		# Rain slants with the wind, in long quick streaks.
+		var drops := int(int(look.get("rain", 0)) * area)
+		var slant := 0.12 + 0.3 * wind
+		var rain := Color(0.82, 0.88, 1.0, 0.42) * Color(light, 1.0)
+		for i in drops:
+			var speed := 760.0 + 320.0 * Scenery._hash(i, 14.0)
+			var length := (14.0 + 16.0 * Scenery._hash(i, 15.0)) * unit
+			var y := fposmod(Scenery._hash(i, 16.0) * size.y + t * speed * unit, size.y + length * 2.0) - length
+			var x := fposmod(Scenery._hash(i, 17.0) * size.x * 1.3 - y * slant, size.x + 40.0) - 20.0
+			draw_line(Vector2(x, y), Vector2(x + length * slant, y - length), rain, 1.4, true)
+		# Snow: the tundra's own flurries, or the weather's. Flakes fall and
+		# are blown sideways, harder in the gusts.
+		var flakes := int(maxi(90 if fx.has("snow") else 0, int(look.get("snow", 0))) * area)
+		var flake := Color(1, 1, 1, 0.85) * Color(light.lightened(0.3), 1.0)
+		for i in flakes:
+			var speed := (30.0 + 50.0 * Scenery._hash(i, 6.0)) * (1.0 + wind * 0.5)
+			var fall := fposmod(Scenery._hash(i, 7.0) * size.y + t * speed, size.y + 20.0) - 10.0
+			var blown := fposmod(Scenery._hash(i, 8.0) * size.x - t * (20.0 + 120.0 * wind * gust) - fall * 0.6 * wind, size.x + 20.0) - 10.0
+			draw_circle(Vector2(blown, fall), 1.2 + 2.0 * Scenery._hash(i, 9.0), flake)
+		if wind >= 0.5:
+			for i in int(6 + 8 * wind):
 				var speed := 380.0 + 260.0 * Scenery._hash(i, 10.0)
-				var x := size.x - fposmod(Scenery._hash(i, 11.0) * size.x * 2.0 + t * speed, size.x * 2.0)
+				var x := size.x - fposmod(Scenery._hash(i, 11.0) * size.x * 2.0 + t * speed * (0.6 + wind * 0.5), size.x * 2.0)
 				var y := size.y * (0.15 + 0.7 * Scenery._hash(i, 12.0)) + sin(t * 2.0 + i) * 6.0
 				var length := 60.0 + 90.0 * Scenery._hash(i, 13.0)
-				draw_line(Vector2(x, y), Vector2(x + length, y - 4.0), Color(1, 1, 1, 0.25 * gust), 1.5, true)
+				draw_line(Vector2(x, y), Vector2(x + length, y - 4.0), Color(1, 1, 1, 0.25 * gust * minf(1.0, wind)), 1.5, true)
+		# A blizzard whites everything out, more in the gusts.
+		var haze := float(look.get("haze", 0.0))
+		if haze > 0.0:
+			draw_rect(Rect2(Vector2.ZERO, size), Color(0.94, 0.96, 1.0, haze * (0.7 + 0.3 * gust)) * Color(light.lightened(0.4), 1.0))
+
+	## The flash lights up the whole scene; the bolt forks down from the
+	## clouds for a moment.
+	func _lightning(size: Vector2) -> void:
+		if scenery._bolt >= 0:
+			var k := scenery._bolt
+			var at := Vector2(size.x * (0.15 + 0.7 * Scenery._hash(k, 34.0)), 0.0)
+			var bolt := PackedVector2Array([at])
+			var low := scenery.horizon_y()
+			for j in range(1, 9):
+				at = Vector2(at.x + (Scenery._hash(k * 9 + j, 35.0) - 0.5) * size.x * 0.06, low * j / 8.0)
+				bolt.append(at)
+			draw_polyline(bolt, Color(1, 1, 1, 0.35), 7.0, true)
+			draw_polyline(bolt, Color(1, 1, 0.92, 0.95), 2.5, true)
+		if scenery._flash > 0.0:
+			draw_rect(Rect2(Vector2.ZERO, size), Color(0.92, 0.94, 1.0, scenery._flash * 0.55))

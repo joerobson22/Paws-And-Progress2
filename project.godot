@@ -23,6 +23,7 @@ run/low_processor_mode=true
 
 Content="*res://core/content.gd"
 App="*res://core/app.gd"
+Outdoors="*res://core/outdoors.gd"
 Audio="*res://core/audio.gd"
 
 [display]

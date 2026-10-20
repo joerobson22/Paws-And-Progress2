@@ -23,7 +23,6 @@ const SWATCHES := [
 ## How tall pets stand in the chooser.
 const PET_HEIGHT := 200.0
 ## The scenery drifts by slowly behind the pets, in pixels a second.
-const DRIFT := 16.0
 
 ## The pet last in the middle, so the screen reopens where you left it.
 static var _remembered := ""
@@ -111,11 +110,6 @@ func _ready() -> void:
 	Audio.ambience(_scenery.ambience())
 
 
-func _process(delta: float) -> void:
-	if _scenery:
-		_scenery.scroll += delta * DRIFT * minf(size.x, size.y) / 720.0
-
-
 ## Back to the focus screen, from either mode.
 func go_back() -> void:
 	App.go("home")
@@ -138,10 +132,24 @@ func _show_place(id: String, animate: bool = true) -> void:
 	_scenery.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_scenery)
 	move_child(_scenery, 1 if old else 0)
+	_attach_front()
 	if old:
 		_scenery.modulate.a = 0.0
 		Motion.fade(_scenery, 1.0, Motion.SLOW).tween_callback(old.queue_free)
+		Motion.to(old, "front_tint:a", 0.0, Motion.SLOW)
 		Audio.ambience(_scenery.ambience())
+	_layout()
+
+
+## The place's front growth goes over the pets (a still scene, but you're
+## standing in it) and under the words. Tall plants keep clear of the pet in
+## the middle, the one you're choosing.
+func _attach_front() -> void:
+	if not is_instance_valid(_pets) or not is_instance_valid(_scenery):
+		return
+	if _scenery.front.get_parent() != _pick:
+		_scenery.front_into(_pick)
+	_pick.move_child(_scenery.front, _pets.get_index() + 1)
 
 
 func _pick_place(id: String) -> void:
@@ -214,6 +222,8 @@ func _refresh_places() -> void:
 
 func _build_pick(select_id: String = "") -> void:
 	for c in _pick.get_children():
+		if c.is_in_group(Scenery.FRONT_GROUP):
+			continue  # belongs to its scenery, which frees it
 		_pick.remove_child(c)
 		c.queue_free()
 	_projects = App.state.active_projects()
@@ -269,6 +279,9 @@ func _build_pick(select_id: String = "") -> void:
 	_pets.changed.connect(_on_pet_changed)
 	_pets.activated.connect(_start_walk)
 	_pets.set_items(items, start)
+	# The pets stand at the back, under the growth and the words.
+	_pick.move_child(_pets, 0)
+	_attach_front()
 	_on_pet_changed(start)
 	_layout()
 	_pets.grab_focus.call_deferred()
@@ -294,6 +307,7 @@ func _layout() -> void:
 	if is_instance_valid(_under):
 		_under.size = Vector2(size.x, _under.get_combined_minimum_size().y)
 		_under.position = Vector2(0, path + 16.0)
+	_scenery.front_gap = Vector2(size.x * 0.5 - PET_HEIGHT * 0.8, size.x * 0.5 + PET_HEIGHT * 0.8)
 	if is_instance_valid(_pets):
 		var band := PET_HEIGHT * 1.15
 		_pets.size = Vector2(size.x, band)

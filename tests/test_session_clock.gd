@@ -40,3 +40,17 @@ func test_forgotten_walk_is_capped() -> void:
 
 func test_format() -> void:
 	eq(SessionClock.format(3725), "01:02:05")
+
+
+func test_walk_left_running_stops_when_the_app_was_last_seen() -> void:
+	var c := SessionClock.begin("p", 1000)
+	c.last_seen_unix = 2500
+	eq(c.left_at(9000, 99999), 2500, "the last heartbeat wins")
+	var old := SessionClock.begin("p", 1000)
+	eq(old.left_at(3000, 99999), 3000, "else when the save was last written")
+	eq(old.left_at(0, 99999), 1000, "else it never really started")
+	eq(old.left_at(500, 99999), 1000, "never before it started")
+	c.last_seen_unix = 200000
+	eq(c.left_at(0, 5000), 5000, "never after now")
+	var back := SessionClock.from_dict(JSON.parse_string(JSON.stringify(c.to_dict())))
+	eq(back.last_seen_unix, 200000, "saved")
