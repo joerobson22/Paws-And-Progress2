@@ -179,7 +179,8 @@ func _location_toggle() -> Control:
 # --- Rewards -----------------------------------------------------------------
 
 ## Everything levelling up unlocks, in order, with a line down the left
-## filled to where you are now.
+## filled to where you are now. The title and your level stay at the top
+## while the rewards scroll, and it opens scrolled to where you are.
 func open_rewards() -> void:
 	var table := Content.levels
 	var xp := App.xp()
@@ -187,7 +188,8 @@ func open_rewards() -> void:
 	# Where you are, as a level with a fraction: 7.4 is 40% of the way to 8.
 	var at := float(p["level"]) + float(p["into"]) / maxf(1.0, float(p["needed"]))
 	var m := Modal.open(460)
-	m.body.add_child(m.heading_row("Rewards"))
+	# The title and where you are stay put; only the rewards scroll.
+	m.header.add_child(m.heading_row("Rewards"))
 	var head := UI.hbox(12)
 	head.add_child(UI.level_badge(p["level"], 44))
 	var words := UI.vbox(0)
@@ -195,15 +197,21 @@ func open_rewards() -> void:
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_child(UI.para("%d XP to level %d. You get 1 XP for each minute focused, and more for gifts." % [int(p["needed"]) - int(p["into"]), int(p["level"]) + 1], 13, UI.INK_SOFT, 700))
 	head.add_child(words)
-	m.body.add_child(head)
+	m.header.add_child(head)
 
 	var rows := _reward_list()
 	var list := UI.vbox(0)
+	# The first reward still to come: just past where you are on the line.
+	var here: Control = null
 	for i in rows.size():
 		var before: int = rows[i - 1]["level"] if i > 0 else 1
 		var after: int = rows[i + 1]["level"] if i + 1 < rows.size() else rows[i]["level"] + 1
-		list.add_child(_reward_row(rows[i], before, after, at))
+		var row := _reward_row(rows[i], before, after, at)
+		list.add_child(row)
+		if here == null and float(rows[i]["level"]) > at:
+			here = row
 	m.body.add_child(list)
+	m.scroll_to(here if here else list.get_child(list.get_child_count() - 1))
 
 
 ## Level 1's animals and places first, then each reward in level order.
