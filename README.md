@@ -30,8 +30,11 @@ macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
 ## How it's laid out
 
 The app is five screens arranged like a plus sign. Swipe between them, use
-the arrow keys on a keyboard (Esc comes back to the middle), or tap a dot on
-the little map at the bottom, which shows where you are:
+the arrow keys on a keyboard (Esc comes back to the middle), or use the
+little map at the bottom, which shows where you are: tap it and it grows into
+a tile per screen, each with its icon (a home for focus, a present for gifts,
+a tick for completed, a person for your profile and a bar chart for stats).
+Tap a tile to go there, or anywhere else to shrink it back.
 
 ```
                  Profile
@@ -53,7 +56,9 @@ the little map at the bottom, which shows where you are:
   name, its animal and three colours; a locked animal hides the colours):
   while you fill that in the bottom buttons go, the × cancels and the + turns
   into a tick that adopts it. Debug builds (running from the editor) also show
-  a switch in the top left that unlocks every animal and place.
+  two switches in the top left: one unlocks every animal and place, the
+  other shows the app at a phone's proportions (letterboxed in the window)
+  instead of the desktop layout.
 - **Gifts** (left): a shelf for your three favourites (they grow and glint
   under the pointer; tap one for a closer look and its trade-in), and three
   rings for how your collection's coming along: gifts discovered (green),
@@ -142,12 +147,12 @@ godot --headless --path . -s tests/run_tests.gd   # unit tests
 godot --headless --path . -s tests/smoke.gd       # drives the whole app with sample data
 ```
 
-The smoke run draws every place, swipes between panes, arranges the shelf by
-dragging (on, swapped in, along and off), sorts and trades gifts, grades a
-project from its "?", opens every popup (achievements included), picks a place (and tries a locked one),
-adopts a pet, walks for "50 minutes" through to the gift and the
-XP bar, throws the gift for the pet to fetch, and switches to dark mode and
-back.
+The smoke run draws every place, opens the map and swipes between panes,
+arranges the shelf by dragging (on, swapped in, along and off), sorts and
+trades gifts, grades a project from its "?", opens every popup (achievements
+included), picks a place (and tries a locked one), adopts a pet, walks for
+"50 minutes" through to the gift and the XP bar, throws the gift for the pet
+to fetch, and switches to dark mode and back.
 CI runs all three on every push (`.github/workflows/ci.yml`). With a display,
 `-s tests/smoke.gd -- --shots=<dir>` saves a screenshot of each step.
 

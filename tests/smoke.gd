@@ -52,13 +52,33 @@ func _run() -> void:
 	await _wait(20)
 	await _shot("focus")
 
-	# The arrow keys move between screens and Esc comes back; so does tapping
-	# a dot on the map.
+	# Tapping the map grows it, with an icon fading in on each screen's tile:
+	# tapping elsewhere shrinks it without going anywhere, and tapping a tile
+	# goes there. The arrow keys move between screens and Esc comes back.
 	var map: Control = main._minimap
-	await _drag(map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center(),
-		map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center(), 1)
+	var small: Vector2 = map.size
+	check(map._grow == 0.0 and not map.open, "the map starts small, with no icons")
+	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
+	await _wait(30)
+	check(map.open and map._grow > 0.99 and map.size.x > small.x * 2.0 and main._at == Vector2i.ZERO,
+		"tapping the map grows it, without going anywhere")
+	check(is_equal_approx(map.get_global_rect().end.y, main.size.y - 18.0) and is_equal_approx(map.get_global_rect().get_center().x, main.size.x * 0.5),
+		"it grows up from where it sat")
+	await _shot("map_open")
+	await _drag(Vector2(main.size.x * 0.5, 40), Vector2(main.size.x * 0.5, 40), 1)
+	await _wait(30)
+	check(not map.open and map._grow < 0.01 and main._at == Vector2i.ZERO, "tapping elsewhere shrinks it again")
+	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
+	await _wait(30)
+	await _key(KEY_ESCAPE)
+	await _wait(30)
+	check(not map.open and main._at == Vector2i.ZERO, "Esc shrinks it too")
+	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
+	await _wait(30)
+	var stats_tile: Vector2 = map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center()
+	await _drag(stats_tile, stats_tile, 1)
 	await _wait(40)
-	check(main._at == Vector2i(0, 1), "tapping the map's bottom dot opens stats")
+	check(main._at == Vector2i(0, 1) and not map.open, "tapping the stats tile goes there, and the map shrinks back")
 	await _key(KEY_ESCAPE)
 	await _wait(30)
 	await _key(KEY_RIGHT)
@@ -96,6 +116,20 @@ func _run() -> void:
 		unlock.button_pressed = false
 		await _wait(10)
 		check(not app.is_unlocked("place", "moon"), "and locks it all again")
+		# The second switch shows the app at a phone's size, letterboxed.
+		var desktop: Vector2 = main.size
+		var switches: Array = _all(debug, func(n): return _is(n, "switch.gd"))
+		check(switches.size() == 2, "a phone size switch under the unlock one")
+		switches[1].button_pressed = true
+		await _wait(20)
+		check(main.size == Vector2(main.PHONE_VIEW) and root.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_KEEP,
+			"the phone size switch shows the app at a phone's size (%s)" % main.size)
+		await _shot("debug_phone")
+		# The pane rebuilt at the new size, so find its switch again.
+		debug = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "debug_bar.gd"))
+		_all(debug, func(n): return _is(n, "switch.gd"))[1].button_pressed = false
+		await _wait(20)
+		check(main.size == desktop and root.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_EXPAND, "and back to filling the window")
 
 	# The location question: asked once, a moment after the focus screen shows.
 	app.state.settings.erase("location")

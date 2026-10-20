@@ -2,9 +2,10 @@ extends Control
 ## App shell. Five panes are laid out like a plus sign with the focus screen
 ## in the middle: gifts to the left, completed projects to the right, your
 ## profile above and stats below. Swipe between them, use the arrow keys
-## (Esc comes back to the middle), or tap a dot on the minimap. Every pane is built once and kept, so each one is as
-## you left it when you come back. Full-screen flows (choosing a focus, the
-## walk, the end of a walk) open over everything through a growing circle.
+## (Esc comes back to the middle), or tap the minimap to open it up and pick
+## one. Every pane is built once and kept, so each one is as you left it when
+## you come back. Full-screen flows (choosing a focus, the walk, the end of a
+## walk) open over everything through a growing circle.
 ## Screens ask to move with App.go().
 
 const PANES := {
@@ -24,6 +25,8 @@ const FLOWS := {
 ## (phones) get a smaller design size so text stays its intended size.
 const DESIGN_SHORT_SIDE := 720.0
 const PHONE_MIN_SHORT_SIDE := 360.0
+## The debug "phone size" switch shows the app at this size, letterboxed.
+const PHONE_VIEW := Vector2i(390, 844)
 ## A drag becomes a swipe once it moves this far...
 const SWIPE_START := 16.0
 ## ...and goes through when let go past this much of the screen, or flicked.
@@ -105,6 +108,14 @@ func _ready() -> void:
 ## there, and the 720 design size (scaled up) on bigger screens.
 func _fit_design_size() -> void:
 	var window := get_window()
+	# Debug builds can show a phone's screen in the window, with bars round it.
+	var aspect := Window.CONTENT_SCALE_ASPECT_KEEP if App.debug_phone_view() else Window.CONTENT_SCALE_ASPECT_EXPAND
+	if window.content_scale_aspect != aspect:
+		window.content_scale_aspect = aspect
+	if App.debug_phone_view():
+		if window.content_scale_size != PHONE_VIEW:
+			window.content_scale_size = PHONE_VIEW
+		return
 	var points := Vector2(DisplayServer.window_get_size()) / _screen_scale()
 	var side := clampf(minf(points.x, points.y), PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
 	var target := Vector2i(roundi(side), roundi(side))
@@ -127,12 +138,13 @@ func _layout() -> void:
 	if not _moving and not _swiping:
 		_world.position = -Vector2(_at) * size
 	var insets := UI.safe_insets(self)
-	_minimap.position = Vector2(roundf((size.x - _minimap.size.x) * 0.5), size.y - _minimap.size.y - 18.0 - insets["bottom"])
+	_minimap.dock(Vector2(size.x * 0.5, size.y - 18.0 - insets["bottom"]))
 
 
 # --- Light and dark ----------------------------------------------------------
 
 func _on_state_changed() -> void:
+	_fit_design_size()
 	var want := UI.wants_dark(str(App.state.settings.get("theme", "auto")))
 	if want != UI.dark:
 		_switch_palette(want)
@@ -225,6 +237,7 @@ func _open_flow(screen: String, params: Dictionary, instant: bool = false) -> vo
 	_flow_layer.add_child(reveal)
 	var below := _flows.duplicate()
 	_flows.append(reveal)
+	_minimap.shrink(true)
 	Motion.fade(_minimap, 0.0, Motion.FAST)
 	var t := reveal.open(instant)
 	if t:
