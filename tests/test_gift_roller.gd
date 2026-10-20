@@ -111,3 +111,17 @@ func test_every_animal_has_a_gift_per_rarity() -> void:
 			eq(n, 1, "%s %s" % [a["id"], rarity])
 		var wearable := gifts.filter(func(g): return g["animal"] == a["id"] and g.has("slot")).size()
 		eq(wearable, 2, "%s wearables" % a["id"])
+
+
+func test_odds_grow_steadily_between_tiers() -> void:
+	var at_30 := GiftRoller.chances(1800, table)
+	var between := GiftRoller.chances(2250, table)
+	var at_45 := GiftRoller.chances(2699, table)
+	check(between["rare"] > at_30["rare"] and at_45["rare"] > between["rare"], "rare grows through the half hour")
+	eq(at_45["legendary"], 0.0, "but no legendary before 45 minutes")
+	var total := 0.0
+	for r in GiftRoller.RARITIES:
+		total += float(between[r])
+	check(absf(total - 1.0) < 0.0001, "the chances add up")
+	eq(GiftRoller.chances(599, table), {"common": 0.0, "rare": 0.0, "epic": 0.0, "legendary": 0.0}, "nothing before the first gift")
+	eq(GiftRoller.chances(600, table)["common"], 0.9)

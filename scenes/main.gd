@@ -1,8 +1,8 @@
 extends Control
 ## App shell. Five panes are laid out like a plus sign with the focus screen
 ## in the middle: gifts to the left, completed projects to the right, your
-## profile above and stats below. Swipe between them, or use the arrow keys
-## (Esc comes back to the middle); the minimap shows where you are. Every pane is built once and kept, so each one is as
+## profile above and stats below. Swipe between them, use the arrow keys
+## (Esc comes back to the middle), or tap a dot on the minimap. Every pane is built once and kept, so each one is as
 ## you left it when you come back. Full-screen flows (choosing a focus, the
 ## walk, the end of a walk) open over everything through a growing circle.
 ## Screens ask to move with App.go().
@@ -76,6 +76,7 @@ func _ready() -> void:
 
 	_minimap = Minimap.new()
 	_minimap.cells = _names
+	_minimap.picked.connect(_go_cell)
 	add_child(_minimap)
 
 	for layer in [_flow_layer, _modal_layer]:

@@ -22,6 +22,7 @@ var _project: ProjectData
 var _hud: Control
 var _timer: Label
 var _pause: Button
+var _sound: Button
 var _gift: GiftButton
 var _last_second := -1
 var _ambience_check := 0.0
@@ -117,10 +118,61 @@ func _build_hud(clock: SessionClock) -> void:
 	_pause.size_flags_vertical = Control.SIZE_SHRINK_END
 	bottom.add_child(_pause)
 	bottom.add_child(UI.spacer())
+	# Debug time buttons: between pause and the gift where there's room, in
+	# a row of their own just above them on phones.
+	if OS.is_debug_build():
+		var steps := DebugBar.time_buttons()
+		if wide:
+			bottom.add_child(steps)
+			bottom.add_child(UI.spacer())
+		else:
+			steps.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			col.add_child(steps)
 	_gift = GiftButton.new()
 	_gift.pressed.connect(_on_gift_pressed)
 	bottom.add_child(_gift)
 	col.add_child(bottom)
+
+	# Along the top: the debug weather picker on the left, sound on the right.
+	var top := MarginContainer.new()
+	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	top.add_theme_constant_override("margin_left", 14 + int(insets["left"]))
+	top.add_theme_constant_override("margin_right", 14 + int(insets["right"]))
+	top.add_theme_constant_override("margin_top", 10 + int(insets["top"]))
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(top)
+	var row := UI.hbox()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(row)
+	if OS.is_debug_build():
+		var weather := DebugBar.weather_picker()
+		weather.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(weather)
+	row.add_child(UI.spacer())
+	_sound = UI.round_button("sound", "Sound", _toggle_sound, UI.GLASS, Color.WHITE, 40, false)
+	row.add_child(_sound)
+	_show_sound()
+
+
+## Sound on means the sound effects or the ambience are; the button turns
+## both off together, or both back on.
+func _sound_on() -> bool:
+	return bool(App.state.settings.get("sound", true)) or bool(App.state.settings.get("ambience", true))
+
+
+func _toggle_sound() -> void:
+	var on := not _sound_on()
+	App.state.settings["sound"] = on
+	App.set_setting("ambience", on)
+	Audio.refresh(_scenery.ambience())
+	_show_sound()
+	Motion.pop(_sound, 0.15, 0.3)
+
+
+func _show_sound() -> void:
+	var on := _sound_on()
+	_sound.icon = Icons.texture("sound" if on else "mute", int(40 * 0.42), Color.WHITE, 2.6)
+	_sound.tooltip_text = "Sound off" if on else "Sound on"
 
 
 ## Centred text with a soft shadow so it reads over any scenery.
@@ -185,7 +237,7 @@ func _draw_lead() -> void:
 	if _lead_alpha <= 0.0:
 		return
 	var hand := _walker.position + _walker.hand * _walker.scale
-	var collar := _animal.position + Vector2(40, -55) * _animal.scale * float(Content.animal(_project.animal_id).get("size", 1.0))
+	var collar := _animal.position + _animal.neck() * _animal.scale
 	var mid := (hand + collar) * 0.5 + Vector2(0, 26.0 * _walker.scale.y)
 	var pts := PackedVector2Array()
 	for i in 13:

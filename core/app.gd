@@ -162,6 +162,15 @@ func debug_unlock_all() -> bool:
 	return OS.is_debug_build() and bool(state.settings.get("debug_unlock_all", false))
 
 
+## The walk's debug time buttons: the walk started `minutes` earlier.
+## Does nothing outside debug builds.
+func debug_add_minutes(minutes: int) -> void:
+	if not OS.is_debug_build() or state.active == null:
+		return
+	state.active.start_unix -= minutes * 60
+	_changed()
+
+
 # --- Gifts -------------------------------------------------------------------
 
 ## Trades gifts up a rarity. Returns the new gift's id, or "" if it can't.

@@ -57,7 +57,7 @@ func _init(p: ProjectData, extra: String = "") -> void:
 	for id in ids:
 		flow.add_child(_gift_chip(id, gifts[id]))
 	if ids.is_empty():
-		flow.add_child(UI.label("No gifts yet", 13, UI.INK_FAINT, false, 700))
+		flow.add_child(UI.label("No gifts", 13, UI.INK_FAINT, false, 700))
 	right.add_child(flow)
 
 	right.add_child(UI.spacer(true))

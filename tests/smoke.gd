@@ -52,9 +52,15 @@ func _run() -> void:
 	await _wait(20)
 	await _shot("focus")
 
-	# The arrow keys move between screens and Esc comes back; the map only
-	# shows where you are.
-	check(main._minimap.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the map isn't a button")
+	# The arrow keys move between screens and Esc comes back; so does tapping
+	# a dot on the map.
+	var map: Control = main._minimap
+	await _drag(map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center(),
+		map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center(), 1)
+	await _wait(40)
+	check(main._at == Vector2i(0, 1), "tapping the map's bottom dot opens stats")
+	await _key(KEY_ESCAPE)
+	await _wait(30)
 	await _key(KEY_RIGHT)
 	await _wait(30)
 	check(main._at == Vector2i(1, 0), "right arrow opens completed")
@@ -185,14 +191,32 @@ func _run() -> void:
 	var tile: Control = _find(gifts_pane, func(n): return _is(n, "gift_tile.gd") and n.gift_id == "staffy_rare")
 	check(tile != null, "found a gift tile")
 	if tile:
-		# The headless window is small, so bring the tile into view first.
+		# The headless window is small, so bring the tile into view first, and
+		# press where it shows inside the scrolling collection.
 		gifts_pane.scroll.ensure_control_visible(tile)
 		await _wait(5)
 		var slot: Control = gifts_pane._slots[1]
-		# Near the tile's corner: in the small headless window its middle is under the minimap.
-		await _drag(tile.get_global_rect().position + Vector2(14, 14), slot.get_global_rect().get_center(), 12, 0.5)
+		var seen: Rect2 = tile.get_global_rect().intersection(gifts_pane.scroll.get_global_rect())
+		await _drag(seen.position + Vector2(14, minf(14.0, seen.size.y * 0.5)), slot.get_global_rect().get_center(), 12, 0.5)
 		await _wait(30)
 		check(app.state.shelf()[1] == "staffy_rare", "dragging a gift onto the shelf (shelf is %s)" % [app.state.shelf()])
+
+	# Only the collection scrolls: the shelf and the filter stay put.
+	var shelf_y: float = gifts_pane._slots[0].get_global_rect().position.y
+	gifts_pane.scroll.scroll_vertical = 400
+	await _wait(5)
+	check(gifts_pane._slots[0].get_global_rect().position.y == shelf_y, "the shelf doesn't scroll away")
+
+	# A quick sideways drag on a shelf gift slides it along the shelf.
+	var before: Array = app.state.shelf()
+	var first: Control = _find(gifts_pane._slots[0], func(n): return _is(n, "gift_tile.gd"))
+	check(first != null and first.slides, "shelf gifts slide")
+	if first:
+		await _drag(first.get_global_rect().get_center(), gifts_pane._slots[2].get_global_rect().get_center(), 10)
+		await _wait(30)
+		var after: Array = app.state.shelf()
+		check(after[2] == before[0] and after[0] == before[2] and main._at == Vector2i(-1, 0),
+			"sliding the first gift to the end swaps them, without leaving the screen (%s -> %s)" % [before, after])
 
 	# The filter menu: picking an option sorts by it; picking it again reverses.
 	var sort: Node = _find(gifts_pane, func(n): return _is(n, "dropdown.gd"))
@@ -251,18 +275,40 @@ func _run() -> void:
 
 	app.go("profile")
 	await _wait(50)
-	_class("res://scenes/customise/customise.gd").open()
-	await _wait(25)
-	await _shot("customise")
-	_close_modal()
 	var profile_pane: Node = main._panes[Vector2i(0, -1)]
+	var modal_class := _class("res://ui/modal.gd")
+	# Tapping the pencil opens the character popup; tapping the level badge
+	# (bottom left of the picture) opens the rewards.
+	var pencil: Button = _find(profile_pane, func(n): return n is Button and n.tooltip_text == "Customise your character")
+	check(pencil != null, "a pencil on the character")
+	if pencil:
+		await _drag(pencil.get_global_rect().get_center(), pencil.get_global_rect().get_center(), 1)
+		await _wait(25)
+		check(modal_class.is_open(), "the pencil opens the customise popup")
+		await _shot("customise")
+		_close_modal()
+		await _wait(15)
+	var badge: Control = _find(profile_pane, func(n): return n is Control and n.tooltip_text == "Levels and rewards")
+	var picture: Control = _find(profile_pane, func(n): return n is Control and n.tooltip_text == "Customise your character" and not n is Button)
+	check(badge != null and picture != null, "a level badge on the character")
+	if badge and picture:
+		var b: Rect2 = badge.get_global_rect()
+		var pic: Rect2 = picture.get_global_rect()
+		check(b.get_center().x < pic.get_center().x and b.get_center().y > pic.get_center().y, "the badge sits bottom left")
+		await _drag(b.get_center(), b.get_center(), 1)
+		await _wait(25)
+		check(modal_class.is_open(), "the badge opens the rewards")
+		await _shot("rewards")
+		_close_modal()
+		await _wait(15)
+		await _drag(pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), 1)
+		await _wait(25)
+		check(modal_class.is_open(), "tapping the character opens the customise popup")
+		_close_modal()
+		await _wait(15)
 	profile_pane.open_settings()
 	await _wait(25)
 	await _shot("settings")
-	_close_modal()
-	profile_pane.open_rewards()
-	await _wait(25)
-	await _shot("rewards")
 	_close_modal()
 
 	app.go("stats")
@@ -371,10 +417,37 @@ func _run() -> void:
 	check(walk._scenery.is_dark() and walk._scenery.ambience() == "night", "the night chorus after dark")
 	await _shot("walk_night")
 	walk._scenery.clock = 10.5
-	app.state.active.start_unix -= 50 * 60
+
+	# The sound button turns the effects and the ambience off together.
+	check(walk._sound_on(), "sound starts on")
+	walk._toggle_sound()
+	check(not app.state.settings.get("sound") and not app.state.settings.get("ambience"), "the sound button mutes everything")
+	walk._toggle_sound()
+	check(app.state.settings.get("sound") and app.state.settings.get("ambience"), "and turns it all back on")
+	check(_find(walk, func(n): return _is(n, "dropdown.gd")) != null, "the debug weather picker is on the walk")
+
+	# The debug time buttons move the walk on; the gift button's pie follows.
+	var steps: Array = _find(walk, func(n): return n is Button and n.text == "+5").get_parent().get_children()
+	check(steps.size() == 4, "+5, +10, +30 and +60 minute buttons")
+	steps[0].pressed.emit()
 	await _wait(30)
+	check(walk._gift._reveal == 0.0 and absf(walk._gift._progress - 0.5) < 0.05, "five minutes in, the dark green is halfway round")
+	await _shot("gift_5min")
+	steps[0].pressed.emit()
+	await _wait(10)
+	check(walk._gift.level() == 0, "ten minutes earns a gift")
+	await _wait(60)
+	check(walk._gift._reveal == 1.0, "and the bright green fills in")
+	steps[2].pressed.emit()
+	await _wait(60)
+	var pie: Dictionary = walk._gift.shown()
+	check(pie["rare"] > 0.1 and pie["epic"] > 0.0 and pie["common"] > 0.5, "40 minutes: slices for the rarer gifts (%s)" % pie)
+	await _shot("gift_40min")
+	steps[1].pressed.emit()
+	await _wait(60)
 	await _shot("walk_50min")
 	check(walk._gift.level() == 1, "50 minutes guarantees a rare gift")
+	check(walk._gift.shown()["common"] < 0.01, "and common drops out of the pie")
 	walk._on_gift_pressed()
 	await _wait(80)
 	await _shot("walk_dive")
@@ -438,7 +511,15 @@ func _run() -> void:
 	check(front.get_parent() == jungle_walk and front.get_index() > jungle_walk._actors.get_index(), "the jungle's growth is in front of the walker")
 	await _wait(2)
 	await _shot("walk_jungle")
-	app.cancel_walk()
+	# Ending it early: no gift, and nothing glows where one would be.
+	jungle_walk._on_gift_pressed()
+	await _wait(20)
+	_close_modal(true)
+	await _wait(420)
+	var empty_finish: Node = main._flows.back().get_child(0)
+	check(_is(empty_finish, "finish.gd") and empty_finish._gift_id == "", "an early finish has no gift")
+	check(not empty_finish._glow.visible, "and no glow where the gift would be")
+	await _shot("finish_no_gift")
 	app.go("home")
 	await _wait(60)
 	check(main._flows.is_empty(), "back home from the jungle")

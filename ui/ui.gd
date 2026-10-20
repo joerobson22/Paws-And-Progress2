@@ -550,7 +550,9 @@ static func animal_portrait(animal_id: String, colours: Array[Color], box_size: 
 
 ## The player's (or a friend's) character in a box: the full figure, or just
 ## the face in a circle for avatars.
-static func character_portrait(look: Dictionary, box_size: Vector2, face_only: bool = false, fill: Color = ACCENT_SOFT) -> Control:
+## `bottom_room` keeps that much clear under the character's feet, for
+## something laid over the bottom of the picture.
+static func character_portrait(look: Dictionary, box_size: Vector2, face_only: bool = false, fill: Color = ACCENT_SOFT, bottom_room: float = 0.0) -> Control:
 	var frame := RoundFrame.new()
 	frame.fill = fill
 	frame.circle = face_only
@@ -566,9 +568,10 @@ static func character_portrait(look: Dictionary, box_size: Vector2, face_only: b
 			view.scale = Vector2(s, s)
 			view.position = frame.size * 0.5 + Vector2(0, 4) * s
 		else:
-			var s := frame.size.y / 175.0
+			var usable := frame.size.y - bottom_room
+			var s := usable / 175.0
 			view.scale = Vector2(s, s)
-			view.position = Vector2(frame.size.x * 0.48, frame.size.y * 0.94)
+			view.position = Vector2(frame.size.x * 0.48, usable * 0.94)
 	frame.resized.connect(place)
 	return frame
 

@@ -5,7 +5,7 @@ extends RefCounted
 ## assets/sounds/ and Audio plays that instead.
 
 const RATE := 22050
-const NAMES := ["bong", "pop", "rustle", "chime", "whoosh", "levelup", "wind", "splash", "rain", "thunder"]
+const NAMES := ["bong", "pop", "rustle", "chime", "whoosh", "levelup", "wind", "splash", "rain", "thunder", "ding"]
 
 static var _cache: Dictionary = {}
 static var _lock := Mutex.new()
@@ -54,6 +54,9 @@ static func sound(name: String) -> AudioStreamWAV:
 			samples = _wind(6.0)
 		"splash":
 			samples = _splash(0.7)
+		"ding":
+			# One bright bell with its octave: the walk's first gift is coming.
+			samples = _mix([_bell(1046.5, 1.6, 1.0), _bell(2093.0, 0.9, 0.35)])
 		"rain":
 			samples = _rain(6.0)
 		"thunder":
