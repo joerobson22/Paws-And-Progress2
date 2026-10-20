@@ -187,19 +187,40 @@ func _run() -> void:
 	_close_modal()
 	await _wait(10)
 
-	# Press and hold a gift, then drag it onto the empty middle shelf spot.
-	var tile: Control = _find(gifts_pane, func(n): return _is(n, "gift_tile.gd") and n.gift_id == "staffy_rare")
-	check(tile != null, "found a gift tile")
-	if tile:
-		# The headless window is small, so bring the tile into view first, and
-		# press where it shows inside the scrolling collection.
-		gifts_pane.scroll.ensure_control_visible(tile)
-		await _wait(5)
-		var slot: Control = gifts_pane._slots[1]
-		var seen: Rect2 = tile.get_global_rect().intersection(gifts_pane.scroll.get_global_rect())
-		await _drag(seen.position + Vector2(14, minf(14.0, seen.size.y * 0.5)), slot.get_global_rect().get_center(), 12, 0.5)
+	# Gifts on the shelf are greyed out in the collection, and the shelf on the
+	# screen itself stays put.
+	var greyed: Control = _find(gifts_pane.scroll, func(n): return _is(n, "gift_tile.gd") and n.gift_id == "staffy_common")
+	check(greyed != null and greyed.mouse_filter == Control.MOUSE_FILTER_IGNORE, "a shelf gift is greyed out in the collection")
+	var on_shelf: Control = _find(gifts_pane._slots[0], func(n): return _is(n, "gift_tile.gd"))
+	check(on_shelf != null and not on_shelf.draggable, "the shelf on the screen doesn't drag")
+
+	# The pencil opens the shelf editor: hold a gift from the collection and
+	# drop it on the empty middle spot, then drag the first along to the last.
+	var modal_class := _class("res://ui/modal.gd")
+	var pencil_button: Button = _find(gifts_pane, func(n): return n is Button and n.tooltip_text == "Arrange your shelf")
+	check(pencil_button != null, "a pencil by the shelf")
+	if pencil_button:
+		await _drag(pencil_button.get_global_rect().get_center(), pencil_button.get_global_rect().get_center(), 1)
 		await _wait(30)
-		check(app.state.shelf()[1] == "staffy_rare", "dragging a gift onto the shelf (shelf is %s)" % [app.state.shelf()])
+	var editor: Node = _find(modal_class.top(), func(n): return _is(n, "shelf_editor.gd")) if modal_class.is_open() else null
+	check(editor != null, "the pencil opens the shelf editor")
+	if editor:
+		await _shot("shelf_editor")
+		var pick: Control = _find(editor._grid, func(n): return _is(n, "gift_tile.gd") and n.gift_id == "staffy_rare")
+		modal_class.top()._scroll.ensure_control_visible(pick)
+		await _wait(5)
+		var seen: Rect2 = pick.get_global_rect().intersection(modal_class.top()._scroll.get_global_rect())
+		await _drag(seen.get_center(), editor._slots[1].get_global_rect().get_center(), 12, 0.5)
+		await _wait(30)
+		check(app.state.shelf()[1] == "staffy_rare", "holding a gift and dropping it on the shelf (shelf is %s)" % [app.state.shelf()])
+		var before: Array = app.state.shelf()
+		await _drag(editor._slots[0].get_global_rect().get_center(), editor._slots[2].get_global_rect().get_center(), 10)
+		await _wait(30)
+		var after: Array = app.state.shelf()
+		check(after[2] == before[0] and after[0] == before[2] and main._at == Vector2i(-1, 0),
+			"dragging a shelf gift along swaps them, without leaving the screen (%s -> %s)" % [before, after])
+		_close_modal()
+		await _wait(20)
 
 	# Only the collection scrolls: the shelf and the filter stay put.
 	var shelf_y: float = gifts_pane._slots[0].get_global_rect().position.y
@@ -207,16 +228,32 @@ func _run() -> void:
 	await _wait(5)
 	check(gifts_pane._slots[0].get_global_rect().position.y == shelf_y, "the shelf doesn't scroll away")
 
-	# A quick sideways drag on a shelf gift slides it along the shelf.
-	var before: Array = app.state.shelf()
-	var first: Control = _find(gifts_pane._slots[0], func(n): return _is(n, "gift_tile.gd"))
-	check(first != null and first.slides, "shelf gifts slide")
-	if first:
-		await _drag(first.get_global_rect().get_center(), gifts_pane._slots[2].get_global_rect().get_center(), 10)
-		await _wait(30)
-		var after: Array = app.state.shelf()
-		check(after[2] == before[0] and after[0] == before[2] and main._at == Vector2i(-1, 0),
-			"sliding the first gift to the end swaps them, without leaving the screen (%s -> %s)" % [before, after])
+	# Putting a gift on a full shelf sets it wobbling: tapping elsewhere
+	# cancels, tapping a shelf gift swaps it out.
+	var outsider := ""
+	for id in app.state.inventory:
+		if app.state.gift_count(id) > 0 and not app.state.shelf().has(id):
+			outsider = id
+			break
+	var full: Array = app.state.shelf()
+	check(not full.has(""), "the shelf is full (%s)" % [full])
+	for attempt in 2:
+		gifts_pane.show_gift(outsider)
+		await _wait(20)
+		var put: Button = _find(modal_class.top(), func(n): return n is Button and n.text == "Put on your shelf")
+		put.pressed.emit()
+		await _wait(25)
+		check(gifts_pane._swapping == outsider, "a full shelf wobbles to pick a gift to swap")
+		if attempt == 0:
+			await _shot("shelf_wobble")
+			await _drag(Vector2(main.size.x * 0.5, 12), Vector2(main.size.x * 0.5, 12), 1)
+			await _wait(15)
+			check(gifts_pane._swapping == "" and app.state.shelf() == full, "tapping elsewhere cancels the swap")
+		else:
+			var middle: Rect2 = gifts_pane._slots[1].get_global_rect()
+			await _drag(middle.get_center(), middle.get_center(), 1)
+			await _wait(25)
+			check(app.state.shelf()[1] == outsider, "tapping a shelf gift swaps it out (shelf is %s)" % [app.state.shelf()])
 
 	# The filter menu: picking an option sorts by it; picking it again reverses.
 	var sort: Node = _find(gifts_pane, func(n): return _is(n, "dropdown.gd"))
@@ -252,6 +289,19 @@ func _run() -> void:
 	_close_modal()
 	await _wait(10)
 
+	# Trading in every last one of a shelf gift takes it off the shelf.
+	app.state.inventory["staffy_common"] = 10
+	app.place_on_shelf("staffy_common", 0)
+	await _wait(10)
+	gifts_pane.show_gift("staffy_common")
+	await _wait(20)
+	gifts_pane._trade(modal_class.top(), "staffy_common")
+	await _wait(25)
+	check(not app.state.shelf().has("staffy_common") and _find(gifts_pane._slots[0], func(n): return _is(n, "gift_tile.gd")) == null,
+		"trading away all of a shelf gift takes it off the shelf")
+	_close_modal()
+	await _wait(10)
+
 	# A drag the other way goes back to the middle; a short drag snaps back.
 	await _drag(main.size * 0.5, main.size * Vector2(0.1, 0.5))
 	await _wait(30)
@@ -272,13 +322,38 @@ func _run() -> void:
 	await _wait(25)
 	await _shot("grade_picker")
 	_close_modal()
+	await _wait(20)
+	# Without a grade a project shows a circled "?": the only thing on its
+	# panel that can be tapped, and it asks for one.
+	var ungraded: Object = app.state.completed_projects()[1]
+	var kept_grade: String = ungraded.grade
+	app.set_grade(ungraded.id, "")
+	await _wait(20)
+	var ungraded_panel: Node = _find(main._panes[Vector2i(1, 0)], func(n): return _is(n, "project_panel.gd") and n.project_id == ungraded.id)
+	var ask: Control = _find(ungraded_panel, func(n): return n is Button) if ungraded_panel else null
+	check(ask != null and ask.get_child_count() == 1, "an ungraded project shows a \"?\"")
+	if ask:
+		# On its animal, top left (the middle can be under the minimap).
+		var on_panel: Vector2 = ungraded_panel.get_global_rect().position + Vector2(56, 44)
+		await _drag(on_panel, on_panel, 1)
+		await _wait(15)
+		check(not _class("res://ui/modal.gd").is_open(), "the rest of the panel doesn't open anything")
+		await _shot("completed_ungraded")
+		var at_ask: Vector2 = ask.get_global_rect().get_center()
+		await _drag(at_ask, at_ask, 1)
+		await _wait(20)
+		check(_class("res://ui/modal.gd").is_open(), "tapping the \"?\" asks for a grade")
+		if _class("res://ui/modal.gd").is_open():
+			_close_modal()
+	app.set_grade(ungraded.id, kept_grade)
+	await _wait(10)
 
 	app.go("profile")
 	await _wait(50)
 	var profile_pane: Node = main._panes[Vector2i(0, -1)]
-	var modal_class := _class("res://ui/modal.gd")
-	# Tapping the pencil opens the character popup; tapping the level badge
-	# (bottom left of the picture) opens the rewards.
+	# Tapping the pencil opens the character popup (the picture itself
+	# doesn't); tapping the level badge (bottom left of the picture) opens
+	# the rewards.
 	var pencil: Button = _find(profile_pane, func(n): return n is Button and n.tooltip_text == "Customise your character")
 	check(pencil != null, "a pencil on the character")
 	if pencil:
@@ -289,7 +364,7 @@ func _run() -> void:
 		_close_modal()
 		await _wait(15)
 	var badge: Control = _find(profile_pane, func(n): return n is Control and n.tooltip_text == "Levels and rewards")
-	var picture: Control = _find(profile_pane, func(n): return n is Control and n.tooltip_text == "Customise your character" and not n is Button)
+	var picture: Control = _find(profile_pane, func(n): return _is(n, "round_frame.gd") and n.size.y > 150.0)
 	check(badge != null and picture != null, "a level badge on the character")
 	if badge and picture:
 		var b: Rect2 = badge.get_global_rect()
@@ -314,9 +389,14 @@ func _run() -> void:
 		await _wait(15)
 		await _drag(pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), 1)
 		await _wait(25)
-		check(modal_class.is_open(), "tapping the character opens the customise popup")
-		_close_modal()
+		check(not modal_class.is_open(), "tapping the picture itself does nothing")
+		if modal_class.is_open():
+			_close_modal()
 		await _wait(15)
+	# Details at the top, achievements at the bottom, icons on the numbers.
+	var medals: Array = _all(profile_pane, func(n): return n is VBoxContainer and n.get_script() != null and "info" in n and n.info is Dictionary and n.info.has("earned"))
+	check(medals.size() >= 8, "achievements on the profile (%d)" % medals.size())
+	check(medals.any(func(m): return m.info["earned"]) and medals.any(func(m): return not m.info["earned"]), "some earned, some still to get")
 	profile_pane.open_settings()
 	await _wait(25)
 	await _shot("settings")
@@ -384,7 +464,15 @@ func _run() -> void:
 	await _shot("complete_confirm")
 	_close_modal(false)
 	await _wait(10)
-	chooser._start_adopting()
+	# The + starts adopting: the bottom buttons go, the + becomes a tick and
+	# the × cancels back to the pets.
+	chooser._on_new()
+	await _wait(30)
+	check(chooser._adopting and chooser._bottom.modulate.a < 0.05 and chooser._new._tick > 0.95, "adopting hides the bottom buttons and shows a tick")
+	chooser._on_close()
+	await _wait(30)
+	check(not chooser._adopting and chooser._bottom.modulate.a > 0.95 and chooser._new._tick < 0.05 and main._flows.size() == 1, "the × cancels adopting")
+	chooser._on_new()
 	await _wait(30)
 	await _shot("new_pet")
 	var locked := -1
@@ -395,7 +483,7 @@ func _run() -> void:
 	check(locked >= 0, "something's still locked at level %d" % level)
 	chooser._animals.go_to(locked)
 	await _wait(25)
-	check(chooser._right.disabled, "a locked animal can't be adopted")
+	check(chooser._new.disabled, "a locked animal can't be adopted")
 	check(chooser._swatch_row.modulate.a < 0.05, "a locked animal hides the colour buttons")
 	await _shot("new_pet_locked")
 	chooser._animals.go_to(1)
@@ -409,7 +497,7 @@ func _run() -> void:
 	await _shot("colour_picker")
 	_close_modal()
 	var count: int = app.state.projects.size()
-	chooser._adopt()
+	chooser._on_new()
 	await _wait(30)
 	check(app.state.projects.size() == count + 1, "adopting adds a project")
 	check(app.state.projects.back().pet_name == "Bramble", "adopting keeps the pet's name")

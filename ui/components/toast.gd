@@ -1,7 +1,10 @@
 class_name Toast
 extends PanelContainer
 ## A short message that floats up from the bottom, waits, then fades away
-## ("Moved to Completed"). Lives on the same layer as popups.
+## ("Moved to Completed"). Lives on the same layer as popups, and wraps onto
+## more lines if it's wider than the screen.
+
+var _text: Label
 
 
 static func show_text(text: String, icon: String = "check") -> void:
@@ -16,7 +19,8 @@ static func show_text(text: String, icon: String = "check") -> void:
 	var row := UI.hbox(8)
 	if icon != "":
 		row.add_child(UI.icon_rect(icon, 16, UI.BG))
-	row.add_child(UI.label(text, 15, UI.BG, false, 800))
+	t._text = UI.label(text, 15, UI.BG, false, 800)
+	row.add_child(t._text)
 	t.add_child(row)
 	var host: Node = (Engine.get_main_loop() as SceneTree).root
 	if Modal.layer and is_instance_valid(Modal.layer):
@@ -27,6 +31,14 @@ static func show_text(text: String, icon: String = "check") -> void:
 
 func _run() -> void:
 	var view := get_viewport_rect().size
+	var most := view.x - 32.0
+	var whole := get_combined_minimum_size().x
+	if whole > most:
+		var around := whole - _text.get_combined_minimum_size().x
+		_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_text.custom_minimum_size.x = most - around
+		var b := get_theme_stylebox("panel") as StyleBoxFlat
+		b.set_corner_radius_all(20)
 	size = get_combined_minimum_size()
 	var rest := Vector2((view.x - size.x) * 0.5, view.y - size.y - 96.0 - UI.safe_insets(self)["bottom"])
 	position = rest + Vector2(0, 16)

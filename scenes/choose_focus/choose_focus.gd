@@ -6,11 +6,12 @@ extends Control
 ## through your pets, which stand on the path with their kind and time
 ## underneath (the one in the middle walks on the spot), and tap one to head
 ## out. At the bottom, the red bin deletes that pet and the green tick
-## completes its project, each after a check. The + at the top switches to
-## adopting a new pet: say what it's for, give it a name, scroll up and down
-## through the animals (locked ones show the level they unlock at, and no
-## colours) and pick its three colours; the red cross cancels and the green +
-## adopts it.
+## completes its project, each after a check. The × at the top left goes back
+## home, and the + at the top right switches to adopting a new pet: say what
+## it's for, give it a name, scroll up and down through the animals (locked
+## ones show the level they unlock at, and no colours) and pick its three
+## colours. While adopting the bottom buttons go away, the × cancels and the
+## + turns into a tick that adopts it.
 ## params: {"from": where the opening circle grew from}
 
 const COLOUR_ROLES := ["Primary", "Secondary", "Tertiary"]
@@ -51,9 +52,11 @@ var _name_edit: LineEdit
 var _pet_edit: LineEdit
 var _swatches: Array[Button] = []
 var _swatch_row: Control
-var _back: Button
+var _close: Button
 var _left: Button
 var _right: Button
+var _bottom: Control
+## The + at the top right; a tick while adopting.
 var _new: KnockoutButton
 
 
@@ -78,15 +81,16 @@ func _ready() -> void:
 	var row := UI.hbox()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top.add_child(row)
-	_back = UI.back_button(go_back)
-	row.add_child(_back)
+	_close = UI.round_button("close", "Back", _on_close, Color.TRANSPARENT, UI.ON_DARK, 48, false)
+	row.add_child(_close)
 	row.add_child(UI.spacer())
 	_new = KnockoutButton.new(48)
 	_new.tooltip_text = "New pet"
-	_new.pressed.connect(_start_adopting)
+	_new.pressed.connect(_on_new)
 	row.add_child(_new)
 
 	var bottom := MarginContainer.new()
+	_bottom = bottom
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.add_theme_constant_override("margin_left", 16 + int(insets["left"]))
 	bottom.add_theme_constant_override("margin_right", 16 + int(insets["right"]))
@@ -113,6 +117,22 @@ func _ready() -> void:
 ## Back to the focus screen, from either mode.
 func go_back() -> void:
 	App.go("home")
+
+
+## The × cancels adopting, or goes back home.
+func _on_close() -> void:
+	if _adopting:
+		_show_mode(false)
+	else:
+		go_back()
+
+
+## The + starts adopting; as a tick it adopts.
+func _on_new() -> void:
+	if _adopting:
+		_adopt()
+	else:
+		_start_adopting()
 
 
 # --- The place ---------------------------------------------------------------
@@ -334,9 +354,6 @@ func _start_walk(i: int) -> void:
 
 
 func _on_left() -> void:
-	if _adopting:
-		_show_mode(false)
-		return
 	var p := _projects[_pets.index]
 	Modal.confirm("Delete %s?" % p.name,
 		"%s will go for good. Time you've already spent stays in your stats." % Content.pet_called(p, true),
@@ -349,9 +366,6 @@ func _on_left() -> void:
 
 
 func _on_right() -> void:
-	if _adopting:
-		_adopt()
-		return
 	var p := _projects[_pets.index]
 	Modal.confirm("Complete %s?" % p.name,
 		"It moves to Completed with everything %s found along the way. You can't undo this." % Content.pet_called(p),
@@ -390,13 +404,17 @@ func _show_mode(adopting: bool, select_id: String = "") -> void:
 	_adopting = adopting
 	var hide_layer := _pick if adopting else _adopt_layer
 	var show_layer := _adopt_layer if adopting else _pick
-	_new.set_disabled_look(adopting)
-	if adopting:
-		_set_icon(_left, "close", "Cancel")
-		_set_icon(_right, "plus", "Adopt")
-		_left.disabled = false
-	else:
+	_new.set_tick(adopting)
+	_new.tooltip_text = "Adopt" if adopting else "New pet"
+	_close.tooltip_text = "Cancel" if adopting else "Back"
+	if not adopting:
+		_new.set_disabled_look(false)
 		_build_pick(select_id)
+	# The bin and the tick at the bottom are for the pets you have.
+	_bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for b in [_left, _right]:
+		b.mouse_filter = Control.MOUSE_FILTER_IGNORE if adopting else Control.MOUSE_FILTER_STOP
+	Motion.fade(_bottom, 0.0 if adopting else 1.0, Motion.FAST)
 	_style_top(adopting)
 	var t := Motion.tween(self, "mode")
 	t.tween_property(hide_layer, "modulate:a", 0.0, Motion.time(Motion.FAST))
@@ -421,7 +439,7 @@ func _build_adopt() -> void:
 	margin.add_theme_constant_override("margin_left", 16 + int(insets["left"]))
 	margin.add_theme_constant_override("margin_right", 16 + int(insets["right"]))
 	margin.add_theme_constant_override("margin_top", 76 + int(insets["top"]))
-	margin.add_theme_constant_override("margin_bottom", 96 + int(insets["bottom"]))
+	margin.add_theme_constant_override("margin_bottom", 28 + int(insets["bottom"]))
 	_adopt_layer.add_child(margin)
 	var v := UI.vbox(8)
 	margin.add_child(v)
@@ -507,7 +525,7 @@ func _on_animal_changed(i: int) -> void:
 	else:
 		_animal_hint.text = "Unlocks at level %d" % Levels.unlock_level("animal", a["id"], Content.levels)
 		_animal_hint.add_theme_color_override("font_color", UI.INK_SOFT)
-	_right.disabled = not open
+	_new.set_disabled_look(not open)
 	# A locked animal can't be coloured in: the colour buttons fade away, but
 	# keep their space so the scroller above doesn't jump.
 	for b in _swatches:
@@ -559,16 +577,21 @@ func _adopt() -> void:
 
 # --- Pieces ------------------------------------------------------------------
 
-## The back button reads white over scenery and ink over the adopt form.
+## The × reads white over scenery and ink over the adopt form, with a faint
+## disc under the pointer. The + is white over scenery and green on the form.
 func _style_top(on_form: bool) -> void:
 	var ink := UI.INK if on_form else UI.ON_DARK
-	UI.style_button(_back, Color.TRANSPARENT, ink)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
-		var sb: StyleBoxFlat = _back.get_theme_stylebox(state)
-		sb.content_margin_left = 8
-		sb.content_margin_right = 14
-	_back.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.0 if on_form else 0.3))
-	_back.add_theme_constant_override("shadow_offset_y", 2)
+	UI.style_button(_close, Color.TRANSPARENT, ink, 999)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		var sb: StyleBoxFlat = _close.get_theme_stylebox(state)
+		sb.set_content_margin_all(0)
+		match state:
+			"hover":
+				sb.bg_color = Color(ink, 0.12)
+			"pressed", "hover_pressed":
+				sb.bg_color = Color(ink, 0.2)
+	_close.icon = Icons.texture("close", 24, Color.WHITE, 3.0)
+	_new.fill_colour = UI.SUCCESS if on_form else Color.WHITE
 
 
 ## Light text with a soft shadow, centred, so it reads over any scenery.

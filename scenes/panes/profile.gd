@@ -1,14 +1,14 @@
 extends Pane
-## Your profile, above the focus screen: your character head to toe (tap it,
-## or the pencil, to change how they look) with your level badge in the
+## Your profile, above the focus screen. At the top: your character head to
+## toe (the pencil changes how they look) with your level badge in the
 ## bottom left and your XP filling a bar along the bottom (tap the badge for
 ## everything levelling up unlocks), your account details and a few lifetime
-## numbers. The gear in the top left opens the settings. It's kept short
-## enough to fit a phone screen, so swiping back down works from anywhere.
+## numbers. At the bottom: your achievements. The gear in the top left opens
+## the settings.
 
 
 func build() -> void:
-	var col := page(720, 16)
+	var col := page(720, 16, true)
 	var head := UI.title_row("Profile")
 	var gear := UI.round_button("gear", "Settings", open_settings, UI.SURFACE, UI.INK, 44)
 	head.add_child(gear)
@@ -43,27 +43,29 @@ func build() -> void:
 
 	var numbers := GridContainer.new()
 	numbers.columns = 3
-	numbers.add_theme_constant_override("h_separation", 12)
+	# Snug on a phone, so "Completed" and its icon fit side by side.
+	var narrow := col.custom_minimum_size.x < 420.0
+	numbers.add_theme_constant_override("h_separation", 8 if narrow else 12)
 	var all_time := Stats.total_seconds(App.state.sessions) + int(p.get("legacy_total_seconds", 0))
 	var gifts := 0
 	for n in App.state.inventory.values():
 		gifts += int(n)
-	numbers.add_child(_number("Focused", Stats.format_duration(all_time)))
-	numbers.add_child(_number("Gifts", str(gifts)))
-	numbers.add_child(_number("Completed", str(App.state.completed_projects().size())))
+	numbers.add_child(_number("Focused", Stats.format_duration(all_time), "clock", narrow))
+	numbers.add_child(_number("Gifts", str(gifts), "gift", narrow))
+	numbers.add_child(_number("Completed", str(App.state.completed_projects().size()), "check", narrow))
 	col.add_child(numbers)
 
+	# The details above stay at the top; the achievements sit at the bottom.
+	col.add_child(UI.spacer(true))
+	col.add_child(_achievements(all_time, col.custom_minimum_size.x))
 
-## The character: tap it, or the pencil, to change how they look. Your
+
+## The character, with a pencil in the corner to change how they look. Your
 ## level badge sits in the bottom left with your XP filling a bar along the
-## bottom; the badge grows under the pointer, and tapping it shows every
+## bottom; the badge shines under the pointer, and tapping it shows every
 ## reward levelling up brings.
 func _figure() -> Control:
 	var figure := UI.character_portrait({}, Vector2(230 if wide else 0, 300 if wide else 250), false, UI.ACCENT_SOFT, 48.0)
-	figure.mouse_filter = Control.MOUSE_FILTER_STOP
-	figure.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	figure.tooltip_text = "Customise your character"
-	Press.attach(figure).tapped.connect(Customise.open)
 	var pencil := UI.round_button("edit", "Customise your character", Customise.open, UI.SURFACE, UI.INK, 36)
 	figure.add_child(pencil)
 
@@ -74,14 +76,14 @@ func _figure() -> Control:
 	badge.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	badge.tooltip_text = "Levels and rewards"
 	Press.attach(badge).tapped.connect(open_rewards)
-	badge.mouse_entered.connect(func(): Motion.to(badge, "scale", Vector2.ONE * 1.15, Motion.FAST))
-	badge.mouse_exited.connect(func(): Motion.to(badge, "scale", Vector2.ONE, Motion.FAST))
+	var shine := Glint.new(0.5)
+	badge.add_child(shine)
+	badge.mouse_entered.connect(shine.shine)
 	figure.resized.connect(func():
 		pencil.size = pencil.get_combined_minimum_size()
 		pencil.position = Vector2(figure.size.x - pencil.size.x - 8, 8)
 		level.size = Vector2(figure.size.x - 20, level.get_combined_minimum_size().y)
-		level.position = Vector2(10, figure.size.y - level.size.y - 10)
-		badge.pivot_offset = badge.size * 0.5)
+		level.position = Vector2(10, figure.size.y - level.size.y - 10))
 	return figure
 
 
@@ -109,14 +111,49 @@ func _edit(key: String, title: String, placeholder: String, max_length: int) -> 
 			App.set_profile(key, text))
 
 
-func _number(title: String, value: String) -> Control:
-	var card := UI.card(UI.SURFACE, 14, 20)
+## A lifetime number, with an icon in the top right saying what it counts.
+func _number(title: String, value: String, icon: String, narrow: bool) -> Control:
+	var card := UI.card(UI.SURFACE, 12 if narrow else 14, 20)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var v := UI.vbox(0)
-	v.add_child(UI.caption(title))
+	# The icon shares the caption's line, so the number gets the full width.
+	var row := UI.hbox(4 if narrow else 6)
+	var cap := UI.caption(title)
+	cap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cap.clip_text = true
+	if narrow:
+		cap.add_theme_font_size_override("font_size", 11)
+	row.add_child(cap)
+	var mark := UI.icon_rect(icon, 14 if narrow else 16, UI.INK_FAINT)
+	mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(mark)
+	v.add_child(row)
 	v.add_child(UI.trimmed(value, 22, UI.INK, true, 600))
 	card.add_child(v)
 	return card
+
+
+## Every achievement as a medal: in colour once earned; grey otherwise, with
+## a ring round it showing how far along you are. Tap one to see what it's for.
+func _achievements(focused_seconds: int, width: float) -> Control:
+	var rows := Achievements.progress(Achievements.list(Content.achievements, Content.animals, Content.gifts),
+		focused_seconds, App.state.inventory.keys(), Content.gifts)
+	var section := UI.vbox(10)
+	var head := UI.hbox(8)
+	head.add_child(UI.caption("Achievements"))
+	head.add_child(UI.spacer())
+	head.add_child(UI.caption("%d of %d" % [rows.filter(func(r): return r["earned"]).size(), rows.size()], UI.INK_FAINT))
+	section.add_child(head)
+	var card := UI.card(UI.SURFACE, 16)
+	var grid := GridContainer.new()
+	grid.columns = clampi(int((width - 32.0) / 80.0), 4, 8)
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 14)
+	for r in rows:
+		grid.add_child(_Medal.new(r))
+	card.add_child(grid)
+	section.add_child(card)
+	return section
 
 
 # --- Settings ----------------------------------------------------------------
@@ -294,3 +331,61 @@ class _Track extends Control:
 			draw_line(Vector2(x, mid), Vector2(x, mid + mid * below), UI.ACCENT, w)
 		draw_circle(Vector2(x, mid), 8.0, UI.ACCENT if reached else UI.SURFACE, true, -1.0, true)
 		draw_arc(Vector2(x, mid), 8.0, 0, TAU, 24, UI.ACCENT if reached else UI.LINE, 3.0, true)
+
+
+## One achievement: a disc with its icon (or its animal) and its name under.
+class _Medal extends VBoxContainer:
+	const SIZE := 52.0
+	var info: Dictionary
+
+	func _init(row: Dictionary) -> void:
+		info = row
+		add_theme_constant_override("separation", 4)
+		size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		var goal := int(row["goal"])
+		var unit := " hours" if row["kind"] == "hours" else " gifts"
+		tooltip_text = "%s\n%s (%d of %d%s)" % [row["name"], row["description"], row["have"], goal, unit]
+		var disc := Control.new()
+		disc.custom_minimum_size = Vector2(SIZE, SIZE)
+		disc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		disc.draw.connect(_draw_disc.bind(disc))
+		add_child(disc)
+		if row["animal"] != "":
+			var pet := AnimalView.new()
+			pet.animal_id = row["animal"]
+			pet.colours = Content.animal_default_colours(row["animal"])
+			pet.scale = Vector2.ONE * 0.3
+			pet.position = Vector2(SIZE * 0.42, SIZE * 0.78)
+			pet.modulate = Color.WHITE if row["earned"] else Color(1, 1, 1, 0.35)
+			disc.add_child(pet)
+		else:
+			var icon := UI.icon_rect(str(row["icon"]), 24, Color.WHITE if row["earned"] else UI.INK_FAINT)
+			icon.position = Vector2(SIZE - 24.0, SIZE - 24.0) * 0.5
+			disc.add_child(icon)
+		var name_label := UI.label(row["name"], 11, UI.INK if row["earned"] else UI.INK_FAINT, false, 800)
+		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		name_label.custom_minimum_size.x = 64
+		add_child(name_label)
+		UI.ignore_mouse(disc)
+		Press.attach(self).tapped.connect(func():
+			Toast.show_text("%s: %s" % [row["name"], row["description"].to_lower()], "trophy" if row["earned"] else "lock"))
+
+	func _draw_disc(disc: Control) -> void:
+		var c := disc.size * 0.5
+		var r := SIZE * 0.5
+		if info["earned"]:
+			var fill := UI.ACCENT
+			if info["kind"] == "all_gifts":
+				fill = Content.rarity_colour("legendary")
+			elif info["kind"] == "animal":
+				fill = Content.rarity_colour("rare").lerp(Color.WHITE, 0.55)
+			disc.draw_circle(c, r, fill, true, -1.0, true)
+			disc.draw_arc(c, r - 3.0, 0, TAU, 40, Color(1, 1, 1, 0.6), 2.0, true)
+		else:
+			disc.draw_circle(c, r, UI.SURFACE_SOFT, true, -1.0, true)
+			var share := float(info["have"]) / maxf(1.0, float(info["goal"]))
+			if share > 0.0:
+				disc.draw_arc(c, r - 2.0, -PI * 0.5, -PI * 0.5 + TAU * share, 48, UI.ACCENT, 3.0, true)

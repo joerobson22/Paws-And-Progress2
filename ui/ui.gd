@@ -388,21 +388,6 @@ static func square_button(icon: String, tip: String, on_press: Callable, fill: C
 	return b
 
 
-## The see-through "‹ Back" button at the top left of full-screen flows.
-static func back_button(on_press: Callable, text: String = "Back") -> Button:
-	var b := button(text, on_press, "ghost")
-	b.icon = Icons.texture("back", 20, Color.WHITE, 3.0)
-	b.add_theme_font_size_override("font_size", 18)
-	b.add_theme_font_override("font", font(false, 900))
-	b.add_theme_constant_override("h_separation", 4)
-	b.custom_minimum_size = Vector2(0, 48)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
-		var sb: StyleBoxFlat = b.get_theme_stylebox(state)
-		sb.content_margin_left = 8
-		sb.content_margin_right = 14
-	return b
-
-
 ## Round filter/segment pill: ink when selected, soft grey when not.
 static func pill_button(text: String, selected: bool, on_press: Callable, height: int = 38) -> Button:
 	var b := button(text, on_press, "primary" if selected else "quiet")
