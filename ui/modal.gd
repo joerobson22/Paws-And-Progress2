@@ -12,8 +12,10 @@ static var _stack: Array[Modal] = []
 
 ## Tapping the backdrop or pressing Escape closes it (with a null result).
 var dismissible := true
-## The card and the column inside it; fill `body` with content.
+## The card and the column inside it; fill `body` with content. Anything in
+## `header` stays put above it while a long body scrolls.
 var card: PanelContainer
+var header: VBoxContainer
 var body: VBoxContainer
 var _backdrop: ColorRect
 var _scroll: ScrollContainer
@@ -183,9 +185,16 @@ func _build(padding: int) -> void:
 	b.shadow_offset = Vector2(0, 10)
 	card.add_theme_stylebox_override("panel", b)
 	centre.add_child(card)
+	var column := UI.vbox(16)
+	card.add_child(column)
+	header = UI.vbox(16)
+	header.visible = false
+	header.child_entered_tree.connect(func(_child): header.visible = true)
+	header.minimum_size_changed.connect(_fit)
+	column.add_child(header)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	card.add_child(_scroll)
+	column.add_child(_scroll)
 	body = UI.vbox(16)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(body)
@@ -202,7 +211,26 @@ func _fit() -> void:
 	var w := minf(_max_width, view.x - 24.0) - pad.x
 	_scroll.custom_minimum_size.x = w
 	body.custom_minimum_size.x = w
-	_scroll.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, view.y - 48.0 - pad.y)
+	header.custom_minimum_size.x = w
+	var above := header.get_combined_minimum_size().y + 16.0 if header.visible else 0.0
+	_scroll.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, maxf(80.0, view.y - 48.0 - pad.y - above))
+
+
+## Scrolls the body so `target` (somewhere inside it) sits in the middle,
+## gliding there as the popup opens.
+func scroll_to(target: Control) -> void:
+	# The card sizes itself over the next couple of frames.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if not is_instance_valid(target):
+		return
+	var y := target.size.y * 0.5
+	var n: Control = target
+	while n != body and n != null:
+		y += n.position.y
+		n = n.get_parent() as Control
+	var most := maxf(0.0, body.size.y - _scroll.size.y)
+	Motion.to(_scroll, "scroll_vertical", int(clampf(y - _scroll.size.y * 0.5, 0.0, most)), Motion.SLOW)
 
 
 func _animate_in() -> void:

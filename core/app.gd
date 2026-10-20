@@ -3,8 +3,8 @@ extends Node
 ## asks the app shell to move between screens.
 
 ## Screens: the five panes ("focus", "gifts", "completed", "profile",
-## "stats"), the full-screen flows ("choose_focus", "walk", "finish"), and
-## "home", which closes any flow and returns to the focus pane.
+## "stats"), the full-screen flows ("choose_focus", "walk", "finish",
+## "ended"), and "home", which closes any flow and returns to the focus pane.
 signal navigate(screen: String, params: Dictionary)
 signal state_changed
 
@@ -12,6 +12,9 @@ var state: GameState
 var rng := RandomNumberGenerator.new()
 ## Set when this launch imported a v1 save, so the app can say so.
 var imported_from_v1 := false
+## Set when this launch found a walk still running from before the app was
+## closed: {session, biome}. The shell shows the focus ended screen for it.
+var ended_walk := {}
 ## Friends for the leaderboard: [{name, weekly_seconds, walking, look}].
 ## Filled by the friends service once accounts exist (roadmap phase 4);
 ## never saved locally.
@@ -21,12 +24,24 @@ var _xp := 0
 var _xp_key := ""
 
 
+## How often a running walk notes that the app is still open, in seconds.
+const HEARTBEAT := 30.0
+
+
 func _ready() -> void:
 	rng.randomize()
 	state = SaveSystem.read()
 	if state == null:
 		state = _first_launch_state()
 		save()
+	elif state.active:
+		ended_walk = _end_left_walk()
+		save()
+	var heartbeat := Timer.new()
+	heartbeat.wait_time = HEARTBEAT
+	heartbeat.autostart = true
+	heartbeat.timeout.connect(_on_heartbeat)
+	add_child(heartbeat)
 
 
 func _notification(what: int) -> void:
@@ -34,7 +49,17 @@ func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_WM_CLOSE_REQUEST:
 			if state:
+				if state.active:
+					state.active.last_seen_unix = now()
 				save()
+
+
+## While walking, notes every so often that the app is still open, so a walk
+## the app is killed in the middle of stops about when that happened.
+func _on_heartbeat() -> void:
+	if state and state.active:
+		state.active.last_seen_unix = now()
+		save()
 
 
 func now() -> int:
@@ -126,7 +151,24 @@ func level() -> int:
 
 ## Whether an animal or place ("animal" / "place") is unlocked yet.
 func is_unlocked(type: String, id: String) -> bool:
+	if debug_unlock_all():
+		return true
 	return level() >= Levels.unlock_level(type, id, Content.levels)
+
+
+## The debug-only "unlock everything" switch on the focus screen. Ignored
+## outside debug builds (runs from the editor, debug exports).
+func debug_unlock_all() -> bool:
+	return OS.is_debug_build() and bool(state.settings.get("debug_unlock_all", false))
+
+
+## The walk's debug time buttons: the walk started `minutes` earlier.
+## Does nothing outside debug builds.
+func debug_add_minutes(minutes: int) -> void:
+	if not OS.is_debug_build() or state.active == null:
+		return
+	state.active.start_unix -= minutes * 60
+	_changed()
 
 
 # --- Gifts -------------------------------------------------------------------
@@ -201,20 +243,9 @@ func finish_walk() -> Dictionary:
 	var gift := GiftRoller.roll(seconds, animal_id, pity, Content.drop_table, Content.gifts, rng)
 	state.profile["walks_since_epic"] = GiftRoller.next_pity_count(pity, seconds, gift.get("rarity", ""), Content.drop_table)
 
-	var s := FocusSession.new()
-	s.id = "s%d_%04x" % [t, rng.randi() & 0xffff]
-	s.project_id = clock.project_id
-	s.animal_id = animal_id
-	s.start_unix = clock.start_unix
-	s.end_unix = t
-	s.focus_seconds = seconds
-	s.gift_id = gift.get("gift_id", "")
+	var s := _log_walk(clock, t, gift.get("gift_id", ""))
 	if s.gift_id != "":
 		state.inventory[s.gift_id] = int(state.inventory.get(s.gift_id, 0)) + 1
-	# Walks under a minute (mis-taps) aren't worth logging.
-	if seconds >= 60:
-		state.sessions.append(s)
-
 	state.active = null
 	_changed()
 	return {"session": s, "gift": gift}
@@ -223,6 +254,33 @@ func finish_walk() -> Dictionary:
 func cancel_walk() -> void:
 	state.active = null
 	_changed()
+
+
+## A walk still running at launch means the app was closed (or killed) in
+## the middle of it. It stops where the app was last seen open and the time
+## still counts, but the pet never got to finish looking: no gift.
+func _end_left_walk() -> Dictionary:
+	var clock := state.active
+	var s := _log_walk(clock, clock.left_at(SaveSystem.saved_unix(), now()), "")
+	state.active = null
+	return {"session": s, "biome": clock.biome_id}
+
+
+## Logs a walk that ended at `end_unix` (walks under a minute, mis-taps,
+## aren't worth keeping) and returns it either way.
+func _log_walk(clock: SessionClock, end_unix: int, gift_id: String) -> FocusSession:
+	var project := state.project(clock.project_id)
+	var s := FocusSession.new()
+	s.id = "s%d_%04x" % [end_unix, rng.randi() & 0xffff]
+	s.project_id = clock.project_id
+	s.animal_id = project.animal_id if project else ""
+	s.start_unix = clock.start_unix
+	s.end_unix = end_unix
+	s.focus_seconds = clock.elapsed(end_unix)
+	s.gift_id = gift_id
+	if s.focus_seconds >= 60:
+		state.sessions.append(s)
+	return s
 
 
 # --- Internals ---------------------------------------------------------------

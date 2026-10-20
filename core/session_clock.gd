@@ -15,6 +15,9 @@ var pause_started_unix: int = 0
 ## How long the player meant to walk; 0 for an open-ended walk.
 var goal_seconds: int = 0
 var biome_id: String = "lake"
+## The last moment the app was known to be open during this walk (kept up
+## to date while it runs); 0 if never recorded.
+var last_seen_unix: int = 0
 
 
 static func begin(p_project_id: String, now: int, p_goal_seconds: int = 0, p_biome_id: String = "lake") -> SessionClock:
@@ -47,6 +50,16 @@ func elapsed(now: int) -> int:
 	return clampi(end - start_unix - paused_total, 0, MAX_SESSION_SECONDS)
 
 
+## When a walk found still running at launch really stopped: the last time
+## the app was seen open, else when the save was last written (`saved_unix`,
+## 0 if unknown), never before the start or after `now`.
+func left_at(saved_unix: int, now: int) -> int:
+	var seen := last_seen_unix if last_seen_unix > 0 else saved_unix
+	if seen <= 0:
+		seen = start_unix
+	return clampi(seen, start_unix, maxi(now, start_unix))
+
+
 func to_dict() -> Dictionary:
 	return {
 		"project_id": project_id,
@@ -55,6 +68,7 @@ func to_dict() -> Dictionary:
 		"pause_started_unix": pause_started_unix,
 		"goal_seconds": goal_seconds,
 		"biome_id": biome_id,
+		"last_seen_unix": last_seen_unix,
 	}
 
 
@@ -66,8 +80,10 @@ static func from_dict(d: Dictionary) -> SessionClock:
 	c.pause_started_unix = int(d.get("pause_started_unix", 0))
 	c.goal_seconds = int(d.get("goal_seconds", 0))
 	c.biome_id = str(d.get("biome_id", "lake"))
+	c.last_seen_unix = int(d.get("last_seen_unix", 0))
 	return c
 
 
 static func format(seconds: int) -> String:
+	@warning_ignore("integer_division")
 	return "%02d:%02d:%02d" % [seconds / 3600, (seconds / 60) % 60, seconds % 60]

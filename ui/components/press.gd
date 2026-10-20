@@ -21,6 +21,16 @@ func _init(owner: Control, watch_hold: bool = false) -> void:
 	_watch_hold = watch_hold
 
 
+## Makes `control` tappable: wires its input to a new Press and keeps the
+## Press alive as long as the control is (a Press only held in a local
+## variable would be freed straight away, and the taps would go nowhere).
+static func attach(control: Control, watch_hold: bool = false) -> Press:
+	var press := Press.new(control, watch_hold)
+	control.set_meta("press", press)
+	control.gui_input.connect(press.handle)
+	return press
+
+
 func handle(e: InputEvent) -> void:
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		if e.pressed:

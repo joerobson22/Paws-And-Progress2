@@ -1,8 +1,8 @@
 extends Control
 ## App shell. Five panes are laid out like a plus sign with the focus screen
 ## in the middle: gifts to the left, completed projects to the right, your
-## profile above and stats below. Swipe between them (or use the arrow keys,
-## or tap the minimap). Every pane is built once and kept, so each one is as
+## profile above and stats below. Swipe between them, use the arrow keys
+## (Esc comes back to the middle), or tap a dot on the minimap. Every pane is built once and kept, so each one is as
 ## you left it when you come back. Full-screen flows (choosing a focus, the
 ## walk, the end of a walk) open over everything through a growing circle.
 ## Screens ask to move with App.go().
@@ -18,6 +18,7 @@ const FLOWS := {
 	"choose_focus": "res://scenes/choose_focus/choose_focus.gd",
 	"walk": "res://scenes/walk/walk.gd",
 	"finish": "res://scenes/walk/finish.gd",
+	"ended": "res://scenes/walk/ended.gd",
 }
 ## The UI is laid out for a short side of this many points; smaller windows
 ## (phones) get a smaller design size so text stays its intended size.
@@ -91,9 +92,12 @@ func _ready() -> void:
 	_panes[_at].show_pane()
 	_minimap.show_cell(_at, true)
 
-	# A walk survives the app being closed: pick it straight back up.
-	if App.state.active:
-		_open_flow("walk", {}, true)
+	# Closing the app ends a walk; say so the next time it opens.
+	if not App.ended_walk.is_empty():
+		_open_flow("ended", App.ended_walk, true)
+		App.ended_walk = {}
+	else:
+		_maybe_ask_location()
 
 
 ## Phones report a short side of ~390 points, so a fixed 720 design size
@@ -245,6 +249,7 @@ func _close_flows() -> void:
 	_flows.clear()
 	# The places' sounds stay with them.
 	Audio.ambience("")
+	_maybe_ask_location()
 	if _at != Vector2i.ZERO:
 		_at = Vector2i.ZERO
 		_minimap.show_cell(_at, true)
@@ -256,6 +261,20 @@ func _close_flows() -> void:
 	top.origin = size * 0.5
 	top.close()
 	Motion.fade(_minimap, 1.0)
+
+
+## Asks once, a moment after the focus screen shows, whether the places may
+## follow the real sunrise, sunset and weather where you are.
+func _maybe_ask_location() -> void:
+	if Outdoors.asked():
+		return
+	await get_tree().create_timer(1.5).timeout
+	if Outdoors.asked() or not _flows.is_empty() or Modal.is_open() or _at != Vector2i.ZERO:
+		return
+	var m := Modal.confirm("Bring your weather along?",
+		"Your walks can follow the real sunrise, sunset and weather where you are. Your rough location comes from your internet connection and is only used to look those up. You can change this in settings.",
+		"Allow", "accent", "Not now")
+	Outdoors.set_enabled(await m.closed == true)
 
 
 func _go_back() -> void:
@@ -392,7 +411,9 @@ func _scroll_blocks(pos: Vector2, horizontal: bool, along: float) -> bool:
 		var sc := n as ScrollContainer
 		if sc == null or not sc.is_visible_in_tree() or not sc.get_global_rect().has_point(pos):
 			continue
-		var bar: ScrollBar = sc.get_h_scroll_bar() if horizontal else sc.get_v_scroll_bar()
+		var bar: ScrollBar = sc.get_v_scroll_bar()
+		if horizontal:
+			bar = sc.get_h_scroll_bar()
 		var mode := sc.horizontal_scroll_mode if horizontal else sc.vertical_scroll_mode
 		if mode == ScrollContainer.SCROLL_MODE_DISABLED:
 			continue

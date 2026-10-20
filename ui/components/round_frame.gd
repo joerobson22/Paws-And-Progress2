@@ -7,7 +7,8 @@ var fill: Color = UI.ACCENT_SOFT:
 	set(v):
 		fill = v
 		queue_redraw()
-var round := false
+## A circle instead of a rounded box.
+var circle := false
 var radius := 18
 
 
@@ -17,7 +18,7 @@ func _init() -> void:
 
 
 func _draw() -> void:
-	if round:
+	if circle:
 		draw_circle(size * 0.5, minf(size.x, size.y) * 0.5, fill, true, -1.0, true)
 	else:
 		var b := UI.box(fill, Color.TRANSPARENT, radius)

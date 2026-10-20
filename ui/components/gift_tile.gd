@@ -3,13 +3,20 @@ extends PanelContainer
 ## One gift: its picture filling the tile, with how many you've had on a
 ## tag overlapping its bottom-right corner. Tap it for details; press and hold
 ## to pick it up and drag it somewhere (the screen listens for `lifted`).
+## Gifts on the shelf also slide: drag one sideways and it moves along the
+## shelf straight away (`slid`).
 
 signal tapped(gift_id: String)
 signal lifted(tile: GiftTile)
+signal slid(tile: GiftTile)
 
 var gift_id := ""
 var art: GiftArt
+## True on the shelf: a sideways drag slides the gift along it.
+var slides := false
 var _press := Press.new(self, true)
+var _slide_from := Vector2.ZERO
+var _slide_armed := false
 
 
 ## `plain` drops the card behind it and the count, for gifts on the shelf.
@@ -17,7 +24,9 @@ func _init(id: String, count: int, plain: bool = false) -> void:
 	gift_id = id
 	var g := Content.gift(id)
 	var colour := Content.rarity_colour(g.get("rarity", "common"))
-	var sb: StyleBox = UI.with_shadow(UI.box(UI.SURFACE, Color.TRANSPARENT, 20), 0.6) if not plain else StyleBoxEmpty.new()
+	var sb: StyleBox = StyleBoxEmpty.new()
+	if not plain:
+		sb = UI.with_shadow(UI.box(UI.SURFACE, Color.TRANSPARENT, 20), 0.6)
 	sb.set_content_margin_all(6)
 	add_theme_stylebox_override("panel", sb)
 	_press.tapped.connect(func(): tapped.emit(gift_id))
@@ -54,3 +63,16 @@ func press_point() -> Vector2:
 
 func _gui_input(e: InputEvent) -> void:
 	_press.handle(e)
+	if not slides:
+		return
+	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+		_slide_armed = e.pressed
+		if e.pressed:
+			_slide_from = e.position
+			# Sideways drags here move the gift, not the whole screen.
+			Gestures.claimed = true
+	elif e is InputEventMouseMotion and _slide_armed:
+		var d: Vector2 = e.position - _slide_from
+		if absf(d.x) >= Gestures.TAP_SLOP and absf(d.x) > absf(d.y):
+			_slide_armed = false
+			slid.emit(self)

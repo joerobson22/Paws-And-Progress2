@@ -23,13 +23,23 @@ var face_only := false:
 var holding_lead := true
 ## Hand position in local space, so the walk screen can draw the lead.
 var hand := Vector2(22, -78)
+## 0 normally, up to 1 when they're dejected: shoulders down, head hung,
+## a frown, and a sigh now and then.
+var sad := 0.0:
+	set(v):
+		sad = v
+		queue_redraw()
 
 var _phase: float = 0.0
+var _sigh: float = 0.0
 
 
 func _process(delta: float) -> void:
 	if walking:
 		_phase += delta * TAU * 1.4 * speed
+		queue_redraw()
+	if sad > 0.0:
+		_sigh += delta
 		queue_redraw()
 
 
@@ -60,7 +70,10 @@ func _draw() -> void:
 	var top := _item("top")
 	var top_colour := Content.cosmetic_colour(top, Color("#b4533f"))
 	var bob := absf(sin(_phase)) * 2.0 if walking and not face_only else 0.0
-	var head := Vector2(2, -124 - bob)
+	# Slumped: everything above the hips sinks a little, and the head hangs.
+	if not face_only:
+		bob -= 4.0 * sad + (sin(_sigh * 1.3) * 0.5 + 0.5) * 1.5 * sad
+	var head := Vector2(2 + 5.0 * sad, -124 - bob + 7.0 * sad)
 	if face_only:
 		draw_set_transform(-head)
 
@@ -219,6 +232,14 @@ func _draw_face(h: Vector2) -> void:
 	var face := _item("face")
 	var eye := h + Vector2(8, -2)
 	draw_circle(eye, 2.2, UI.INK, true, -1.0, true)
+	if sad > 0.5:
+		# A sad brow, a frown and, glasses aside, nothing else.
+		draw_line(eye + Vector2(-4, -3.5), eye + Vector2(3, -5.5), UI.INK, 1.4, true)
+		draw_arc(h + Vector2(8, 10), 3.5, PI + 0.6, TAU - 0.2, 8, UI.INK, 1.6, true)
+		if _style(face) == "glasses":
+			draw_arc(eye, 5, 0, TAU, 16, UI.INK, 1.6, true)
+			draw_line(eye + Vector2(-5, 0), h + Vector2(-4, 0), UI.INK, 1.4, true)
+		return
 	match _style(face):
 		"grin":
 			draw_arc(h + Vector2(8, 4), 5, 0.1, PI - 0.4, 10, UI.INK, 2.0, true)
@@ -291,9 +312,9 @@ func _cap_dome(h: Vector2, c: Color) -> void:
 	draw_colored_polygon(pts, c)
 
 
-func _ellipse(centre: Vector2, radius: Vector2, colour: Color, rotation: float = 0.0) -> void:
+func _ellipse(centre: Vector2, radius: Vector2, colour: Color, angle: float = 0.0) -> void:
 	var pts := PackedVector2Array()
 	for i in 20:
 		var a := TAU * i / 20.0
-		pts.append(centre + Vector2(cos(a) * radius.x, sin(a) * radius.y).rotated(rotation))
+		pts.append(centre + Vector2(cos(a) * radius.x, sin(a) * radius.y).rotated(angle))
 	draw_colored_polygon(pts, colour)

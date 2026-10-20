@@ -1,6 +1,7 @@
 extends Pane
-## Your profile, above the focus screen: your character head to toe (tap it
-## to change how they look) with your level along the bottom (tap that for
+## Your profile, above the focus screen: your character head to toe (tap it,
+## or the pencil, to change how they look) with your level badge in the
+## bottom left and your XP filling a bar along the bottom (tap the badge for
 ## everything levelling up unlocks), your account details and a few lifetime
 ## numbers. The gear in the top left opens the settings. It's kept short
 ## enough to fit a phone screen, so swiping back down works from anywhere.
@@ -16,7 +17,11 @@ func build() -> void:
 	var p := App.state.profile
 
 	var me := UI.card(UI.SURFACE, 18)
-	var body: BoxContainer = UI.hbox(24) if wide else UI.vbox(12)
+	var body: BoxContainer
+	if wide:
+		body = UI.hbox(24)
+	else:
+		body = UI.vbox(12)
 	me.add_child(body)
 	col.add_child(me)
 	body.add_child(_figure())
@@ -24,8 +29,8 @@ func build() -> void:
 	var info := UI.vbox(2)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.alignment = BoxContainer.ALIGNMENT_CENTER
-	var name := str(p.get("username", ""))
-	info.add_child(_field("Username", name if name != "" else "Add your name", name == "",
+	var username := str(p.get("username", ""))
+	info.add_child(_field("Username", username if username != "" else "Add your name", username == "",
 		_edit.bind("username", "Your name", "What should we call you?", 24)))
 	info.add_child(UI.divider())
 	var school := str(p.get("institution", ""))
@@ -49,39 +54,34 @@ func build() -> void:
 	col.add_child(numbers)
 
 
-## The character, with your level along the bottom.
+## The character: tap it, or the pencil, to change how they look. Your
+## level badge sits in the bottom left with your XP filling a bar along the
+## bottom; the badge grows under the pointer, and tapping it shows every
+## reward levelling up brings.
 func _figure() -> Control:
-	var figure := UI.character_portrait({}, Vector2(230 if wide else 0, 300 if wide else 250))
+	var figure := UI.character_portrait({}, Vector2(230 if wide else 0, 300 if wide else 250), false, UI.ACCENT_SOFT, 48.0)
 	figure.mouse_filter = Control.MOUSE_FILTER_STOP
 	figure.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	figure.tooltip_text = "Customise your character"
-	var press := Press.new(figure)
-	figure.gui_input.connect(press.handle)
-	press.tapped.connect(Customise.open)
-	# A pencil in the corner says the figure can be tapped.
-	var pencil := UI.panel(UI.SURFACE, 999, 8)
-	pencil.add_child(UI.icon_rect("edit", 18, UI.INK))
-	pencil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	Press.attach(figure).tapped.connect(Customise.open)
+	var pencil := UI.round_button("edit", "Customise your character", Customise.open, UI.SURFACE, UI.INK, 36)
 	figure.add_child(pencil)
 
-	var strip := PanelContainer.new()
-	var sb := UI.box(Color(UI.SURFACE, 0.9), Color.TRANSPARENT, 16)
-	sb.set_content_margin_all(8)
-	sb.content_margin_right = 12
-	strip.add_theme_stylebox_override("panel", sb)
-	strip.mouse_filter = Control.MOUSE_FILTER_STOP
-	strip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	strip.tooltip_text = "Levels and rewards"
-	strip.add_child(LevelBar.new(App.xp()))
-	var strip_press := Press.new(strip)
-	strip.gui_input.connect(strip_press.handle)
-	strip_press.tapped.connect(open_rewards)
-	figure.add_child(strip)
+	var level := LevelBar.new(App.xp(), false, false)
+	figure.add_child(level)
+	var badge := level.badge()
+	badge.mouse_filter = Control.MOUSE_FILTER_STOP
+	badge.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	badge.tooltip_text = "Levels and rewards"
+	Press.attach(badge).tapped.connect(open_rewards)
+	badge.mouse_entered.connect(func(): Motion.to(badge, "scale", Vector2.ONE * 1.15, Motion.FAST))
+	badge.mouse_exited.connect(func(): Motion.to(badge, "scale", Vector2.ONE, Motion.FAST))
 	figure.resized.connect(func():
 		pencil.size = pencil.get_combined_minimum_size()
-		pencil.position = Vector2(figure.size.x - pencil.size.x - 10, 10)
-		strip.size = Vector2(figure.size.x - 20, strip.get_combined_minimum_size().y)
-		strip.position = Vector2(10, figure.size.y - strip.size.y - 10))
+		pencil.position = Vector2(figure.size.x - pencil.size.x - 8, 8)
+		level.size = Vector2(figure.size.x - 20, level.get_combined_minimum_size().y)
+		level.position = Vector2(10, figure.size.y - level.size.y - 10)
+		badge.pivot_offset = badge.size * 0.5)
 	return figure
 
 
@@ -99,9 +99,7 @@ func _field(title: String, value: String, placeholder: bool, on_tap: Callable) -
 		var b := UI.round_button("edit", "Edit %s" % title.to_lower(), on_tap, UI.SURFACE_SOFT, UI.INK, 38, false)
 		row.add_child(b)
 		row.mouse_filter = Control.MOUSE_FILTER_STOP
-		var press := Press.new(row)
-		row.gui_input.connect(press.handle)
-		press.tapped.connect(on_tap)
+		Press.attach(row).tapped.connect(on_tap)
 	return row
 
 
@@ -134,6 +132,8 @@ func open_settings() -> void:
 	s.add_child(_toggle("Reduce motion", "Gentler scenery and quicker, simpler animations.", "reduce_motion"))
 	s.add_child(UI.divider())
 	s.add_child(_toggle("Keep the screen on", "Stops your phone or laptop sleeping during a walk.", "keep_screen_on"))
+	s.add_child(UI.divider())
+	s.add_child(_location_toggle())
 	m.body.add_child(s)
 	var about := UI.para("Paws & Progress %s  ·  Fonts: Fredoka and Nunito (SIL Open Font License)" % ProjectSettings.get_setting("application/config/version", ""), 13, UI.INK_FAINT)
 	about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -157,10 +157,30 @@ func _toggle(title: String, detail: String, key: String) -> Control:
 	return row
 
 
+## Real sunrise, sunset and weather: on and off goes through Outdoors, which
+## also says where it thinks you are once it knows.
+func _location_toggle() -> Control:
+	var row := UI.hbox(16)
+	var text := UI.vbox(2)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_child(UI.label("Local sunrise and weather", 16, UI.INK, false, 800))
+	var detail := "Walks follow the real sky where you are, from your rough location (worked out from your internet connection)."
+	if Outdoors.place_name() != "":
+		detail += " Now: %s, %s." % [Outdoors.place_name(), Weather.look(Outdoors.weather(), Content.weathers)["name"].to_lower()]
+	text.add_child(UI.para(detail, 13))
+	row.add_child(text)
+	var sw := Switch.new(Outdoors.enabled())
+	sw.tooltip_text = "Local sunrise and weather"
+	sw.toggled.connect(Outdoors.set_enabled)
+	row.add_child(sw)
+	return row
+
+
 # --- Rewards -----------------------------------------------------------------
 
 ## Everything levelling up unlocks, in order, with a line down the left
-## filled to where you are now.
+## filled to where you are now. The title and your level stay at the top
+## while the rewards scroll, and it opens scrolled to where you are.
 func open_rewards() -> void:
 	var table := Content.levels
 	var xp := App.xp()
@@ -168,7 +188,8 @@ func open_rewards() -> void:
 	# Where you are, as a level with a fraction: 7.4 is 40% of the way to 8.
 	var at := float(p["level"]) + float(p["into"]) / maxf(1.0, float(p["needed"]))
 	var m := Modal.open(460)
-	m.body.add_child(m.heading_row("Rewards"))
+	# The title and where you are stay put; only the rewards scroll.
+	m.header.add_child(m.heading_row("Rewards"))
 	var head := UI.hbox(12)
 	head.add_child(UI.level_badge(p["level"], 44))
 	var words := UI.vbox(0)
@@ -176,15 +197,21 @@ func open_rewards() -> void:
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_child(UI.para("%d XP to level %d. You get 1 XP for each minute focused, and more for gifts." % [int(p["needed"]) - int(p["into"]), int(p["level"]) + 1], 13, UI.INK_SOFT, 700))
 	head.add_child(words)
-	m.body.add_child(head)
+	m.header.add_child(head)
 
 	var rows := _reward_list()
 	var list := UI.vbox(0)
+	# The first reward still to come: just past where you are on the line.
+	var here: Control = null
 	for i in rows.size():
 		var before: int = rows[i - 1]["level"] if i > 0 else 1
 		var after: int = rows[i + 1]["level"] if i + 1 < rows.size() else rows[i]["level"] + 1
-		list.add_child(_reward_row(rows[i], before, after, at))
+		var row := _reward_row(rows[i], before, after, at)
+		list.add_child(row)
+		if here == null and float(rows[i]["level"]) > at:
+			here = row
 	m.body.add_child(list)
+	m.scroll_to(here if here else list.get_child(list.get_child_count() - 1))
 
 
 ## Level 1's animals and places first, then each reward in level order.
@@ -215,15 +242,15 @@ func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
 	row.add_child(track)
 
 	var icon: Control
-	var name := ""
+	var title := ""
 	if r["type"] == "place":
 		var b := Content.biome(r["id"])
-		name = b.get("name", "")
+		title = b.get("name", "")
 		icon = UI.panel(_place_colour(b), 16, 0)
 		icon.custom_minimum_size = Vector2(56, 56)
 		icon.add_child(UI.icon_rect(str(b.get("icon", "place_lake")), 28, Color.WHITE))
 	else:
-		name = Content.animal(r["id"]).get("name", "")
+		title = Content.animal(r["id"]).get("name", "")
 		icon = UI.animal_portrait(r["id"], Content.animal_default_colours(r["id"]), Vector2(56, 56))
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.modulate.a = 1.0 if open else 0.45
@@ -232,7 +259,7 @@ func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
 	var words := UI.vbox(0)
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.alignment = BoxContainer.ALIGNMENT_CENTER
-	words.add_child(UI.trimmed(name, 17, UI.INK if open else UI.INK_SOFT, false, 800))
+	words.add_child(UI.trimmed(title, 17, UI.INK if open else UI.INK_SOFT, false, 800))
 	var kind := "place" if r["type"] == "place" else "animal"
 	var when := ("From the start" if level == 1 else "Level %d" % level) + "  ·  new " + kind
 	words.add_child(UI.label(when, 13, UI.INK_FAINT, false, 700))

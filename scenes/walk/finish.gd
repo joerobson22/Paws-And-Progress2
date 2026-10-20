@@ -73,12 +73,13 @@ func _ready() -> void:
 	_scenery.size = size
 	_stage.add_child(_scenery)
 	_stage.add_child(_back_actors)
-	_scenery.front_into(_stage)
 	_sheet.color = Color(0, 0, 0, 0)
 	_sheet.size = size
 	_sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stage.add_child(_sheet)
 	_stage.add_child(_front_actors)
+	# The growth stays in front of everyone, darkened with the rest.
+	_scenery.front_into(_stage)
 
 	var feet := _scenery.path_y()
 	_walker = CharacterView.new()
@@ -88,6 +89,8 @@ func _ready() -> void:
 	_glow = _Glow.new()
 	_glow.colour = Content.rarity_colour(roll.get("rarity", "common")) if not roll.is_empty() else UI.ACCENT
 	_glow.strength = 0.0
+	# Only a gift glows: with nothing found, nothing lights up.
+	_glow.visible = _gift_id != ""
 	_front_actors.add_child(_glow)
 	if _project:
 		_animal = AnimalView.new()
@@ -152,7 +155,7 @@ func _build_words(session: FocusSession, roll: Dictionary) -> void:
 	if roll.is_empty():
 		found.add_child(_word(UI.label("No gift this time", 24, UI.ON_DARK, true, 600)))
 		var why := "Walks under a minute aren't saved." if seconds < 60 else \
-			"Focus for %d minutes or more and your pet finds you one." % (int(Content.drop_table.get("min_seconds", 600)) / 60)
+			"Focus for %d minutes or more and your pet finds you one." % floori(Content.drop_table.get("min_seconds", 600) / 60.0)
 		found.add_child(_word(UI.para(why, 15, UI.ON_DARK_SOFT)))
 	else:
 		var g := Content.gift(_gift_id)
@@ -216,7 +219,7 @@ func _play() -> void:
 	t.tween_property(_sheet, "color:a", SHEET_ALPHA, Motion.time(0.6))
 	t.tween_property(_stage, "scale", Vector2.ONE * zoom["scale"], Motion.time(1.0))
 	t.tween_property(_stage, "position", zoom["position"], Motion.time(1.0))
-	t.tween_property(_glow, "strength", 1.0 if _gift_id != "" else 0.35, Motion.time(1.0))
+	t.tween_property(_glow, "strength", 1.0 if _gift_id != "" else 0.0, Motion.time(1.0))
 	await t.finished
 	if _animal and _gift_id != "":
 		_state = "ready"
@@ -324,6 +327,12 @@ func _pick_up(pointer: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
+	# The growth in front darkens with the sheet, and no tall plant stands
+	# between you and your pet while it's at home.
+	_scenery.front_tint = Color.WHITE.darkened(_sheet.color.a)
+	if _animal:
+		var reach := 140.0 * _unit
+		_scenery.front_gap = Vector2(_rest.x - reach, _rest.x + reach)
 	if _state == "holding" and is_instance_valid(_held):
 		var at := _held.position + _held.size * 0.5
 		_held.position = at.lerp(_hold_target, minf(1.0, delta * 18.0)) - _held.size * 0.5

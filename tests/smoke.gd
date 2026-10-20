@@ -1,8 +1,9 @@
 extends SceneTree
 ## Smoke run: boots the real app, fills it with sample data and visits every
-## pane, popup and full-screen flow (including a real swipe, a full walk with
-## a gift, throwing the gift for the pet to fetch, and dark mode), so script
-## errors in UI code show up in CI.
+## pane, popup and full-screen flow (including a real swipe, the arrow keys,
+## a full walk with a gift, throwing the gift for the pet to fetch, a walk
+## left running when the app closed, every kind of weather, and dark mode),
+## so script errors in UI code show up in CI.
 ##   godot --headless --path . -s tests/smoke.gd
 ## Optional: --shots=<dir> saves a screenshot per step (needs a display).
 
@@ -44,9 +45,67 @@ func _run() -> void:
 	_fill_sample_data()
 	var main := _main()
 	var app := _app()
+	# Answered, so the location question doesn't pop up mid-run (and nothing
+	# goes out to the internet from CI); it's asked on purpose further down.
+	app.state.settings["location"] = "off"
 
 	await _wait(20)
 	await _shot("focus")
+
+	# The arrow keys move between screens and Esc comes back; so does tapping
+	# a dot on the map.
+	var map: Control = main._minimap
+	await _drag(map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center(),
+		map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center(), 1)
+	await _wait(40)
+	check(main._at == Vector2i(0, 1), "tapping the map's bottom dot opens stats")
+	await _key(KEY_ESCAPE)
+	await _wait(30)
+	await _key(KEY_RIGHT)
+	await _wait(30)
+	check(main._at == Vector2i(1, 0), "right arrow opens completed")
+	await _key(KEY_ESCAPE)
+	await _wait(30)
+	check(main._at == Vector2i.ZERO, "Esc comes back to the middle")
+
+	# The orb grows under the pointer.
+	var orb_rect: Rect2 = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "focus_orb.gd")).get_global_rect()
+	var over := InputEventMouseMotion.new()
+	over.position = orb_rect.get_center()
+	over.global_position = over.position
+	root.push_input(over, true)
+	await _wait(20)
+	var hovered: Node = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "focus_orb.gd"))
+	check(hovered._grow > 1.03, "the orb grows on hover (%.2f)" % hovered._grow)
+	over = over.duplicate()
+	over.position = Vector2(4, main.size.y * 0.5)
+	over.global_position = over.position
+	root.push_input(over, true)
+	await _wait(20)
+	check(hovered._grow < 1.01, "and shrinks back")
+
+	# Debug builds get an unlock-everything switch in the top left.
+	var debug: Node = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "debug_bar.gd"))
+	check(debug != null, "the debug bar shows in a debug build")
+	if debug:
+		var unlock: Button = _find(debug, func(n): return _is(n, "switch.gd"))
+		unlock.button_pressed = true
+		await _wait(10)
+		check(app.is_unlocked("place", "moon") and app.is_unlocked("animal", "bear"), "the debug switch unlocks everything")
+		await _shot("debug")
+		unlock.button_pressed = false
+		await _wait(10)
+		check(not app.is_unlocked("place", "moon"), "and locks it all again")
+
+	# The location question: asked once, a moment after the focus screen shows.
+	app.state.settings.erase("location")
+	main._maybe_ask_location()
+	await _wait(110)
+	check(_class("res://ui/modal.gd").is_open(), "asks about local sunrise and weather")
+	await _shot("location_prompt")
+	_close_modal(false)
+	await _wait(20)
+	check(app.state.settings.get("location") == "off" and not root.get_node("Outdoors").enabled(), "Not now leaves it off")
 
 	# Every place draws cleanly round the clock, along a stretch of walk,
 	# its front growth included.
@@ -68,6 +127,19 @@ func _run() -> void:
 		check(scenery.tint() == Color.WHITE, "%s is in full light at midday" % b["id"])
 		if b["id"] == "jungle":
 			check(scenery.front.get_child_count() >= 3, "the jungle has growth in front")
+		# Every kind of weather, the way this place shows it.
+		for kind in ["sunny", "partly", "cloudy", "rainy", "stormy", "snowy"]:
+			scenery.weather = kind
+			for scroll in [2000.0, 52000.0]:
+				scenery.scroll = scroll
+				await process_frame
+		scenery.weather = "rainy"
+		var dry: bool = b["id"] in ["desert", "moon"]
+		check((scenery.weather_kind() == "sunny") == dry, "%s: rain shows as %s" % [b["id"], scenery.weather_kind()])
+		if b["id"] == "tundra":
+			check(scenery.weather_kind() == "snowy", "rain falls as snow in the tundra")
+			scenery.weather = "stormy"
+			check(scenery.weather_kind() == "blizzard" and scenery.ambience() == "wind", "a storm is a blizzard there")
 		scenery.queue_free()
 	await process_frame
 	# The lake through a day, for the docs.
@@ -81,6 +153,26 @@ func _run() -> void:
 		await _wait(2)
 		await _shot("day_%04.1f" % hour)
 	day.queue_free()
+	await process_frame
+	# Weather, for the docs: the lake in sun and cloud, cloud, rain and a
+	# storm (caught mid-flash), the forest in snow, the tundra in a blizzard.
+	for shot in [["lake", "partly"], ["lake", "cloudy"], ["lake", "rainy"], ["lake", "stormy"], ["forest", "snowy"], ["tundra", "stormy"]]:
+		var w: Control = _class("res://scenes/walk/scenery.gd").new()
+		w.biome = _content().biome(shot[0])
+		root.add_child(w)
+		w.size = main.size
+		w.scroll = 7000.0
+		w.clock = 13.0
+		w.weather = shot[1]
+		if shot[1] == "stormy" and shot[0] == "lake":
+			w._time = 3 * w.STORM_EVERY + w._hash(3, 31.0) * 4.0 + 0.01
+		await process_frame
+		await process_frame
+		if shot[1] == "stormy" and shot[0] == "lake":
+			check(w._flash > 0.0 and w._bolt == 3, "lightning flashes in a storm")
+			check(w.ambience() == "rain", "and it sounds like rain")
+		await _shot("weather_%s_%s" % shot)
+		w.queue_free()
 	await process_frame
 
 	# A real swipe: dragging right from the middle brings in the gifts on the left.
@@ -99,14 +191,32 @@ func _run() -> void:
 	var tile: Control = _find(gifts_pane, func(n): return _is(n, "gift_tile.gd") and n.gift_id == "staffy_rare")
 	check(tile != null, "found a gift tile")
 	if tile:
-		# The headless window is small, so bring the tile into view first.
+		# The headless window is small, so bring the tile into view first, and
+		# press where it shows inside the scrolling collection.
 		gifts_pane.scroll.ensure_control_visible(tile)
 		await _wait(5)
 		var slot: Control = gifts_pane._slots[1]
-		# Near the tile's corner: in the small headless window its middle is under the minimap.
-		await _drag(tile.get_global_rect().position + Vector2(14, 14), slot.get_global_rect().get_center(), 12, 0.5)
+		var seen: Rect2 = tile.get_global_rect().intersection(gifts_pane.scroll.get_global_rect())
+		await _drag(seen.position + Vector2(14, minf(14.0, seen.size.y * 0.5)), slot.get_global_rect().get_center(), 12, 0.5)
 		await _wait(30)
 		check(app.state.shelf()[1] == "staffy_rare", "dragging a gift onto the shelf (shelf is %s)" % [app.state.shelf()])
+
+	# Only the collection scrolls: the shelf and the filter stay put.
+	var shelf_y: float = gifts_pane._slots[0].get_global_rect().position.y
+	gifts_pane.scroll.scroll_vertical = 400
+	await _wait(5)
+	check(gifts_pane._slots[0].get_global_rect().position.y == shelf_y, "the shelf doesn't scroll away")
+
+	# A quick sideways drag on a shelf gift slides it along the shelf.
+	var before: Array = app.state.shelf()
+	var first: Control = _find(gifts_pane._slots[0], func(n): return _is(n, "gift_tile.gd"))
+	check(first != null and first.slides, "shelf gifts slide")
+	if first:
+		await _drag(first.get_global_rect().get_center(), gifts_pane._slots[2].get_global_rect().get_center(), 10)
+		await _wait(30)
+		var after: Array = app.state.shelf()
+		check(after[2] == before[0] and after[0] == before[2] and main._at == Vector2i(-1, 0),
+			"sliding the first gift to the end swaps them, without leaving the screen (%s -> %s)" % [before, after])
 
 	# The filter menu: picking an option sorts by it; picking it again reverses.
 	var sort: Node = _find(gifts_pane, func(n): return _is(n, "dropdown.gd"))
@@ -165,18 +275,51 @@ func _run() -> void:
 
 	app.go("profile")
 	await _wait(50)
-	_class("res://scenes/customise/customise.gd").open()
-	await _wait(25)
-	await _shot("customise")
-	_close_modal()
 	var profile_pane: Node = main._panes[Vector2i(0, -1)]
+	var modal_class := _class("res://ui/modal.gd")
+	# Tapping the pencil opens the character popup; tapping the level badge
+	# (bottom left of the picture) opens the rewards.
+	var pencil: Button = _find(profile_pane, func(n): return n is Button and n.tooltip_text == "Customise your character")
+	check(pencil != null, "a pencil on the character")
+	if pencil:
+		await _drag(pencil.get_global_rect().get_center(), pencil.get_global_rect().get_center(), 1)
+		await _wait(25)
+		check(modal_class.is_open(), "the pencil opens the customise popup")
+		await _shot("customise")
+		_close_modal()
+		await _wait(15)
+	var badge: Control = _find(profile_pane, func(n): return n is Control and n.tooltip_text == "Levels and rewards")
+	var picture: Control = _find(profile_pane, func(n): return n is Control and n.tooltip_text == "Customise your character" and not n is Button)
+	check(badge != null and picture != null, "a level badge on the character")
+	if badge and picture:
+		var b: Rect2 = badge.get_global_rect()
+		var pic: Rect2 = picture.get_global_rect()
+		check(b.get_center().x < pic.get_center().x and b.get_center().y > pic.get_center().y, "the badge sits bottom left")
+		await _drag(b.get_center(), b.get_center(), 1)
+		await _wait(25)
+		check(modal_class.is_open(), "the badge opens the rewards")
+		var rewards: Node = modal_class.top()
+		var title_y: float = rewards.header.get_global_rect().position.y
+		await _wait(50)
+		check(rewards.header.get_child_count() == 2, "the title and your level sit above the list")
+		check(rewards._scroll.scroll_vertical > 0, "it opens scrolled down to where you are (level %d)" % app.level())
+		# The next reward to come is in view: the first one with a padlock.
+		var next_up: Control = _find(rewards.body, func(n): return n is HBoxContainer and n.get_child_count() == 4)
+		check(next_up != null and rewards._scroll.get_global_rect().encloses(next_up.get_global_rect()), "the next reward to come is in view")
+		await _shot("rewards")
+		rewards._scroll.scroll_vertical = 0
+		await _wait(5)
+		check(is_equal_approx(rewards.header.get_global_rect().position.y, title_y), "the title doesn't scroll")
+		_close_modal()
+		await _wait(15)
+		await _drag(pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), 1)
+		await _wait(25)
+		check(modal_class.is_open(), "tapping the character opens the customise popup")
+		_close_modal()
+		await _wait(15)
 	profile_pane.open_settings()
 	await _wait(25)
 	await _shot("settings")
-	_close_modal()
-	profile_pane.open_rewards()
-	await _wait(25)
-	await _shot("rewards")
 	_close_modal()
 
 	app.go("stats")
@@ -215,6 +358,21 @@ func _run() -> void:
 	await _wait(50)
 	check(app.state.settings.get("walk_biome") == "beach", "picking an unlocked place")
 	await _shot("choose_beach")
+	# In the jungle the growth stands in front of the pets, under the words,
+	# and the scene holds still while you choose.
+	app.state.settings["debug_unlock_all"] = true
+	chooser._pick_place("jungle")
+	await _wait(50)
+	var growth: Control = chooser._scenery.front
+	check(growth.get_parent() == chooser._pick and growth.get_index() > chooser._pets.get_index() and growth.get_index() < chooser._words.get_index(),
+		"the place's growth is over the pets and under the words")
+	var still: float = chooser._scenery.scroll
+	await _wait(20)
+	check(chooser._scenery.scroll == still, "the background holds still while you choose")
+	await _shot("choose_jungle")
+	chooser._pick_place("beach")
+	app.state.settings["debug_unlock_all"] = false
+	await _wait(50)
 	chooser._pick_place("moon")
 	await _wait(20)
 	check(app.state.settings.get("walk_biome") == "beach", "a locked place can't be picked")
@@ -270,10 +428,37 @@ func _run() -> void:
 	check(walk._scenery.is_dark() and walk._scenery.ambience() == "night", "the night chorus after dark")
 	await _shot("walk_night")
 	walk._scenery.clock = 10.5
-	app.state.active.start_unix -= 50 * 60
+
+	# The sound button turns the effects and the ambience off together.
+	check(walk._sound_on(), "sound starts on")
+	walk._toggle_sound()
+	check(not app.state.settings.get("sound") and not app.state.settings.get("ambience"), "the sound button mutes everything")
+	walk._toggle_sound()
+	check(app.state.settings.get("sound") and app.state.settings.get("ambience"), "and turns it all back on")
+	check(_find(walk, func(n): return _is(n, "dropdown.gd")) != null, "the debug weather picker is on the walk")
+
+	# The debug time buttons move the walk on; the gift button's pie follows.
+	var steps: Array = _find(walk, func(n): return n is Button and n.text == "+5").get_parent().get_children()
+	check(steps.size() == 4, "+5, +10, +30 and +60 minute buttons")
+	steps[0].pressed.emit()
 	await _wait(30)
+	check(walk._gift._reveal == 0.0 and absf(walk._gift._progress - 0.5) < 0.05, "five minutes in, the dark green is halfway round")
+	await _shot("gift_5min")
+	steps[0].pressed.emit()
+	await _wait(10)
+	check(walk._gift.level() == 0, "ten minutes earns a gift")
+	await _wait(60)
+	check(walk._gift._reveal == 1.0, "and the bright green fills in")
+	steps[2].pressed.emit()
+	await _wait(60)
+	var pie: Dictionary = walk._gift.shown()
+	check(pie["rare"] > 0.1 and pie["epic"] > 0.0 and pie["common"] > 0.5, "40 minutes: slices for the rarer gifts (%s)" % pie)
+	await _shot("gift_40min")
+	steps[1].pressed.emit()
+	await _wait(60)
 	await _shot("walk_50min")
 	check(walk._gift.level() == 1, "50 minutes guarantees a rare gift")
+	check(walk._gift.shown()["common"] < 0.01, "and common drops out of the pie")
 	walk._on_gift_pressed()
 	await _wait(80)
 	await _shot("walk_dive")
@@ -288,6 +473,7 @@ func _run() -> void:
 	await _wait(420)
 	check(finish._home.modulate.a > 0.9, "the home button fades in at the end")
 	check(finish._state == "ready", "the gift can be picked up")
+	check(finish._scenery.front.get_index() > finish._front_actors.get_index(), "the growth stays in front of the pet")
 	await _shot("finish")
 
 	# Easter egg: hold the gift, flick it up into the distance, and wait for
@@ -305,6 +491,27 @@ func _run() -> void:
 	await _wait(60)
 	check(main._flows.is_empty() and main._at == Vector2i.ZERO, "home closes the flow")
 
+	# Closing the app mid-walk ends the walk: the next launch logs it up to
+	# when the app was last open, with no gift, and shows focus ended.
+	app.start_walk(app.state.projects[0].id, -1, "forest")
+	app.state.active.start_unix -= 25 * 60
+	app.state.active.last_seen_unix = app.now() - 2 * 60
+	var logged: int = app.state.sessions.size()
+	var ended: Dictionary = app._end_left_walk()
+	var stopped: int = ended["session"].focus_seconds
+	check(app.state.active == null and app.state.sessions.size() == logged + 1, "a walk left running is logged")
+	check(stopped >= 22 * 60 and stopped <= 24 * 60, "up to when the app was last open (%ds)" % stopped)
+	check(ended["session"].gift_id == "", "with no gift")
+	main._open_flow("ended", ended, true)
+	await _wait(170)
+	var ended_screen: Node = main._flows.back().get_child(0)
+	check(ended_screen._walker.sad > 0.9 and ended_screen._animal.sad > 0.9, "you and your pet look dejected")
+	check(ended_screen._home.modulate.a > 0.5, "the way home shows")
+	await _shot("ended")
+	ended_screen.go_back()
+	await _wait(60)
+	check(main._flows.is_empty(), "home from focus ended")
+
 	# In the jungle the leaves pass in front of you and your pet.
 	app.start_walk(app.state.projects[0].id, -1, "jungle")
 	app.go("walk", {"from": main.size * 0.5})
@@ -315,7 +522,15 @@ func _run() -> void:
 	check(front.get_parent() == jungle_walk and front.get_index() > jungle_walk._actors.get_index(), "the jungle's growth is in front of the walker")
 	await _wait(2)
 	await _shot("walk_jungle")
-	app.cancel_walk()
+	# Ending it early: no gift, and nothing glows where one would be.
+	jungle_walk._on_gift_pressed()
+	await _wait(20)
+	_close_modal(true)
+	await _wait(420)
+	var empty_finish: Node = main._flows.back().get_child(0)
+	check(_is(empty_finish, "finish.gd") and empty_finish._gift_id == "", "an early finish has no gift")
+	check(not empty_finish._glow.visible, "and no glow where the gift would be")
+	await _shot("finish_no_gift")
 	app.go("home")
 	await _wait(60)
 	check(main._flows.is_empty(), "back home from the jungle")
@@ -333,7 +548,7 @@ func _run() -> void:
 		await _wait(50)
 		await _shot(pane + "_dark")
 	main._panes[Vector2i(0, -1)].open_rewards()
-	await _wait(25)
+	await _wait(50)
 	await _shot("rewards_dark")
 	_close_modal()
 	app.go("focus")
@@ -454,6 +669,16 @@ func _find(node: Node, match: Callable) -> Node:
 		if deeper:
 			return deeper
 	return null
+
+
+func _key(code: Key) -> void:
+	for down in [true, false]:
+		var e := InputEventKey.new()
+		e.keycode = code
+		e.physical_keycode = code
+		e.pressed = down
+		root.push_input(e)
+		await process_frame
 
 
 func _wait(frames: int) -> void:

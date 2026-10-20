@@ -2,7 +2,8 @@ class_name Minimap
 extends Control
 ## The little map of the app: five dots laid out like the screens (focus in
 ## the middle, one each side), with the one you're on filled in. The
-## highlight glides with you as you swipe; tap a dot to go there.
+## highlight glides with you as you swipe; tap a dot to go there (or use
+## the arrow keys).
 
 signal picked(cell: Vector2i)
 

@@ -9,6 +9,8 @@ var drop_table: Dictionary = {}
 var biomes: Array = []
 ## The sky and light round the clock (see DayCycle).
 var day_cycle: Dictionary = {}
+## How each kind of weather looks (see Weather).
+var weathers: Dictionary = {}
 var grade_scales: Array = []
 var quotes: Array = []
 ## Home screen lines: {morning, afternoon, evening, night, anytime}.
@@ -38,6 +40,7 @@ func _init() -> void:
 	var b := _load("res://data/biomes.json")
 	biomes = b.get("biomes", [])
 	day_cycle = b.get("day_cycle", {})
+	weathers = b.get("weathers", {})
 	var keys: Array = day_cycle.get("keys", [])
 	keys.sort_custom(func(x, y): return float(x["hour"]) < float(y["hour"]))
 	grade_scales = _load("res://data/grades.json").get("scales", [])
@@ -152,17 +155,17 @@ func grade(ref: String) -> Dictionary:
 
 # --- Quotes ------------------------------------------------------------------
 
-## The same quote for the same seed, so a walk keeps its quote across restarts.
-func quote(seed: int) -> String:
+## The same quote for the same key, so a walk keeps its quote across restarts.
+func quote(key: int) -> String:
 	if quotes.is_empty():
 		return ""
-	return str(quotes[posmod(seed, quotes.size())])
+	return str(quotes[posmod(key, quotes.size())])
 
 
 ## A line for the home screen at this hour: half the time a greeting for the
 ## time of day, otherwise an anytime line. Lines needing a name are skipped
 ## when there isn't one.
-func greeting(hour: int, name: String, rng: RandomNumberGenerator) -> String:
+func greeting(hour: int, username: String, rng: RandomNumberGenerator) -> String:
 	var part := "night"
 	if hour >= 5 and hour < 12:
 		part = "morning"
@@ -171,10 +174,10 @@ func greeting(hour: int, name: String, rng: RandomNumberGenerator) -> String:
 	elif hour >= 17 and hour < 22:
 		part = "evening"
 	var pool: Array = greetings.get(part, []) if rng.randf() < 0.5 else greetings.get("anytime", [])
-	pool = pool.filter(func(l): return name != "" or not str(l).contains("{name}"))
+	pool = pool.filter(func(l): return username != "" or not str(l).contains("{name}"))
 	if pool.is_empty():
 		return "Ready when you are"
-	return str(pool[rng.randi_range(0, pool.size() - 1)]).replace("{name}", name)
+	return str(pool[rng.randi_range(0, pool.size() - 1)]).replace("{name}", username)
 
 
 # --- Cosmetics ---------------------------------------------------------------

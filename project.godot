@@ -14,7 +14,7 @@ config/name="Paws & Progress"
 config/description="Walk your animals through beautiful scenery while you work."
 config/version="0.1.0"
 run/main_scene="res://scenes/main.tscn"
-config/features=PackedStringArray("4.5", "Mobile")
+config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
 config/quit_on_go_back=false
 run/low_processor_mode=true
@@ -23,6 +23,7 @@ run/low_processor_mode=true
 
 Content="*res://core/content.gd"
 App="*res://core/app.gd"
+Outdoors="*res://core/outdoors.gd"
 Audio="*res://core/audio.gd"
 
 [display]
