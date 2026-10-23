@@ -5,9 +5,11 @@ extends SceneTree
 ## left running when the app closed, every kind of weather, and dark mode),
 ## so script errors in UI code show up in CI.
 ##   godot --headless --path . -s tests/smoke.gd
-## Optional: --shots=<dir> saves a screenshot per step (needs a display).
+## Optional: --shots=<dir> saves a screenshot per step (needs a display);
+## --quick skips drawing every place and weather, for a fast look at the UI.
 
 var _shots_dir := ""
+var _quick := false
 var _failed := false
 
 
@@ -15,6 +17,8 @@ func _initialize() -> void:
 	for arg in OS.get_cmdline_user_args() + OS.get_cmdline_args():
 		if arg.begins_with("--shots="):
 			_shots_dir = arg.trim_prefix("--shots=")
+		elif arg == "--quick":
+			_quick = true
 	change_scene_to_file("res://scenes/main.tscn")
 	_run.call_deferred()
 
@@ -57,6 +61,9 @@ func _run() -> void:
 	# goes there. The arrow keys move between screens and Esc comes back.
 	var map: Control = main._minimap
 	var small: Vector2 = map.size
+	check(map.mouse_default_cursor_shape == Control.CURSOR_CAN_DROP, "the map shows the open hand")
+	var any_button: Button = _find(main, func(n): return n is Button and n.is_visible_in_tree())
+	check(any_button != null and any_button.mouse_default_cursor_shape == Control.CURSOR_CAN_DROP, "buttons show the open hand")
 	check(map._grow == 0.0 and not map.open, "the map starts small, with no icons")
 	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
 	await _wait(30)
@@ -141,73 +148,8 @@ func _run() -> void:
 	await _wait(20)
 	check(app.state.settings.get("location") == "off" and not root.get_node("Outdoors").enabled(), "Not now leaves it off")
 
-	# Every place draws cleanly round the clock, along a stretch of walk,
-	# its front growth included.
-	for b in _content().biomes:
-		var scenery: Control = _class("res://scenes/walk/scenery.gd").new()
-		scenery.biome = b
-		root.add_child(scenery)
-		scenery.size = main.size
-		for hour in [6.2, 12.0, 18.4, 23.0]:
-			scenery.clock = hour
-			for scroll in [1234.0, 40000.0, 91000.0]:
-				scenery.scroll = scroll
-				await process_frame
-			if hour == 12.0 or b["id"] == "jungle":
-				await _shot("place_%s_%02d" % [b["id"], int(hour)])
-		check(scenery.darkness() > 0.9, "%s is dark at 11pm" % b["id"])
-		scenery.clock = 12.0
-		check(scenery.darkness() == (1.0 if b.has("sky") else 0.0), "%s is light at midday unless it has its own sky" % b["id"])
-		check(scenery.tint() == Color.WHITE, "%s is in full light at midday" % b["id"])
-		if b["id"] == "jungle":
-			check(scenery.front.get_child_count() >= 3, "the jungle has growth in front")
-		# Every kind of weather, the way this place shows it.
-		for kind in ["sunny", "partly", "cloudy", "rainy", "stormy", "snowy"]:
-			scenery.weather = kind
-			for scroll in [2000.0, 52000.0]:
-				scenery.scroll = scroll
-				await process_frame
-		scenery.weather = "rainy"
-		var dry: bool = b["id"] in ["desert", "moon"]
-		check((scenery.weather_kind() == "sunny") == dry, "%s: rain shows as %s" % [b["id"], scenery.weather_kind()])
-		if b["id"] == "tundra":
-			check(scenery.weather_kind() == "snowy", "rain falls as snow in the tundra")
-			scenery.weather = "stormy"
-			check(scenery.weather_kind() == "blizzard" and scenery.ambience() == "wind", "a storm is a blizzard there")
-		scenery.queue_free()
-	await process_frame
-	# The lake through a day, for the docs.
-	var day: Control = _class("res://scenes/walk/scenery.gd").new()
-	day.biome = _content().biome("lake")
-	root.add_child(day)
-	day.size = main.size
-	day.scroll = 5000.0
-	for hour in [5.5, 7.0, 12.0, 17.5, 18.6, 23.0]:
-		day.clock = hour
-		await _wait(2)
-		await _shot("day_%04.1f" % hour)
-	day.queue_free()
-	await process_frame
-	# Weather, for the docs: the lake in sun and cloud, cloud, rain and a
-	# storm (caught mid-flash), the forest in snow, the tundra in a blizzard.
-	for shot in [["lake", "partly"], ["lake", "cloudy"], ["lake", "rainy"], ["lake", "stormy"], ["forest", "snowy"], ["tundra", "stormy"]]:
-		var w: Control = _class("res://scenes/walk/scenery.gd").new()
-		w.biome = _content().biome(shot[0])
-		root.add_child(w)
-		w.size = main.size
-		w.scroll = 7000.0
-		w.clock = 13.0
-		w.weather = shot[1]
-		if shot[1] == "stormy" and shot[0] == "lake":
-			w._time = 3 * w.STORM_EVERY + w._hash(3, 31.0) * 4.0 + 0.01
-		await process_frame
-		await process_frame
-		if shot[1] == "stormy" and shot[0] == "lake":
-			check(w._flash > 0.0 and w._bolt == 3, "lightning flashes in a storm")
-			check(w.ambience() == "rain", "and it sounds like rain")
-		await _shot("weather_%s_%s" % shot)
-		w.queue_free()
-	await process_frame
+	if not _quick:
+		await _scenery_gallery(main)
 
 	# A real swipe: dragging right from the middle brings in the gifts on the left.
 	await _drag(main.size * 0.5, main.size * Vector2(0.9, 0.5))
@@ -240,7 +182,7 @@ func _run() -> void:
 	await _wait(20)
 
 	# The pencil opens the shelf editor, where it's all drag and drop.
-	var pencil_button: Button = _find(gifts_pane, func(n): return n is Button and n.tooltip_text == "Arrange your shelf")
+	var pencil_button: Button = _find(gifts_pane, func(n): return n is Button and n.accessibility_name == "Arrange your shelf")
 	check(pencil_button != null, "a pencil by the shelf")
 	if pencil_button:
 		await _drag(pencil_button.get_global_rect().get_center(), pencil_button.get_global_rect().get_center(), 1)
@@ -288,17 +230,31 @@ func _run() -> void:
 			_close_modal()
 			await _wait(20)
 
-		# The filter menu: picking an option sorts by it; picking it again reverses.
+		# The sort menu: picking an option sorts by it straight away; picking it
+		# again flips its arrow, and only then reverses and closes by itself.
 		var sort: Node = _find(editor_modal, func(n): return _is(n, "dropdown.gd"))
+		check(sort.text.begins_with("Sort by"), "the menu says Sort by (%s)" % sort.text)
 		sort._open()
 		await _wait(15)
 		await _shot("gift_filter")
-		sort._choose("name")
-		await _wait(10)
-		check(app.state.settings.get("gift_sort") == "name" and not app.state.settings.get("gift_sort_reversed"), "filter by A-Z")
-		sort._choose("name")
-		await _wait(10)
-		check(app.state.settings.get("gift_sort_reversed") == true, "choosing A-Z again reverses it")
+		await _tap_menu(sort, "A–Z")
+		await _wait(15)
+		check(app.state.settings.get("gift_sort") == "name" and not app.state.settings.get("gift_sort_reversed") and not is_instance_valid(sort._menu),
+			"sort by A-Z, and the menu closes")
+		sort._open()
+		await _wait(15)
+		await _tap_menu(sort, "A–Z")
+		await _wait(6)
+		check(sort._flipping and is_instance_valid(sort._menu) and not app.state.settings.get("gift_sort_reversed"), "the arrow flips before anything changes")
+		await _shot("gift_sort_flip")
+		await _tap_menu(sort, "Rarity")
+		# Animations run on real time, which a slow display stretches out.
+		for i in 60:
+			if not sort._flipping and not is_instance_valid(sort._menu):
+				break
+			await _wait(5)
+		check(app.state.settings.get("gift_sort") == "name" and app.state.settings.get("gift_sort_reversed") == true and not is_instance_valid(sort._menu),
+			"then A-Z reverses and the menu closes by itself (taps during the flip do nothing)")
 		var shown := []
 		for t in _all(editor._grid, func(n): return _is(n, "gift_tile.gd")):
 			shown.append(_content().gift(t.gift_id)["name"].to_lower())
@@ -306,8 +262,10 @@ func _run() -> void:
 		sorted.sort()
 		sorted.reverse()
 		check(shown.size() > 10 and shown == sorted, "Z-A order in the collection")
-		sort._choose("rarity")
-		await _wait(10)
+		sort._open()
+		await _wait(15)
+		await _tap_menu(sort, "Rarity")
+		await _wait(15)
 		_close_modal()
 		await _wait(20)
 
@@ -387,7 +345,7 @@ func _run() -> void:
 	# Tapping the pencil opens the character popup (the picture itself
 	# doesn't); tapping the level badge (bottom left of the picture) opens
 	# the rewards.
-	var pencil: Button = _find(profile_pane, func(n): return n is Button and n.tooltip_text == "Customise your character")
+	var pencil: Button = _find(profile_pane, func(n): return n is Button and n.accessibility_name == "Customise your character")
 	check(pencil != null, "a pencil on the character")
 	if pencil:
 		await _drag(pencil.get_global_rect().get_center(), pencil.get_global_rect().get_center(), 1)
@@ -396,7 +354,7 @@ func _run() -> void:
 		await _shot("customise")
 		_close_modal()
 		await _wait(15)
-	var badge: Control = _find(profile_pane, func(n): return n is Control and n.tooltip_text == "Levels and rewards")
+	var badge: Control = _find(profile_pane, func(n): return n is Control and n.accessibility_name == "Levels and rewards")
 	var picture: Control = _find(profile_pane, func(n): return _is(n, "round_frame.gd") and n.size.y > 150.0)
 	check(badge != null and picture != null, "a level badge on the character")
 	if badge and picture:
@@ -714,12 +672,91 @@ func _run() -> void:
 	_find(main._panes[Vector2i.ZERO], func(n): return _is(n, "theme_toggle.gd"))._flip()
 	await _wait(60)
 	check(not _class("res://ui/ui.gd").dark, "and back to light")
+	# No tooltips anywhere: every pane has been built by now.
+	var tipped: Control = _find(main, func(n): return n is Control and n.tooltip_text != "")
+	check(tipped == null, "no tooltips (%s has one)" % [tipped])
+	for pane in main._panes.values():
+		var title: Control = _find(pane, func(n): return n is TextureRect and n.get_parent() is PanelContainer and n.get_parent().get_parent() is HBoxContainer)
+		check(pane.name == "Focus" or title != null, "%s has its map icon by its title" % pane.name)
 
 	if _failed:
 		quit(1)
 		return
 	print("SMOKE OK")
 	quit(0)
+
+
+## Every place round the clock and in every weather, plus the day-cycle and
+## weather pictures for the docs. Slow with a display (it's all software
+## rendering there), so --quick skips it.
+func _scenery_gallery(main: Node) -> void:
+	# Every place draws cleanly round the clock, along a stretch of walk,
+	# its front growth included.
+	for b in _content().biomes:
+		var scenery: Control = _class("res://scenes/walk/scenery.gd").new()
+		scenery.biome = b
+		root.add_child(scenery)
+		scenery.size = main.size
+		for hour in [6.2, 12.0, 18.4, 23.0]:
+			scenery.clock = hour
+			for scroll in [1234.0, 40000.0, 91000.0]:
+				scenery.scroll = scroll
+				await process_frame
+			if hour == 12.0 or b["id"] == "jungle":
+				await _shot("place_%s_%02d" % [b["id"], int(hour)])
+		check(scenery.darkness() > 0.9, "%s is dark at 11pm" % b["id"])
+		scenery.clock = 12.0
+		check(scenery.darkness() == (1.0 if b.has("sky") else 0.0), "%s is light at midday unless it has its own sky" % b["id"])
+		check(scenery.tint() == Color.WHITE, "%s is in full light at midday" % b["id"])
+		if b["id"] == "jungle":
+			check(scenery.front.get_child_count() >= 3, "the jungle has growth in front")
+		# Every kind of weather, the way this place shows it.
+		for kind in ["sunny", "partly", "cloudy", "rainy", "stormy", "snowy"]:
+			scenery.weather = kind
+			for scroll in [2000.0, 52000.0]:
+				scenery.scroll = scroll
+				await process_frame
+		scenery.weather = "rainy"
+		var dry: bool = b["id"] in ["desert", "moon"]
+		check((scenery.weather_kind() == "sunny") == dry, "%s: rain shows as %s" % [b["id"], scenery.weather_kind()])
+		if b["id"] == "tundra":
+			check(scenery.weather_kind() == "snowy", "rain falls as snow in the tundra")
+			scenery.weather = "stormy"
+			check(scenery.weather_kind() == "blizzard" and scenery.ambience() == "wind", "a storm is a blizzard there")
+		scenery.queue_free()
+	await process_frame
+	# The lake through a day, for the docs.
+	var day: Control = _class("res://scenes/walk/scenery.gd").new()
+	day.biome = _content().biome("lake")
+	root.add_child(day)
+	day.size = main.size
+	day.scroll = 5000.0
+	for hour in [5.5, 7.0, 12.0, 17.5, 18.6, 23.0]:
+		day.clock = hour
+		await _wait(2)
+		await _shot("day_%04.1f" % hour)
+	day.queue_free()
+	await process_frame
+	# Weather, for the docs: the lake in sun and cloud, cloud, rain and a
+	# storm (caught mid-flash), the forest in snow, the tundra in a blizzard.
+	for shot in [["lake", "partly"], ["lake", "cloudy"], ["lake", "rainy"], ["lake", "stormy"], ["forest", "snowy"], ["tundra", "stormy"]]:
+		var w: Control = _class("res://scenes/walk/scenery.gd").new()
+		w.biome = _content().biome(shot[0])
+		root.add_child(w)
+		w.size = main.size
+		w.scroll = 7000.0
+		w.clock = 13.0
+		w.weather = shot[1]
+		if shot[1] == "stormy" and shot[0] == "lake":
+			w._time = 3 * w.STORM_EVERY + w._hash(3, 31.0) * 4.0 + 0.01
+		await process_frame
+		await process_frame
+		if shot[1] == "stormy" and shot[0] == "lake":
+			check(w._flash > 0.0 and w._bolt == 3, "lightning flashes in a storm")
+			check(w.ambience() == "rain", "and it sounds like rain")
+		await _shot("weather_%s_%s" % shot)
+		w.queue_free()
+	await process_frame
 
 
 func _fill_sample_data() -> void:
@@ -851,6 +888,16 @@ func _key(code: Key) -> void:
 		e.pressed = down
 		root.push_input(e)
 		await process_frame
+
+
+## Taps the option labelled `text` in an open dropdown's menu.
+func _tap_menu(dropdown: Node, text: String) -> void:
+	var b: Button = _find(dropdown._menu, func(n): return n is Button and n.text == text)
+	if b == null:
+		check(false, "the menu has %s" % text)
+		return
+	var at := b.get_global_rect().get_center()
+	await _drag(at, at, 1)
 
 
 func _wait(frames: int) -> void:

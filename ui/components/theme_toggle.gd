@@ -19,7 +19,7 @@ func _init() -> void:
 	size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	flat = true
 	focus_mode = Control.FOCUS_NONE
-	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	mouse_default_cursor_shape = Cursor.HOVER
 	# No backing at all, hovered or pressed: just the icon.
 	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 		add_theme_stylebox_override(state, StyleBoxEmpty.new())
@@ -28,6 +28,7 @@ func _init() -> void:
 	_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_icon)
+	accessibility_name = "Switch to light mode" if UI.dark else "Switch to dark mode"
 	pressed.connect(_flip)
 	mouse_entered.connect(func(): _hover(true))
 	mouse_exited.connect(func(): _hover(false))

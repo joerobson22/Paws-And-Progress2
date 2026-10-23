@@ -2,7 +2,7 @@ class_name ShelfEditor
 extends Control
 ## Arranging the shelf, in a popup from the pencil on the gifts screen: the
 ## three spots stay along the top with every gift you've found scrolling
-## below (in the order picked from "Filter by"). It's all drag and drop:
+## below (in the order picked from "Sort by"). It's all drag and drop:
 ## drag a gift onto an empty spot to put it there, onto a full one to swap
 ## it in, along the shelf to move it, or off the shelf to take it down.
 ## Gifts already on the shelf are greyed out below. On a computer, gifts
@@ -42,12 +42,7 @@ static func open() -> Modal:
 	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(cap)
 	head.add_child(UI.spacer())
-	var sort := Dropdown.new(SORTS, str(App.state.settings.get("gift_sort", "rarity")),
-		bool(App.state.settings.get("gift_sort_reversed", false)), "Filter by")
-	sort.chosen.connect(func(option: String, reversed: bool):
-		App.state.settings["gift_sort"] = option
-		App.set_setting("gift_sort_reversed", reversed))
-	head.add_child(sort)
+	head.add_child(Dropdown.for_setting(SORTS, "gift_sort", "rarity"))
 	m.header.add_child(head)
 	editor._grid = GridContainer.new()
 	editor._grid.add_theme_constant_override("h_separation", 10)

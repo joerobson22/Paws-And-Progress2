@@ -10,7 +10,6 @@ var _time := 0.0
 func _init() -> void:
 	custom_minimum_size = Vector2(54, 22)
 	mouse_filter = Control.MOUSE_FILTER_PASS
-	tooltip_text = "Walking right now"
 
 
 func _process(delta: float) -> void:

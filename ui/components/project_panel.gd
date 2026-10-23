@@ -91,7 +91,6 @@ static func _gift_chip(gift_id: String, count: int) -> Control:
 	var n := UI.label("×%d" % count, 13, Content.rarity_text_colour(Content.gift(gift_id).get("rarity", "common")), false, 800)
 	n.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(n)
-	h.tooltip_text = Content.gift(gift_id).get("name", "")
 	return h
 
 
@@ -105,19 +104,19 @@ class _GradeButton extends Button:
 	func _init(grade_ref: String) -> void:
 		flat = true
 		focus_mode = Control.FOCUS_ALL
-		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		mouse_default_cursor_shape = Cursor.HOVER
 		size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 			add_theme_stylebox_override(state, StyleBoxEmpty.new())
 		if grade_ref == "":
 			custom_minimum_size = Vector2(SIZE, SIZE)
-			tooltip_text = "Give it a grade"
+			accessibility_name = "Give it a grade"
 		else:
 			var badge := UI.grade_badge(grade_ref, int(SIZE))
 			badge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			custom_minimum_size = badge.custom_minimum_size
 			add_child(badge)
-			tooltip_text = "%s · change the grade" % badge.tooltip_text
+			accessibility_name = "%s · change the grade" % badge.accessibility_name
 		_cover = Control.new()
 		_cover.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		_cover.mouse_filter = Control.MOUSE_FILTER_IGNORE

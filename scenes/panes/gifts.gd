@@ -17,7 +17,7 @@ func build() -> void:
 	_rings.clear()
 	var col := page(760, 22)
 	var counts := Collection.progress(App.state.inventory, Content.gifts, Content.animals)
-	col.add_child(UI.title_row("Gifts", "%d of %d found" % [counts["found"], counts["gifts"]]))
+	col.add_child(title_row("Gifts"))
 	col.add_child(_shelf(col.custom_minimum_size.x))
 	if counts["found"] == 0:
 		var empty := UI.card(UI.SURFACE, 24)
@@ -90,7 +90,6 @@ func _progress(counts: Dictionary, width: float) -> Control:
 	for s in stats:
 		var cell := UI.vbox(4)
 		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		cell.tooltip_text = s[5]
 		var ring := ProgressRing.new(Collection.fraction(s[2], s[3]), Content.rarity_colour(s[4]), diameter)
 		_rings.append(ring)
 		cell.add_child(ring)

@@ -96,10 +96,6 @@ func gift(id: String) -> Dictionary:
 	return _gifts_by_id.get(id, {})
 
 
-func gifts_for(animal_id: String) -> Array:
-	return gifts.filter(func(g): return g["animal"] == animal_id)
-
-
 func rarity_colour(rarity_id: String) -> Color:
 	return Color.from_string(_rarities_by_id.get(rarity_id, {}).get("colour", "#888888"), Color.GRAY)
 
