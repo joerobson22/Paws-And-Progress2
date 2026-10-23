@@ -9,6 +9,8 @@ extends Pane
 
 ## Project names in the strip under the chart are cut to this many letters.
 const CHIP_LETTERS := 10
+## The least room across for the weeks to sit beside the chart.
+const COLUMNS_FROM := 560.0
 
 const DAY_NAMES := ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const DAY_WORDS := ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -20,13 +22,18 @@ var _chart_title: Label
 var _chart_total: Label
 var _legend: HBoxContainer
 var _weeks: Dictionary = {}  # week start -> history button
+## The past weeks go in a column beside the chart (else a strip under it).
+var _columns := false
 
 
 func build() -> void:
 	var today := App.today()
 	if _week < 0 or _week > Stats.week_start(today):
 		_week = Stats.week_start(today)
-	var col := frame(1000 if wide else 680, 14)
+	# Computers always have the height for the weeks beside the chart, even
+	# in the smallest window; phones put them in a strip under it.
+	_columns = wide or (not App.phone_layout() and margins(1000)["width"] >= COLUMNS_FROM)
+	var col := frame(1000 if _columns else 680, 14)
 
 	var head := title_row("Stats")
 	head.add_child(_streak())
@@ -60,11 +67,12 @@ func build() -> void:
 
 	# The chart gets the most room; the leaderboard the rest.
 	var history := _history(today)
-	if wide:
+	if _columns:
 		var row := UI.hbox(16)
 		row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		row.size_flags_stretch_ratio = 1.5
-		history.custom_minimum_size.x = 230
+		# Narrower in a small window, so the chart keeps most of the width.
+		history.custom_minimum_size.x = clampf(col.custom_minimum_size.x * 0.28, 180.0, 230.0)
 		row.add_child(history)
 		row.add_child(chart_card)
 		col.add_child(row)
@@ -77,7 +85,7 @@ func build() -> void:
 	var board := Leaderboard.new(Friends.ranked(App.friends, mine, App.state.active != null),
 		"Friends join you here once accounts arrive: you'll see their weeks, and who's out walking right now.")
 	# At least a row and yours: a friend above you, then your pinned row.
-	board.custom_minimum_size.y = 180 if wide else 128
+	board.custom_minimum_size.y = 180 if _columns else 128
 	col.add_child(board)
 	_select_week(_week, false)
 
@@ -109,8 +117,8 @@ func _streak() -> Control:
 	return row
 
 
-## Past weeks, newest first: a column beside the chart on wide screens, a
-## sideways strip under it on phones.
+## Past weeks, newest first: a column beside the chart on computers and
+## wide screens, a sideways strip under it on phones.
 func _history(today: int) -> Control:
 	_weeks.clear()
 	var totals := Stats.weekly_totals(App.state.sessions, App.tz_bias())
@@ -122,7 +130,7 @@ func _history(today: int) -> Control:
 	for w in weeks:
 		best = maxi(best, int(totals.get(w, 0)))
 	var list: BoxContainer
-	if wide:
+	if _columns:
 		list = UI.vbox(8)
 	else:
 		list = UI.hbox(8)
@@ -130,7 +138,7 @@ func _history(today: int) -> Control:
 		var b := _week_button(w, int(totals.get(w, 0)), best, today)
 		list.add_child(b)
 		_weeks[w] = b
-	if wide:
+	if _columns:
 		# Scrolls without cutting the cards' shadows off at the sides.
 		var holder := UI.shadow_scroll(list)
 		holder.size_flags_horizontal = Control.SIZE_FILL
@@ -144,7 +152,7 @@ func _history(today: int) -> Control:
 
 func _week_button(w: int, seconds: int, best: int, today: int) -> Button:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(0 if wide else 132, 70)
+	b.custom_minimum_size = Vector2(0 if _columns else 132, 70)
 	# The words clip, not the button, or its shadow would be cut off.
 	var v := UI.vbox(2)
 	v.clip_contents = true
