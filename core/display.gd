@@ -29,9 +29,12 @@ const PHONE_SCREEN_SHARE := 0.85
 static var _before_phone := {}
 
 
-## Whether there's a window to manage: computers, with a real display.
+## Whether there's a window to manage: computers, with a real display, and
+## not under the test runners (scripts run with -s), whose window stays the
+## size the command line gave it.
 static func managed() -> bool:
-	return not OS.has_feature("mobile") and DisplayServer.get_name() != "headless"
+	return not OS.has_feature("mobile") and DisplayServer.get_name() != "headless" \
+		and Engine.get_main_loop().get_script() == null
 
 
 ## Physical pixels per point: Retina/iOS report it directly; Android via DPI.
@@ -131,33 +134,30 @@ static func current_mode() -> String:
 	return "windowed"
 
 
-## The settings rows for the window: its mode, and its size. Picking a size
-## goes back to a window if it was fullscreen or maximised. Computers only;
-## empty on phones and in the debug phone view.
+## The settings row for the window: its mode, and its size beside it.
+## Picking a size goes back to a window if it was fullscreen or maximised.
+## Computers only; empty on phones and in the debug phone view.
 static func settings_rows(window: Window) -> Array[Control]:
 	var rows: Array[Control] = []
 	if OS.has_feature("mobile") or App.debug_phone_view():
 		return rows
 	var mode := Dropdown.new(MODE_NAMES, current_mode(), false, "", false)
+	mode.accessibility_name = "Window mode"
 	var options := resolution_options(window)
 	var size := Dropdown.new(options, current_resolution(window, options), false, "", false)
+	size.accessibility_name = "Window size"
 	mode.chosen.connect(func(id: String, _reversed: bool): App.set_setting("window_mode", id))
 	size.chosen.connect(func(id: String, _reversed: bool):
 		App.state.settings["window_mode"] = "windowed"
 		mode.select("windowed")
 		App.set_setting("resolution", id))
-	rows.append(_row("Window", "Windowed, maximised or fullscreen.", mode))
-	rows.append(_row("Window size", "How big the window is when it isn't fullscreen.", size))
-	return rows
-
-
-static func _row(title: String, detail: String, control: Control) -> Control:
-	var row := UI.hbox(16)
+	var row := UI.hbox(8)
 	var text := UI.vbox(2)
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_child(UI.label(title, 16, UI.INK, false, 800))
-	text.add_child(UI.para(detail, 13))
+	text.add_child(UI.label("Window", 16, UI.INK, false, 800))
+	text.add_child(UI.para("Fullscreen or not, and its size.", 13))
 	row.add_child(text)
-	control.accessibility_name = title
-	row.add_child(control)
-	return row
+	row.add_child(mode)
+	row.add_child(size)
+	rows.append(row)
+	return rows

@@ -68,12 +68,17 @@ func appear(on: bool) -> void:
 	_shown = on
 	if on:
 		visible = true
-		Motion.fade(self, 1.0, Motion.FAST)
 	else:
 		_set_hover_target(0.0, true)
-		Motion.fade(self, 0.0, Motion.FAST * 0.6).tween_callback(func():
-			if not _shown:
-				visible = false)
+
+
+## Fades a step towards showing or not each frame (quicker going), so a
+## change of mind halfway carries on from where it is.
+func _process(delta: float) -> void:
+	var step := delta / maxf(Motion.time(Motion.FAST), 0.001)
+	modulate.a = move_toward(modulate.a, 1.0 if _shown else 0.0, step * (1.0 if _shown else 1.6))
+	if not _shown and modulate.a <= 0.0:
+		visible = false
 
 
 func _gui_input(e: InputEvent) -> void:

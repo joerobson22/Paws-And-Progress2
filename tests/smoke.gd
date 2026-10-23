@@ -132,6 +132,7 @@ func _run() -> void:
 	# others. Under the pointer an arrow slides out and darkens.
 	var arrows: Dictionary = main._arrows
 	var showing := func(): return arrows.keys().filter(func(d): return arrows[d].visible and arrows[d].modulate.a > 0.99)
+	await _wait(15)
 	check(showing.call().size() == 4, "an arrow on every side of the focus screen (%d)" % showing.call().size())
 	var right: Control = arrows[Vector2i.RIGHT]
 	check(right.get_global_rect().end.x == main.size.x and is_equal_approx(right.get_global_rect().get_center().y, main.size.y * 0.5),
@@ -192,7 +193,7 @@ func _run() -> void:
 		check(root.content_scale_size == Vector2i(390, 390) and app.phone_layout() and not map.hover_grow,
 			"the phone size switch lays the app out at a phone's width")
 		check(arrows.values().all(func(a): return not a.visible), "with no edge arrows")
-		if DisplayServer.get_name() != "headless":
+		if _class("res://core/display.gd").managed():
 			check(absf(main.size.x - 390.0) < 1.0 and main.size.y > 780.0, "in a phone-shaped window (%s)" % main.size)
 		await _shot("debug_phone")
 		# The pane rebuilt at the new size, so find its switch again.
@@ -446,7 +447,9 @@ func _run() -> void:
 		var b: Rect2 = badge.get_global_rect()
 		var pic: Rect2 = picture.get_global_rect()
 		check(b.get_center().x < pic.get_center().x and b.get_center().y > pic.get_center().y, "the badge sits bottom left")
-		await _drag(b.get_center(), b.get_center(), 1)
+		# Its right side: on a small window its left can be under the minimap.
+		var on_badge := Vector2(b.end.x - 8.0, b.get_center().y)
+		await _drag(on_badge, on_badge, 1)
 		await _wait(25)
 		check(modal_class.is_open(), "the badge opens the rewards")
 		var rewards: Node = modal_class.top()
@@ -484,8 +487,8 @@ func _run() -> void:
 		# On a short window the page scrolls, so bring it into view first.
 		profile_pane.scroll.ensure_control_visible(medal_card)
 		await _wait(5)
-		# Its left side: the middle of the bottom can be under the minimap.
-		var on_card: Vector2 = medal_card.get_global_rect().position + Vector2(40, 40)
+		# Its right side: the bottom left corner can be under the minimap.
+		var on_card: Vector2 = Vector2(medal_card.get_global_rect().end.x - 40.0, medal_card.get_global_rect().position.y + 40.0)
 		await _drag(on_card, on_card, 1)
 		await _wait(25)
 	check(modal_class.is_open() and _find(modal_class.top().header, func(n): return n is Label and n.text == "Achievements") != null,
@@ -518,6 +521,9 @@ func _run() -> void:
 		await _wait(15)
 		check(app.state.settings.get("resolution") == "1280x720" and app.state.settings.get("window_mode") == "windowed" and pickers[0].text == "Windowed",
 			"picking a size saves it and goes back to a window")
+		# The save is shared with the app, so leave its window as it was.
+		app.state.settings.erase("window_mode")
+		app.state.settings.erase("resolution")
 	_close_modal()
 	await _wait(20)
 

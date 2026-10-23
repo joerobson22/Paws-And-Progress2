@@ -5,7 +5,8 @@ extends Button
 ## closes the menu straight away. Picking the one already chosen reverses
 ## it: its arrow flips over, then the menu closes by itself and the new
 ## order applies (nothing in the menu can be tapped while the arrow turns).
-## `sortable` off (e.g. a plain picker) drops the arrows and the reversing.
+## `sortable` off (e.g. a plain picker) drops the arrows and the reversing:
+## picking the one already chosen just reports it again.
 
 signal chosen(option: String, reversed: bool)
 
@@ -79,7 +80,8 @@ func select(id: String) -> void:
 
 func _refresh() -> void:
 	text = "%s: %s" % [prefix, _label(current)] if prefix != "" else _label(current)
-	icon = _arrow(reversed) if sortable else null
+	# A plain picker still shows its arrow down, so it reads as a menu.
+	icon = _arrow(reversed and sortable)
 
 
 func _open() -> void:
@@ -143,7 +145,9 @@ func _choose(id: String, arrow: TextureRect) -> void:
 		_apply()
 		return
 	if not sortable:
-		_close()
+		# Picked again: nothing to reverse, but say so (a window size
+		# picked again still takes you out of fullscreen).
+		_apply()
 		return
 	# The same choice again: flip its arrow over, then reverse the order.
 	reversed = not reversed
