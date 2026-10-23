@@ -46,6 +46,7 @@ const PATHS := {
 	"sort_down": "M6 9l6 6 6-6",
 	"sort_up": "M6 15l6-6 6 6",
 	"dot": "fill:M12 5.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13z",
+	"calendar": "M4 6h16v14H4zM4 10h16M8 3v5M16 3v5",
 	"shelf": "M3 15h18M5 15v4M19 15v4M7 15V9h4v6M13 15v-4h4v4",
 }
 

@@ -35,6 +35,8 @@ const SWIPE_START := 16.0
 ## ...and goes through when let go past this much of the screen, or flicked.
 const SWIPE_COMMIT := 0.22
 const FLICK_SPEED := 1.6  # screens per second
+## How long the old colours take to fade into the new ones.
+const PALETTE_FADE := 0.8
 
 var _world := Control.new()
 var _panes := {}  # Vector2i -> Pane
@@ -44,6 +46,9 @@ var _moving := false
 var _flow_layer := Control.new()
 var _flows: Array[CircleReveal] = []
 var _modal_layer := Control.new()
+## Holds the picture of the old colours while it fades out.
+var _fade_layer := Control.new()
+var _fading := 0
 var _minimap: Minimap
 var _arrows := {}  # Vector2i direction -> NavArrow
 var _bg := ColorRect.new()
@@ -97,10 +102,14 @@ func _ready() -> void:
 	_minimap.picked.connect(_go_cell)
 	add_child(_minimap)
 
-	for layer in [_flow_layer, _modal_layer]:
+	for layer in [_fade_layer, _flow_layer, _modal_layer]:
 		layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(layer)
+	# Flows and popups always draw on top, even over things lifted above
+	# the fade between light and dark.
+	_flow_layer.z_index = 2
+	_modal_layer.z_index = 2
 	Modal.layer = _modal_layer
 
 	App.navigate.connect(_open)
@@ -196,11 +205,13 @@ func _on_state_changed() -> void:
 		_switch_palette(want)
 
 
-## Swaps light and dark: everything on screen is rebuilt in the new colours
-## under a snapshot of the old ones, which then fades away.
+## Swaps light and dark without anything moving: the screen on show is
+## rebuilt in the new colours exactly as it was (same layout, scroll and
+## text, no entry animations), under a picture of the old colours that
+## then fades away. What a pane keeps through a rebuild (the orb, the
+## toggle) is lifted above the picture so it carries on moving.
 func _switch_palette(dark: bool) -> void:
-	# A picture of the screen as it was, to fade away over the new colours
-	# (there's no picture to take when running without a display).
+	# There's no picture to take when running without a display.
 	var snapshot: Image = null
 	if DisplayServer.get_name() != "headless":
 		snapshot = get_viewport().get_texture().get_image()
@@ -210,21 +221,43 @@ func _switch_palette(dark: bool) -> void:
 	_minimap.queue_redraw()
 	for dir in _arrows:
 		_arrows[dir].refresh()
+	var lifted: Array[Node] = []
+	Motion.still = true
 	for cell in _panes:
 		var pane: Pane = _panes[cell]
 		if pane.shown:
 			pane.rebuild()
+			lifted.append_array(pane.keeps())
 		else:
 			pane.mark_dirty()
 	if snapshot == null or snapshot.is_empty():
+		_settle.call_deferred()
 		return
 	var cover := TextureRect.new()
 	cover.texture = ImageTexture.create_from_image(snapshot)
 	cover.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cover.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	cover.stretch_mode = TextureRect.STRETCH_SCALE
 	cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_modal_layer.add_child(cover)
-	Motion.fade(cover, 0.0, Motion.SLOW).tween_callback(cover.queue_free)
+	_fade_layer.add_child(cover)
+	_fading += 1
+	for node in lifted:
+		(node as CanvasItem).z_index = 1
+	await _settle()
+	Motion.fade(cover, 0.0, PALETTE_FADE).tween_callback(func():
+		cover.queue_free()
+		_fading -= 1
+		if _fading == 0:
+			for node in lifted:
+				if is_instance_valid(node):
+					(node as CanvasItem).z_index = 0)
+
+
+## Some screens start animations a frame after they're built, so animations
+## stay still until then.
+func _settle() -> void:
+	await get_tree().process_frame
+	Motion.still = false
 
 
 # --- Navigation --------------------------------------------------------------

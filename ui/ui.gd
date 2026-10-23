@@ -343,6 +343,42 @@ static func scroll_area(sideways: bool = false) -> ScrollContainer:
 	return sc
 
 
+## A scroll_area() for a list of cards that lets their shadows show: the
+## scrolling part reaches `room` past the holder's edges (into the screen's
+## gutter), with the same room inside it round `content`, so the cards line
+## up with everything above them yet aren't cut off flat at the sides. Put
+## the returned holder in the layout; `content` goes inside it, and the
+## ScrollContainer is the holder's only child.
+static func shadow_scroll(content: Control, room: int = 16) -> Control:
+	var holder := Control.new()
+	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sc := scroll_area()
+	sc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sc.offset_left = -room
+	sc.offset_top = -room
+	sc.offset_right = room
+	sc.offset_bottom = room
+	holder.add_child(sc)
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for side in ["left", "top", "right", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, room)
+	sc.add_child(margin)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(content)
+	# The scrollbar takes its width from the room on the right, not from the
+	# cards, so they keep lining up with what's above.
+	var bar := sc.get_v_scroll_bar()
+	var fit := func():
+		var used := int(bar.get_combined_minimum_size().x) if bar.visible else 0
+		margin.add_theme_constant_override("margin_right", maxi(0, room - used))
+	bar.visibility_changed.connect(fit)
+	fit.call()
+	return holder
+
+
 # --- Buttons -----------------------------------------------------------------
 
 ## A text button. `kind` picks the style: "primary" (ink), "accent" (green),
