@@ -35,3 +35,20 @@ func test_fraction() -> void:
 	eq(Collection.fraction(1, 4), 0.25)
 	eq(Collection.fraction(0, 0), 0.0, "nothing to have")
 	eq(Collection.fraction(5, 4), 1.0, "never more than all of it")
+
+
+const SORTABLE := [
+	{"id": "cat_rare", "animal": "cat", "rarity": "rare", "name": "Yarn"},
+	{"id": "dog_common", "animal": "dog", "rarity": "common", "name": "Bone"},
+	{"id": "dog_epic", "animal": "dog", "rarity": "epic", "name": "Collar"},
+	{"id": "cat_common", "animal": "cat", "rarity": "common", "name": "Mouse"},
+]
+
+
+func test_sort_gifts() -> void:
+	var ids := ["cat_rare", "dog_common", "dog_epic", "cat_common"]
+	eq(Collection.sort_gifts(ids, "rarity", false, SORTABLE, ANIMALS), ["dog_epic", "cat_rare", "dog_common", "cat_common"], "rarest first, then A-Z")
+	eq(Collection.sort_gifts(ids, "name", false, SORTABLE, ANIMALS), ["dog_common", "dog_epic", "cat_common", "cat_rare"], "A-Z")
+	eq(Collection.sort_gifts(ids, "animal", false, SORTABLE, ANIMALS), ["dog_common", "dog_epic", "cat_common", "cat_rare"], "pet type, commonest first")
+	eq(Collection.sort_gifts(ids, "name", true, SORTABLE, ANIMALS), ["cat_rare", "cat_common", "dog_epic", "dog_common"], "reversed")
+	eq(ids, ["cat_rare", "dog_common", "dog_epic", "cat_common"], "leaves the list it's given alone")
