@@ -85,7 +85,7 @@ func _ready() -> void:
 	row.add_child(_close)
 	row.add_child(UI.spacer())
 	_new = KnockoutButton.new(48)
-	_new.tooltip_text = "New pet"
+	_new.accessibility_name = "New pet"
 	_new.pressed.connect(_on_new)
 	row.add_child(_new)
 
@@ -196,7 +196,7 @@ func _place_buttons() -> Control:
 		var cell := UI.vbox(0)
 		var button := Button.new()
 		button.custom_minimum_size = Vector2(42, 42)
-		button.tooltip_text = b["name"]
+		button.accessibility_name = b["name"]
 		button.pressed.connect(_pick_place.bind(id))
 		cell.add_child(button)
 		_places[id] = button
@@ -207,7 +207,7 @@ func _place_buttons() -> Control:
 			button.add_child(lock)
 			var lv := UI.label("Lv %d" % Levels.unlock_level("place", id, Content.levels), 10, UI.ON_DARK_SOFT, false, 800)
 			lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			button.tooltip_text = "%s · unlocks at level %d" % [b["name"], Levels.unlock_level("place", id, Content.levels)]
+			button.accessibility_name = "%s · unlocks at level %d" % [b["name"], Levels.unlock_level("place", id, Content.levels)]
 			cell.add_child(lv)
 		row.add_child(cell)
 	_refresh_places()
@@ -405,8 +405,8 @@ func _show_mode(adopting: bool, select_id: String = "") -> void:
 	var hide_layer := _pick if adopting else _adopt_layer
 	var show_layer := _adopt_layer if adopting else _pick
 	_new.set_tick(adopting)
-	_new.tooltip_text = "Adopt" if adopting else "New pet"
-	_close.tooltip_text = "Cancel" if adopting else "Back"
+	_new.accessibility_name = "Adopt" if adopting else "New pet"
+	_close.accessibility_name = "Cancel" if adopting else "Back"
 	if not adopting:
 		_new.set_disabled_look(false)
 		_build_pick(select_id)
@@ -478,7 +478,7 @@ func _build_adopt() -> void:
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(52, 52)
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		b.tooltip_text = "%s colour" % COLOUR_ROLES[k]
+		b.accessibility_name = "%s colour" % COLOUR_ROLES[k]
 		b.pressed.connect(_pick_colour.bind(k))
 		cell.add_child(b)
 		var l := UI.caption(COLOUR_ROLES[k])
@@ -618,7 +618,7 @@ func _field(placeholder: String, max_length: int, font_size: int) -> LineEdit:
 
 func _set_icon(b: Button, icon: String, tip: String) -> void:
 	b.icon = Icons.texture(icon, int(b.custom_minimum_size.x * 0.42), Color.WHITE, 2.6)
-	b.tooltip_text = tip
+	b.accessibility_name = tip
 
 
 ## An animal standing on a soft shadow, for the carousels. `locked_at` > 0

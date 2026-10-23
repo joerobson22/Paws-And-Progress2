@@ -11,6 +11,9 @@ var shown := false
 var wide := false
 var scroll: ScrollContainer
 
+## Room kept clear under a screen's content for the minimap.
+const BOTTOM_CLEAR := 96
+
 var _dirty := true
 var _resize_queued := false
 
@@ -108,7 +111,7 @@ func page(max_width: float = 680.0, gap: int = 18, fill_height: bool = false) ->
 	margin.add_theme_constant_override("margin_left", gutter + int(insets["left"]))
 	margin.add_theme_constant_override("margin_right", gutter + int(insets["right"]))
 	margin.add_theme_constant_override("margin_top", 26 + int(insets["top"]))
-	margin.add_theme_constant_override("margin_bottom", 96 + int(insets["bottom"]))
+	margin.add_theme_constant_override("margin_bottom", BOTTOM_CLEAR + int(insets["bottom"]))
 	scroll.add_child(margin)
 	var column := UI.vbox(gap)
 	column.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -117,3 +120,33 @@ func page(max_width: float = 680.0, gap: int = 18, fill_height: bool = false) ->
 	if fill_height:
 		column.custom_minimum_size.y = maxf(0.0, size.y - 122.0 - insets["top"] - insets["bottom"])
 	return column
+
+
+## A column filling the pane exactly, centred and at most `max_width` wide,
+## clear of the notch at the top and the minimap at the bottom. Unlike
+## page() it never scrolls: whatever's in it has to fit, so give the parts
+## that can give way SIZE_EXPAND_FILL, and put long lists in a
+## UI.scroll_area() of their own. Returns the column to fill.
+func frame(max_width: float = 680.0, gap: int = 18) -> VBoxContainer:
+	var insets := UI.safe_insets(self)
+	var gutter := 32.0 if wide else 18.0
+	var width := maxf(0.0, minf(max_width, size.x - 2.0 * gutter - insets["left"] - insets["right"]))
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.clip_contents = true
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", int(gutter + insets["left"]))
+	margin.add_theme_constant_override("margin_right", int(gutter + insets["right"]))
+	margin.add_theme_constant_override("margin_top", 26 + int(insets["top"]))
+	margin.add_theme_constant_override("margin_bottom", BOTTOM_CLEAR + int(insets["bottom"]))
+	add_child(margin)
+	var column := UI.vbox(gap)
+	column.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	column.custom_minimum_size.x = width
+	margin.add_child(column)
+	return column
+
+
+## The pane's title with its app-map icon beside it (UI.title_row).
+func title_row(title: String) -> HBoxContainer:
+	return UI.title_row(title, Minimap.ICONS.get(name.to_lower(), ""))

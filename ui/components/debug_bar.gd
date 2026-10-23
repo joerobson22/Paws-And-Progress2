@@ -27,7 +27,7 @@ func _init() -> void:
 
 func _switch(grid: GridContainer, title: String, tip: String, on: bool, setting: String) -> void:
 	var sw := Switch.new(on)
-	sw.tooltip_text = tip
+	sw.accessibility_name = tip
 	sw.toggled.connect(func(value: bool): App.set_setting(setting, value))
 	grid.add_child(sw)
 	var words := UI.label(title, 13, UI.INK_SOFT, false, 800)
@@ -40,8 +40,7 @@ static func weather_picker() -> Dropdown:
 	var options := [["live", "Live"]]
 	for kind in Weather.KINDS:
 		options.append([kind, Weather.look(kind, Content.weathers)["name"]])
-	var pick := Dropdown.new(options, Outdoors.override if Outdoors.override != "" else "live", false, "Weather")
-	pick.tooltip_text = "Preview the weather (debug builds only)"
+	var pick := Dropdown.new(options, Outdoors.override if Outdoors.override != "" else "live", false, "Weather", false)
 	pick.chosen.connect(func(option: String, _reversed: bool): Outdoors.override = "" if option == "live" else option)
 	return pick
 
@@ -53,7 +52,6 @@ static func time_buttons() -> HBoxContainer:
 	for minutes in STEPS:
 		var b := Button.new()
 		b.text = "+%d" % minutes
-		b.tooltip_text = "Add %d minutes to the walk (debug builds only)" % minutes
 		b.custom_minimum_size = Vector2(46, 32)
 		b.add_theme_font_size_override("font_size", 13)
 		UI.style_button(b, UI.GLASS, Color.WHITE, 999)

@@ -22,7 +22,7 @@ func build() -> void:
 		_week = Stats.week_start(today)
 	var col := page(1000 if wide else 680)
 
-	var head := UI.title_row("Stats")
+	var head := title_row("Stats")
 	head.add_child(_streak())
 	col.add_child(head)
 
@@ -73,7 +73,6 @@ func _streak() -> Control:
 	sb.content_margin_left = 14
 	sb.content_margin_right = 16
 	pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	pill.tooltip_text = "Focus %d+ minutes a day to keep it going. After %d days in a row you can rest for a day without losing it." % [floori(Stats.STREAK_MIN_SECONDS / 60.0), Stats.REST_DAY_AFTER]
 	var row := UI.hbox(10)
 	pill.add_child(row)
 	row.add_child(UI.icon_rect("flame", 26, UI.FLAME if days > 0 else UI.INK_FAINT))
@@ -300,13 +299,6 @@ class _Chart extends Control:
 			if (piece[0] as Rect2).grow_individual(6, 1, 6, 1).has_point(p):
 				return piece
 		return []
-
-	func _get_tooltip(at: Vector2) -> String:
-		var hit := _piece_at(at)
-		if hit.is_empty():
-			return ""
-		var p := App.state.project(hit[1])
-		return "%s: %s" % [p.name if p else "Deleted project", Stats.format_duration(int(days[hit[2]][hit[1]]))]
 
 	func _draw() -> void:
 		_pieces.clear()

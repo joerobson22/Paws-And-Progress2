@@ -5,15 +5,13 @@ extends Pane
 ## everything levelling up unlocks), and your account details. Under them,
 ## your achievements fill the rest of the screen, as many medals as fit, so
 ## the page never needs scrolling; tap them for the full list. The gear in
-## the top left opens the settings.
+## the top right opens the settings.
 
 
 func build() -> void:
 	var col := page(720, 16, true)
-	var head := UI.title_row("Profile")
-	var gear := UI.round_button("gear", "Settings", open_settings, UI.SURFACE, UI.INK, 44)
-	head.add_child(gear)
-	head.move_child(gear, 0)
+	var head := title_row("Profile")
+	head.add_child(UI.round_button("gear", "Settings", open_settings, UI.SURFACE, UI.INK, 44))
 	col.add_child(head)
 	var p := App.state.profile
 
@@ -58,8 +56,8 @@ func _figure() -> Control:
 	figure.add_child(level)
 	var badge := level.badge()
 	badge.mouse_filter = Control.MOUSE_FILTER_STOP
-	badge.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	badge.tooltip_text = "Levels and rewards"
+	badge.mouse_default_cursor_shape = Cursor.HOVER
+	badge.accessibility_name = "Levels and rewards"
 	Press.attach(badge).tapped.connect(open_rewards)
 	var shine := Glint.new(0.5)
 	badge.add_child(shine)
@@ -204,7 +202,7 @@ func _toggle(title: String, detail: String, key: String) -> Control:
 	text.add_child(UI.para(detail, 13))
 	row.add_child(text)
 	var sw := Switch.new(bool(App.state.settings.get(key, false)))
-	sw.tooltip_text = title
+	sw.accessibility_name = title
 	sw.toggled.connect(func(on: bool):
 		App.set_setting(key, on)
 		if key == "ambience":
@@ -226,7 +224,7 @@ func _location_toggle() -> Control:
 	text.add_child(UI.para(detail, 13))
 	row.add_child(text)
 	var sw := Switch.new(Outdoors.enabled())
-	sw.tooltip_text = "Local sunrise and weather"
+	sw.accessibility_name = "Local sunrise and weather"
 	sw.toggled.connect(Outdoors.set_enabled)
 	row.add_child(sw)
 	return row
@@ -435,8 +433,8 @@ class _MedalCard extends PanelContainer:
 		b.set_content_margin_all(16)
 		add_theme_stylebox_override("panel", b)
 		mouse_filter = Control.MOUSE_FILTER_STOP
-		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		tooltip_text = "See every achievement"
+		mouse_default_cursor_shape = Cursor.HOVER
+		accessibility_name = "See every achievement"
 		# A plain Control: the medals inside don't make the card any taller.
 		_room.custom_minimum_size.y = _Medal.HEIGHT
 		_room.mouse_filter = Control.MOUSE_FILTER_IGNORE

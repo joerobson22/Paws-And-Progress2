@@ -12,12 +12,7 @@ func build() -> void:
 	var col := page(720)
 	var done := App.state.completed_projects()
 	done.sort_custom(func(a, b): return a.completed_unix > b.completed_unix)
-	var total := 0
-	for p in done:
-		total += App.state.project_seconds(p.id)
-	var sub := "Finished projects land here" if done.is_empty() else \
-		"%d finished · %s of focus between them" % [done.size(), Stats.format_duration(total)]
-	col.add_child(UI.title_row("Completed", sub))
+	col.add_child(title_row("Completed"))
 	if done.is_empty():
 		var empty := UI.card(UI.SURFACE, 24)
 		var v := UI.vbox(6)
@@ -77,7 +72,7 @@ func _grade_choice(ref: String, p: ProjectData, m: Modal) -> Control:
 	var g := Content.grade(ref)
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(66, 72)
-	b.tooltip_text = g.get("name", "")
+	b.accessibility_name = g.get("name", "")
 	var on := p.grade == ref
 	UI.style_button(b, UI.ACCENT_SOFT if on else UI.SURFACE_SOFT, UI.INK, 18)
 	if on:

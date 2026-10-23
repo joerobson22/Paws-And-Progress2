@@ -80,6 +80,7 @@ func _ready() -> void:
 		_panes[cell] = pane
 		_names[cell] = pane_name
 
+	add_child(Cursor.new())
 	_minimap = Minimap.new()
 	_minimap.cells = _names
 	_minimap.picked.connect(_go_cell)
