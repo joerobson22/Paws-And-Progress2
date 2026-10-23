@@ -818,6 +818,9 @@ func _stats_and_friends(main: Node) -> void:
 		var bottom := stats_pane.get_global_rect().end.y - 90.0
 		check(board.get_global_rect().end.y <= bottom, "the leaderboard fits above the map")
 		check(stats_pane._chart.size.y >= 100.0, "the chart keeps room to read")
+		var board_rect: Rect2 = board.get_global_rect()
+		var seen_me := func(n): return n is Control and n.has_meta("press") and n.accessibility_name == "Your profile" and n.is_visible_in_tree() and board_rect.encloses(n.get_global_rect())
+		check(_all(board, seen_me).size() == 1, "your row always shows on the leaderboard card")
 	check(_find(board, func(n): return n is TextureRect and n.texture == _class("res://ui/icons.gd").texture("trophy", 22, _class("res://ui/ui.gd").ACCENT)) != null, "a trophy by the heading")
 	var full: Button = _find(board, func(n): return n is Button and n.text == "See full")
 	check(full != null, "a See full button")

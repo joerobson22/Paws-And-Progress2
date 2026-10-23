@@ -3,10 +3,20 @@ extends PanelContainer
 ## The friends leaderboard: a card with a trophy and "Friends leaderboard"
 ## across the top, "See full" on the right, and everyone's week under it,
 ## most focus first. The heading stays put while the rows scroll. "See full"
-## opens the whole list in a popup. Tapping a friend's face or name opens
-## their profile; tapping yours goes to your profile screen.
+## opens the whole list in a popup. When you're further down than the card
+## shows, your row takes its last spot, so you can always see where you
+## are. It only ever shows whole rows. Tapping a friend's face or name
+## opens their profile; tapping yours goes to your profile screen.
+
+## A row and the line under it.
+const ROW_PITCH := 57.0
 
 var rows: Array
+var _holder: Control
+var _scroll: ScrollContainer
+var _list_box: VBoxContainer
+var _pinned: Control
+var _mine: Control
 
 
 ## `list` is rows from Friends.ranked(). `note` shows under the rows when
@@ -47,24 +57,68 @@ func _init(list: Array, note: String = "") -> void:
 		head.add_child(full)
 	column.add_child(head)
 
-	var sc := UI.scroll_area()
-	sc.custom_minimum_size.y = 56
-	column.add_child(sc)
-	var list_box := _list(list)
-	list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# The list and your pinned row are placed by hand in here (see _fit), so
+	# their heights never push the card taller.
+	_holder = Control.new()
+	_holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_holder.custom_minimum_size.y = ROW_PITCH
+	_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_holder)
+	_scroll = UI.scroll_area()
+	_holder.add_child(_scroll)
+	_list_box = _list(list)
+	_list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if list.size() <= 1 and note != "":
-		list_box.add_child(UI.divider())
+		_list_box.add_child(UI.divider())
 		var words := UI.para(note, 13, UI.INK_FAINT)
 		var pad := MarginContainer.new()
 		pad.add_theme_constant_override("margin_top", 10)
 		pad.add_theme_constant_override("margin_bottom", 10)
 		pad.add_child(words)
-		list_box.add_child(pad)
+		_list_box.add_child(pad)
 	var room := MarginContainer.new()
 	room.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	room.add_child(list_box)
-	sc.add_child(room)
-	UI.clear_of_bar(sc, room)
+	room.add_child(_list_box)
+	_scroll.add_child(room)
+	UI.clear_of_bar(_scroll, room)
+
+	# Your row again, for when yours is out of sight below.
+	var at := list.find_custom(func(r): return r.get("me", false))
+	if at >= 0:
+		_mine = _list_box.get_child(at * 2)
+		_pinned = UI.vbox(0)
+		_pinned.add_child(UI.divider())
+		_pinned.add_child(row(at + 1, list[at]))
+		_pinned.visible = false
+		_holder.add_child(_pinned)
+	_holder.resized.connect(_fit)
+	# Your row's place is only known once the list is laid out.
+	_list_box.resized.connect(_fit, CONNECT_DEFERRED)
+	_scroll.get_v_scroll_bar().value_changed.connect(func(_v): _fit())
+
+
+## Sizes the list to as many whole rows as fit, so none is cut in half, and
+## pins your row at the bottom while yours is further down than that.
+func _fit() -> void:
+	var room := _holder.size
+	var pin_height := _pinned.get_combined_minimum_size().y if _pinned else 0.0
+	var pin: bool = _pinned != null and _mine.position.y + _mine.size.y - _scroll.scroll_vertical > _whole_rows(room.y) + 1.0
+	var list_height := _whole_rows(room.y - pin_height if pin else room.y)
+	_scroll.position = Vector2.ZERO
+	_scroll.size = Vector2(room.x, list_height)
+	if _pinned:
+		_pinned.visible = pin
+		_pinned.position = Vector2(0, list_height)
+		# As wide as the list, so its time lines up with theirs by the scrollbar.
+		_pinned.size = Vector2(_list_box.size.x if _list_box.size.x > 0.0 else room.x, pin_height)
+
+
+## The height of as many whole rows as fit in `room` (all of them when they do).
+func _whole_rows(room: float) -> float:
+	var all := _list_box.get_combined_minimum_size().y
+	if all <= room:
+		return all
+	return maxf(0.0, floorf((room + 1.0) / ROW_PITCH) * ROW_PITCH - 1.0)
 
 
 ## Everyone in a popup titled "Friend leaderboard". The title stays at the

@@ -76,7 +76,8 @@ func build() -> void:
 	var mine := Stats.week_total(App.state.sessions, Stats.week_start(today), App.tz_bias())
 	var board := Leaderboard.new(Friends.ranked(App.friends, mine, App.state.active != null),
 		"Friends join you here once accounts arrive: you'll see their weeks, and who's out walking right now.")
-	board.custom_minimum_size.y = 128
+	# At least a row and yours: a friend above you, then your pinned row.
+	board.custom_minimum_size.y = 180 if wide else 128
 	col.add_child(board)
 	_select_week(_week, false)
 
@@ -129,13 +130,14 @@ func _history(today: int) -> Control:
 		var b := _week_button(w, int(totals.get(w, 0)), best, today)
 		list.add_child(b)
 		_weeks[w] = b
-	var sc := ScrollContainer.new()
 	if wide:
-		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	else:
-		sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		sc.custom_minimum_size.y = 84
+		# Scrolls without cutting the cards' shadows off at the sides.
+		var holder := UI.shadow_scroll(list)
+		holder.size_flags_horizontal = Control.SIZE_FILL
+		return holder
+	var sc := ScrollContainer.new()
+	sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.custom_minimum_size.y = 84
 	sc.add_child(list)
 	return sc
 
@@ -143,8 +145,9 @@ func _history(today: int) -> Control:
 func _week_button(w: int, seconds: int, best: int, today: int) -> Button:
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(0 if wide else 132, 70)
-	b.clip_contents = true
+	# The words clip, not the button, or its shadow would be cut off.
 	var v := UI.vbox(2)
+	v.clip_contents = true
 	v.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	v.offset_left = 14
 	v.offset_right = -14
