@@ -1,8 +1,14 @@
 extends Pane
 ## Stats, below the focus screen. This week's focus as a bar per day, each
-## bar split by project (tap a piece for that project's details), your past
-## weeks beside it (tap one to chart it), your streak in the top right, and
-## the friends leaderboard underneath.
+## bar split by project (tap a piece, or a project in the sideways strip
+## under the chart, for that project's details), your past weeks beside it
+## (tap one to chart it), your streak in the top right (a shield on the
+## flame when you've earned a day off), and the friends leaderboard
+## underneath. It all fits the screen; only the strips and the leaderboard
+## scroll.
+
+## Project names in the strip under the chart are cut to this many letters.
+const CHIP_LETTERS := 10
 
 const DAY_NAMES := ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const DAY_WORDS := ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -12,7 +18,7 @@ var _week := -1
 var _chart: _Chart
 var _chart_title: Label
 var _chart_total: Label
-var _legend: HFlowContainer
+var _legend: HBoxContainer
 var _weeks: Dictionary = {}  # week start -> history button
 
 
@@ -20,7 +26,7 @@ func build() -> void:
 	var today := App.today()
 	if _week < 0 or _week > Stats.week_start(today):
 		_week = Stats.week_start(today)
-	var col := page(1000 if wide else 680)
+	var col := frame(1000 if wide else 680, 14)
 
 	var head := title_row("Stats")
 	head.add_child(_streak())
@@ -28,7 +34,8 @@ func build() -> void:
 
 	var chart_card := UI.card(UI.SURFACE, 20)
 	chart_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var c := UI.vbox(12)
+	chart_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var c := UI.vbox(10)
 	chart_card.add_child(c)
 	var chart_head := UI.hbox(8)
 	_chart_title = UI.label("", 20, UI.INK, true, 600)
@@ -38,56 +45,67 @@ func build() -> void:
 	chart_head.add_child(_chart_total)
 	c.add_child(chart_head)
 	_chart = _Chart.new()
-	_chart.custom_minimum_size.y = 230
+	_chart.custom_minimum_size.y = 100
+	_chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_chart.segment_tapped.connect(_show_project)
 	c.add_child(_chart)
-	_legend = HFlowContainer.new()
-	_legend.add_theme_constant_override("h_separation", 8)
-	_legend.add_theme_constant_override("v_separation", 8)
-	c.add_child(_legend)
+	var strip := UI.scroll_area(true)
+	strip.custom_minimum_size.y = 34
+	var strip_room := MarginContainer.new()
+	_legend = UI.hbox(8)
+	strip_room.add_child(_legend)
+	strip.add_child(strip_room)
+	UI.clear_of_bar(strip, strip_room, 8)
+	c.add_child(strip)
 
+	# The chart gets the most room; the leaderboard the rest.
 	var history := _history(today)
 	if wide:
 		var row := UI.hbox(16)
-		history.custom_minimum_size = Vector2(230, 0)
+		row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		row.size_flags_stretch_ratio = 1.5
+		history.custom_minimum_size.x = 230
 		row.add_child(history)
 		row.add_child(chart_card)
 		col.add_child(row)
-		# The history column scrolls within the chart's height.
-		chart_card.resized.connect(func(): history.custom_minimum_size.y = chart_card.size.y)
 	else:
+		chart_card.size_flags_stretch_ratio = 1.5
 		col.add_child(chart_card)
 		col.add_child(history)
 
-	col.add_child(UI.caption("Friends this week"))
-	col.add_child(_leaderboard(today))
+	var mine := Stats.week_total(App.state.sessions, Stats.week_start(today), App.tz_bias())
+	var board := Leaderboard.new(Friends.ranked(App.friends, mine, App.state.active != null),
+		"Friends join you here once accounts arrive: you'll see their weeks, and who's out walking right now.")
+	board.custom_minimum_size.y = 128
+	col.add_child(board)
 	_select_week(_week, false)
 
 
+## Your streak: the flame with how many days, and a see-through blue
+## shield over the flame's corner when you've earned a day off.
 func _streak() -> Control:
 	var sessions := App.state.sessions
 	var days := Stats.current_streak(sessions, App.today(), App.tz_bias())
 	var rest_ready := Stats.rest_day_ready(sessions, App.today(), App.tz_bias())
-	var pill := UI.card(UI.SURFACE, 12, 20)
-	var sb: StyleBoxFlat = pill.get_theme_stylebox("panel")
-	sb.content_margin_left = 14
-	sb.content_margin_right = 16
-	pill.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	var row := UI.hbox(10)
-	pill.add_child(row)
-	row.add_child(UI.icon_rect("flame", 26, UI.FLAME if days > 0 else UI.INK_FAINT))
-	var v := UI.vbox(0)
-	v.add_child(UI.label("%d day%s" % [days, "" if days == 1 else "s"], 18, UI.INK, true, 600))
+	var row := UI.hbox(8)
+	row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.accessibility_name = "%d day streak%s" % [days, ", day off earned" if rest_ready else ""]
+	var flame := Control.new()
+	flame.custom_minimum_size = Vector2(34, 34)
+	flame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	flame.add_child(UI.icon_rect("flame", 32, UI.FLAME if days > 0 else UI.INK_FAINT))
 	if rest_ready:
-		var rest := UI.hbox(4)
-		rest.add_child(UI.icon_rect("moon", 12, UI.ACCENT))
-		rest.add_child(UI.label("Rest day ready", 12, UI.ACCENT, false, 800))
-		v.add_child(rest)
-	else:
-		v.add_child(UI.label("streak", 12, UI.INK_SOFT, false, 800))
-	row.add_child(v)
-	UI.ignore_mouse(pill)
-	return pill
+		# A ring of page colour round the shield keeps it apart from the flame.
+		var cut := UI.icon_rect("shield", 22, UI.BG)
+		cut.position = Vector2(15, 14)
+		flame.add_child(cut)
+		var shield := UI.icon_rect("shield", 18, Color(Content.rarity_colour("rare"), 0.6))
+		shield.position = Vector2(17, 16)
+		flame.add_child(shield)
+	row.add_child(flame)
+	row.add_child(UI.label("%d day%s" % [days, "" if days == 1 else "s"], 22, UI.INK, true, 600))
+	UI.ignore_mouse(row)
+	return row
 
 
 ## Past weeks, newest first: a column beside the chart on wide screens, a
@@ -166,7 +184,10 @@ func _select_week(w: int, animate: bool = true) -> void:
 
 func _legend_chip(project_id: String, seconds: int) -> Control:
 	var p := App.state.project(project_id)
-	var b := UI.button("%s  %s" % [p.name if p else "Deleted project", Stats.format_duration(seconds)], _show_project.bind(project_id, -1), "quiet")
+	var title: String = p.name if p else "Deleted project"
+	if title.length() > CHIP_LETTERS:
+		title = title.left(CHIP_LETTERS).strip_edges() + "..."
+	var b := UI.button("%s  %s" % [title, Stats.format_duration(seconds)], _show_project.bind(project_id, -1), "quiet")
 	b.custom_minimum_size.y = 34
 	b.add_theme_font_size_override("font_size", 13)
 	b.icon = Icons.texture("dot", 12, UI.series_colour(project_id))
@@ -204,57 +225,6 @@ func _show_project(project_id: String, day: int) -> void:
 	m.body.add_child(panel)
 	if not p.is_complete():
 		m.body.add_child(UI.para("Still in progress. Its panel moves to Completed when you finish it.", 13, UI.INK_FAINT))
-
-
-func _leaderboard(today: int) -> Control:
-	var card := UI.card(UI.SURFACE, 10)
-	var list := UI.vbox(0)
-	card.add_child(list)
-	var mine := Stats.week_total(App.state.sessions, Stats.week_start(today), App.tz_bias())
-	var rows: Array = [{"name": "You", "weekly_seconds": mine, "walking": App.state.active != null, "look": {}, "me": true}]
-	rows.append_array(App.friends)
-	rows.sort_custom(func(a, b): return int(a["weekly_seconds"]) > int(b["weekly_seconds"]))
-	for i in rows.size():
-		if i > 0:
-			list.add_child(UI.divider())
-		list.add_child(_leader_row(i + 1, rows[i]))
-	if App.friends.is_empty():
-		list.add_child(UI.divider())
-		var soon := UI.para("Friends join you here once accounts arrive: you'll see their weeks, and who's out walking right now.", 13, UI.INK_FAINT)
-		var pad := MarginContainer.new()
-		for side in ["left", "right", "top", "bottom"]:
-			pad.add_theme_constant_override("margin_" + side, 12)
-		pad.add_child(soon)
-		list.add_child(pad)
-	return card
-
-
-func _leader_row(rank: int, f: Dictionary) -> Control:
-	var row := UI.hbox(12)
-	var pad := MarginContainer.new()
-	for side in ["left", "right"]:
-		pad.add_theme_constant_override("margin_" + side, 10)
-	pad.add_theme_constant_override("margin_top", 8)
-	pad.add_theme_constant_override("margin_bottom", 8)
-	pad.add_child(row)
-	var r := UI.label(str(rank), 15, UI.INK_FAINT, true, 600)
-	r.custom_minimum_size.x = 18
-	r.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(r)
-	var face := UI.character_portrait(f.get("look", {}), Vector2(44, 44), true)
-	row.add_child(face)
-	var who := UI.trimmed(str(f.get("name", "")), 16, UI.INK, false, 800 if f.get("me", false) else 700)
-	who.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(who)
-	if f.get("walking", false):
-		var walking := WalkingIndicator.new()
-		walking.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(walking)
-	else:
-		var t := UI.label(Stats.format_duration(int(f.get("weekly_seconds", 0))), 16, UI.INK, true, 600)
-		t.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		row.add_child(t)
-	return pad
 
 
 ## The week's bars: one per day, stacked by project, tappable piece by piece.

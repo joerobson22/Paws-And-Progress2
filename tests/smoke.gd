@@ -417,6 +417,7 @@ func _run() -> void:
 	await _wait(25)
 	await _shot("stats_popup")
 	_close_modal()
+	await _stats_and_friends(main)
 	main._panes[Vector2i(0, 1)]._select_week(main._panes[Vector2i(0, 1)]._week - 7)
 	await _wait(10)
 
@@ -792,12 +793,96 @@ func _fill_sample_data() -> void:
 	app.state.inventory["bird_epic"] = 1
 	app.state.place_on_shelf("staffy_common", 0)
 	app.state.place_on_shelf("bird_epic", 2)
-	app.friends = [
-		{"name": "Sam", "weekly_seconds": 9 * 3600, "walking": true, "look": {"skin_tone": 3, "hair_tone": 0, "cosmetics": {"hair": "hair_curly", "hat": "hat_beanie"}}},
-		{"name": "Priya", "weekly_seconds": 6 * 3600 + 1200, "walking": false, "look": {"skin_tone": 2, "hair_tone": 0, "cosmetics": {"hair": "hair_long", "face": "face_smile"}}},
-		{"name": "Alex", "weekly_seconds": 2 * 3600, "walking": false, "look": {"skin_tone": 0, "hair_tone": 3, "cosmetics": {"hair": "hair_bun", "hat": "hat_cap"}}},
-	]
+	app.friends = _class("res://core/friends.gd").sample()
 	app.state_changed.emit()
+
+
+## Stats fits the screen, with the friends leaderboard under the chart;
+## "See full" lists everyone, and tapping a friend opens their profile.
+func _stats_and_friends(main: Node) -> void:
+	var app := _app()
+	var modal_class := _class("res://ui/modal.gd")
+	var stats_pane: Control = main._panes[Vector2i(0, 1)]
+	check(stats_pane.scroll == null, "stats doesn't scroll as a page")
+	var streak: Label = _find(stats_pane, func(n): return n is Label and n.text.ends_with(" days"))
+	check(streak != null and _find(stats_pane, func(n): return n is Label and n.text == "streak") == null, "the streak just says how many days")
+	var chips: Array = _all(stats_pane._legend, func(n): return n is Button)
+	check(chips.size() > 1 and chips.all(func(b): return b.text.split("  ")[0].length() <= 13), "project names in the strip are cut to 10 letters")
+	check(chips.any(func(b): return b.text.begins_with("Dissertati...")), "a long name ends in ...")
+	check(stats_pane._legend.get_parent().get_parent() is ScrollContainer, "the projects scroll sideways")
+	var board: Control = _find(stats_pane, func(n): return _is(n, "leaderboard.gd"))
+	check(board != null and board.rows.size() == app.friends.size() + 1, "the leaderboard has you and every friend")
+	if board == null:
+		return
+	if main.size.y >= 590:
+		var bottom := stats_pane.get_global_rect().end.y - 90.0
+		check(board.get_global_rect().end.y <= bottom, "the leaderboard fits above the map")
+		check(stats_pane._chart.size.y >= 100.0, "the chart keeps room to read")
+	check(_find(board, func(n): return n is TextureRect and n.texture == _class("res://ui/icons.gd").texture("trophy", 22, _class("res://ui/ui.gd").ACCENT)) != null, "a trophy by the heading")
+	var full: Button = _find(board, func(n): return n is Button and n.text == "See full")
+	check(full != null, "a See full button")
+	if full:
+		await _tap_control(full, main)
+	check(modal_class.is_open() and _find(modal_class.top(), func(n): return n is Label and n.text == "Friend leaderboard") != null, "See full opens the whole leaderboard")
+	if modal_class.is_open():
+		check(_all(modal_class.top().body, func(n): return n.has_meta("press")).size() == app.friends.size() + 1, "everyone is in it")
+		await _shot("leaderboard_full")
+		_close_modal()
+		await _wait(20)
+
+	# Tapping a friend's name opens their profile, over everything.
+	var friend_row: Control = _find(board, func(n): return n.has_meta("press") and n.accessibility_name == "Mei's profile")
+	check(friend_row != null, "friends' names can be tapped")
+	if friend_row:
+		await _tap_control(friend_row, main)
+	var popup: Node = modal_class.top() if modal_class.is_open() else null
+	check(popup != null and _find(popup, func(n): return n is Label and n.text == "Mei") != null, "it opens their profile")
+	if popup:
+		check(_find(popup, func(n): return n is Label and n.text == "University of York") != null, "with where they study")
+		check(_find(popup, func(n): return _is(n, "medal_card.gd")) != null, "and their achievements")
+		await _shot("friend_profile")
+		var tile: Control = _find(popup, func(n): return _is(n, "gift_tile.gd"))
+		check(tile != null and tile.tappable, "their shelf gifts can be tapped")
+		if tile:
+			await _tap_control(tile, main)
+			var details: Node = modal_class.top()
+			check(details != popup and _find(details, func(n): return n is Label and n.text.begins_with("You have")) == null
+				and _find(details, func(n): return n is Button and n.text.begins_with("Trade")) == null, "their gift shows without a count or trade-in")
+			await _shot("friend_gift")
+			_close_modal()
+			await _wait(20)
+		_close_modal()
+		await _wait(20)
+
+	# Tapping yourself goes to your profile.
+	var me_row: Control = _find(board, func(n): return n.has_meta("press") and n.accessibility_name == "Your profile")
+	if me_row:
+		await _tap_control(me_row, main)
+		await _wait(20)
+	check(main._at == main.PANES["profile"][0] and not modal_class.is_open(), "tapping yourself goes to your profile")
+	app.go("stats")
+	await _wait(50)
+
+
+## Taps `c`, scrolling it into view first. In the CI's tiny window it may
+## still be out of sight, so there it presses it directly.
+func _tap_control(c: Control, main: Node) -> void:
+	var n: Node = c.get_parent()
+	while n and not n is ScrollContainer:
+		n = n.get_parent()
+	if n:
+		(n as ScrollContainer).ensure_control_visible(c)
+		await _wait(5)
+	var at := c.get_global_rect().get_center()
+	if main.size.y >= 590 and Rect2(Vector2.ZERO, main.size).has_point(at):
+		await _drag(at, at, 1)
+	elif c is BaseButton:
+		c.pressed.emit()
+	elif c.has_meta("press"):
+		c.get_meta("press").tapped.emit()
+	elif _is(c, "gift_tile.gd"):
+		c.tapped.emit(c.gift_id)
+	await _wait(30)
 
 
 ## The shelf editor, open from the profile: putting gifts up, swapping,

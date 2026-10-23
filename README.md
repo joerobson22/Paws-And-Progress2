@@ -90,9 +90,15 @@ Tap a tile to go there, or anywhere else to shrink it back.
   focused, every gift found, and a set for each animal's gifts
   (`data/achievements.json`). The page never scrolls. The settings are
   behind the gear in the top right.
-- **Stats** (down): this week's focus split by project, past weeks with any
-  focus in them, your streak (one rest day allowed after three days in a row)
-  and the friends leaderboard.
+- **Stats** (down): this week's focus split by project (the projects scroll
+  sideways under the chart), past weeks with any focus in them, your streak
+  as a flame with the days beside it (a blue shield on the flame when you've
+  earned a rest day: one allowed after three days in a row), and the friends
+  leaderboard, which scrolls inside its card. "See full" lists everyone in a
+  popup. Tap a friend's face or name for their profile: their character,
+  where they study, when they joined, their week, their gift shelf (tap a
+  gift for a look) and their achievements. Tap yours for your profile. The
+  page never scrolls. Debug builds come with sample friends (`core/friends.gd`).
 
 On a walk, the button in the corner is a pie chart of the gift your pet will
 bring back. For the first ten minutes a dark green slice sweeps round; then it
@@ -182,6 +188,7 @@ core/            game logic, no UI
   levels.gd        XP from the walk log, levels, and what each one unlocks
   stats.gd         weekly totals, records, streaks (from the session log)
   achievements.gd  achievements and how far along each one is
+  friends.gd       the leaderboard order, and sample friends for debug builds
   collection.gd    the gifts screen's rings: discovered, gift tables, cosmetics
   models/          ProjectData, FocusSession resources
 data/            all content: animals, gifts, drop table, places (biomes),
@@ -199,6 +206,7 @@ ui/
   modal.gd         popups, confirmations, prompts, colour picker
   components/      orb, minimap, carousel, gift tile, grid, shelf and
                    details popup, medal card, stat panel, gift button,
+                   leaderboard, friend profile, profile card pieces,
                    project panel, character and animal drawings, ...
 tests/           headless unit tests and the smoke run
 ```
