@@ -109,11 +109,6 @@ func add_project(p: ProjectData) -> void:
 	_changed()
 
 
-func update_project(_p: ProjectData) -> void:
-	# Projects are edited in place; this just persists and notifies.
-	_changed()
-
-
 func delete_project(id: String) -> void:
 	state.projects.assign(state.projects.filter(func(p): return p.id != id))
 	_changed()
