@@ -372,6 +372,20 @@ static func shadow_scroll(content: Control, room: int = 16) -> Control:
 	return holder
 
 
+## Keeps `content` (a MarginContainer inside `sc`) clear of `sc`'s scrollbar:
+## while the bar shows, `gap` more room on its side (the right for a list
+## that scrolls down, the bottom for a sideways strip), so nothing touches
+## it; none when everything fits.
+static func clear_of_bar(sc: ScrollContainer, content: MarginContainer, gap: int = 10) -> void:
+	var sideways := sc.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED
+	var bar: ScrollBar = sc.get_h_scroll_bar() if sideways else sc.get_v_scroll_bar()
+	var side := "margin_bottom" if sideways else "margin_right"
+	var fit := func():
+		content.add_theme_constant_override(side, gap if bar.visible else 0)
+	bar.visibility_changed.connect(fit)
+	fit.call()
+
+
 # --- Buttons -----------------------------------------------------------------
 
 ## A text button. `kind` picks the style: "primary" (ink), "accent" (green),

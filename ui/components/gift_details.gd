@@ -2,11 +2,13 @@ class_name GiftDetails
 extends RefCounted
 ## A closer look at one gift, in a popup: its picture, rarity, which animal
 ## it's from, how many you have and its trade-in. Opened from the gifts
-## screen's collection, and after a trade for the gift it brought.
+## screen's collection, after a trade for the gift it brought, and from a
+## friend's shelf (just to look at: no count and no trade-in).
 
 
-## `fresh` celebrates a gift that's just arrived from a trade.
-static func open(id: String, fresh: bool = false) -> void:
+## `fresh` celebrates a gift that's just arrived from a trade. `yours` off
+## leaves out how many you have and the trade-in, for a friend's gift.
+static func open(id: String, fresh: bool = false, yours: bool = true) -> void:
 	var g := Content.gift(id)
 	if g.is_empty():
 		return
@@ -32,6 +34,8 @@ static func open(id: String, fresh: bool = false) -> void:
 		meta.add_child(UI.tag("NEW", UI.INK, UI.BG))
 	m.body.add_child(meta)
 	m.body.add_child(UI.para(g.get("description", ""), 16, UI.INK))
+	if not yours:
+		return
 	if g.has("slot"):
 		m.body.add_child(UI.para("Wearable (%s). Dress your character on your profile, above the focus screen." % Content.slot_name(g["slot"]).to_lower(), 14))
 	m.body.add_child(UI.label("You have %d" % count, 15, UI.INK_SOFT, false, 800))

@@ -63,54 +63,22 @@ func _figure() -> Control:
 ## Your name, where you study and when you joined: small, at the top.
 func _details() -> Control:
 	var p := App.state.profile
-	var info := UI.vbox(0)
 	var username := str(p.get("username", ""))
-	info.add_child(_field("Username", username if username != "" else "Add your name", username == "",
-		_edit.bind("username", "Your name", "What should we call you?", 24)))
-	info.add_child(UI.divider())
 	var school := str(p.get("institution", ""))
-	info.add_child(_field("School, college or university", school if school != "" else "Add where you study", school == "",
-		_edit.bind("institution", "Where do you study?", "e.g. University of Leeds", 60)))
-	info.add_child(UI.divider())
 	var joined := int(p.get("created_unix", 0))
-	info.add_child(_field("Joined", Stats.format_date(joined, App.tz_bias()) if joined > 0 else "Today", false, Callable()))
-	return info
-
-
-## A labelled detail; tappable to edit when `on_tap` is given.
-func _field(title: String, value: String, placeholder: bool, on_tap: Callable) -> Control:
-	var row := UI.hbox(8)
-	row.custom_minimum_size.y = 38
-	var text := UI.vbox(0)
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.alignment = BoxContainer.ALIGNMENT_CENTER
-	var cap := UI.caption(title)
-	cap.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	cap.clip_text = true
-	text.add_child(cap)
-	text.add_child(UI.trimmed(value, 15, UI.INK_FAINT if placeholder else UI.INK, false, 800))
-	row.add_child(text)
-	if on_tap.is_valid():
-		var b := UI.round_button("edit", "Edit %s" % title.to_lower(), on_tap, UI.SURFACE_SOFT, UI.INK, 28, false)
-		row.add_child(b)
-		row.mouse_filter = Control.MOUSE_FILTER_STOP
-		Press.attach(row).tapped.connect(on_tap)
-	return row
+	return ProfileCard.details([
+		ProfileCard.field("Username", username if username != "" else "Add your name", username == "",
+			_edit.bind("username", "Your name", "What should we call you?", 24)),
+		ProfileCard.field("School, college or university", school if school != "" else "Add where you study", school == "",
+			_edit.bind("institution", "Where do you study?", "e.g. University of Leeds", 60)),
+		ProfileCard.field("Joined", Stats.format_date(joined, App.tz_bias()) if joined > 0 else "Today"),
+	])
 
 
 ## Your gift shelf, along the bottom of the card, with a pencil that opens
 ## the shelf editor. The gifts here are only to look at.
 func _shelf() -> Control:
-	var v := UI.vbox(2)
-	var head := UI.hbox(8)
-	var cap := UI.caption("Gift shelf")
-	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	cap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(cap)
-	head.add_child(UI.round_button("edit", "Arrange your shelf", ShelfEditor.open, UI.SURFACE_SOFT, UI.INK, 28, false))
-	v.add_child(head)
-	v.add_child(GiftShelf.new(GiftShelf.mine(), 66.0 if wide else 60.0))
-	return v
+	return ProfileCard.shelf(GiftShelf.new(GiftShelf.mine(), 66.0 if wide else 60.0), ShelfEditor.open)
 
 
 func _edit(key: String, title: String, placeholder: String, max_length: int) -> void:
@@ -134,11 +102,7 @@ func _achievements() -> Control:
 	var rows := achievement_rows()
 	var section := UI.vbox(8)
 	section.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var head := UI.hbox(8)
-	head.add_child(UI.caption("Achievements"))
-	head.add_child(UI.spacer())
-	head.add_child(UI.caption("%d of %d" % [rows.filter(func(r): return r["earned"]).size(), rows.size()], UI.INK_FAINT))
-	section.add_child(head)
+	section.add_child(ProfileCard.achievements_head(rows))
 	var medals := MedalCard.new(rows)
 	medals.shrank.connect(func(): section.size_flags_vertical = Control.SIZE_FILL)
 	section.add_child(medals)
