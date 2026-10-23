@@ -152,6 +152,30 @@ func grade(ref: String) -> Dictionary:
 	return {}
 
 
+## Where a grade stands among every grade, best first, for sorting: [band,
+## scale, place]. Each scale's grades are spread over the same five bands
+## (the university classes), so a 9, an A* and a First share the top band;
+## within a band university comes first, then A-Level, then GCSE. Anything
+## without a grade sorts after all of them.
+func grade_rank(ref: String) -> Array:
+	var g := grade(ref)
+	if g.is_empty():
+		return [99, 99, 99]
+	var order := ["uni", "alevel", "gcse"]
+	for scale in grade_scales:
+		if scale["id"] != g["scale"]:
+			continue
+		var place := 0
+		for i in scale["grades"].size():
+			if scale["grades"][i]["id"] == g["id"]:
+				place = i
+		var last := maxi(1, scale["grades"].size() - 1)
+		var band := roundi(4.0 * place / last)
+		var which := order.find(g["scale"])
+		return [band, which if which >= 0 else order.size(), place]
+	return [99, 99, 99]
+
+
 # --- Quotes ------------------------------------------------------------------
 
 ## The same quote for the same key, so a walk keeps its quote across restarts.
