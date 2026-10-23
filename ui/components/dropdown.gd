@@ -127,7 +127,9 @@ func _open() -> void:
 	# Under the pill, or above it when there's no room underneath.
 	var y := at.end.y + 6.0
 	if y + card.size.y > _menu.size.y - 8.0:
-		y = maxf(8.0, at.position.y - 6.0 - card.size.y)
+		y = at.position.y - 6.0 - card.size.y
+	# Always on the screen, even if the pill itself is partly off it.
+	y = clampf(y, 8.0, maxf(8.0, _menu.size.y - card.size.y - 8.0))
 	card.position = Vector2(clampf(at.end.x - card.size.x, 8.0, _menu.size.x - card.size.x - 8.0), y)
 	card.modulate.a = 0.0
 	var t := Motion.tween(card, "menu")
