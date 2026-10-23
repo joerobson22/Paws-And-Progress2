@@ -12,6 +12,8 @@ const SORTS := [
 	["grade", "Grade"], ["pet", "Pet type"], ["name", "A–Z"],
 ]
 const SORT_KEY := "completed_sort"
+## The least height the list gets: about one project panel.
+const LIST_MIN := 170.0
 
 ## Which grading scale the picker opens on; remembered while the app runs.
 var _scale := ""
@@ -30,7 +32,8 @@ func build() -> void:
 		empty.add_child(v)
 		col.add_child(empty)
 		return
-	col.add_child(_stats(done, col.custom_minimum_size.x))
+	var stats := _stats(done, col.custom_minimum_size.x)
+	col.add_child(stats)
 
 	var head := UI.hbox(8)
 	var cap := UI.caption("Your projects")
@@ -45,11 +48,26 @@ func build() -> void:
 	col.add_child(head)
 
 	_list = UI.vbox(14)
-	var holder := UI.shadow_scroll(_list)
+	var inner := UI.vbox(14)
+	inner.add_child(_list)
+	var holder := UI.shadow_scroll(inner)
 	# Pane keeps this list's place when the screen rebuilds (e.g. on grading).
 	scroll = holder.get_child(0)
 	col.add_child(holder)
 	_fill_list()
+	_make_room(holder, stats, inner)
+
+
+## On a screen too short for the stats and a whole project under them, the
+## stats go to the top of the list and scroll away with it, so there's
+## always room for the list itself.
+func _make_room(holder: Control, stats: Control, inner: VBoxContainer) -> void:
+	await get_tree().process_frame
+	if not is_instance_valid(holder) or holder.size.y >= LIST_MIN:
+		return
+	stats.get_parent().remove_child(stats)
+	inner.add_child(stats)
+	inner.move_child(stats, 0)
 
 
 ## The four headline numbers. Side by side on a wide screen, two by two on
