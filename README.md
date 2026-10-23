@@ -67,9 +67,14 @@ Tap a tile to go there, or anywhere else to shrink it back.
   again and its arrow flips over to reverse it). Tap a gift for a closer look
   and its trade-in (10 commons for a rare, 5 rares for an epic, 3 epics for a
   legendary); trading away the last of a shelf gift takes it off the shelf.
-- **Completed** (right): a panel per finished project. Tap the circled "?" in
-  its corner to give it a GCSE, A-Level or university grade, and tap the grade
-  to change it.
+- **Completed** (right): four headline numbers (projects finished, their
+  total focus time, the biggest by focus time and the longest from start to
+  finish), then a scrolling list with a panel per finished project. "Sort by"
+  orders it by most gifts, biggest, longest, grade, pet type or A–Z; pick the
+  same option again to reverse it. Grades sort best first across scales (a
+  First, an A* and a 9 share the top band, university first). Tap the circled
+  "?" in a panel's corner to give it a GCSE, A-Level or university grade, and
+  tap the grade to change it.
 - **Profile** (up): one card with your character (the pencil customises it),
   your level badge in the bottom left (it shines under the pointer; tap it
   for every reward) and your XP along the bottom. Beside it, your details at

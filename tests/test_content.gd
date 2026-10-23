@@ -53,3 +53,13 @@ func test_trade_costs() -> void:
 func test_every_animal_can_dive() -> void:
 	for a in load_json("res://data/animals.json")["animals"]:
 		check(a.has("dive") and a["dive"].has("hops") and a["dive"].has("seconds"), a["id"])
+
+
+## Grades sort best first across scales: each scale spreads over the five
+## university classes, and within one of those university comes first.
+func test_grade_rank_orders_across_scales() -> void:
+	var content: Node = load("res://core/content.gd").new()
+	var refs := ["gcse/4", "", "alevel/a", "uni/upper_second", "gcse/9", "uni/first", "alevel/a_star", "gcse/8", "uni/fail"]
+	refs.sort_custom(func(a, b): return content.grade_rank(a) < content.grade_rank(b))
+	eq(refs, ["uni/first", "alevel/a_star", "gcse/9", "uni/upper_second", "alevel/a", "gcse/8", "gcse/4", "uni/fail", ""])
+	content.free()

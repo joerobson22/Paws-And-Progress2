@@ -265,6 +265,9 @@ func _run() -> void:
 	var ask: Control = _find(ungraded_panel, func(n): return n is Button) if ungraded_panel else null
 	check(ask != null and ask.get_child_count() == 1, "an ungraded project shows a \"?\"")
 	if ask:
+		# The list scrolls on its own: bring the panel into view first.
+		main._panes[Vector2i(1, 0)].scroll.ensure_control_visible(ungraded_panel)
+		await _wait(5)
 		# On its animal, top left (the middle can be under the minimap).
 		var on_panel: Vector2 = ungraded_panel.get_global_rect().position + Vector2(56, 44)
 		await _drag(on_panel, on_panel, 1)
@@ -279,6 +282,24 @@ func _run() -> void:
 			_close_modal()
 	app.set_grade(ungraded.id, kept_grade)
 	await _wait(10)
+
+	# Completed's own sort menu re-sorts just its list: the screen around it
+	# (and its stats) stays as it is.
+	var completed_pane: Node = main._panes[Vector2i(1, 0)]
+	var stats_panel: Node = _find(completed_pane, func(n): return _is(n, "stat_panel.gd"))
+	check(stats_panel != null, "completed shows its stats")
+	var done_sort: Node = _find(completed_pane, func(n): return _is(n, "dropdown.gd"))
+	done_sort._open()
+	await _wait(15)
+	await _shot("completed_sort")
+	await _tap_menu(done_sort, "Grade")
+	await _wait(15)
+	var first_panel: Node = _find(completed_pane, func(n): return _is(n, "project_panel.gd"))
+	var best: Array = completed_pane.sort_projects(app.state.completed_projects(), "grade", false)
+	check(app.state.settings.get("completed_sort") == "grade" and first_panel.project_id == best[0].id,
+		"sorting completed by grade puts the best first")
+	check(is_instance_valid(stats_panel), "sorting doesn't rebuild the screen")
+	await _shot("completed_by_grade")
 
 	app.go("profile")
 	await _wait(50)
@@ -612,12 +633,24 @@ func _run() -> void:
 	check(main._flows.is_empty(), "back home from the jungle")
 	check(_audio().current_ambience() == "", "the jungle's sounds stop at home")
 
-	# Dark mode: the sun in the corner switches the whole app.
-	var toggle: Node = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "theme_toggle.gd"))
+	# Dark mode: the sun in the corner switches the whole app, fading into
+	# the new colours with nothing on screen moving or starting over.
+	var focus_pane: Node = main._panes[Vector2i.ZERO]
+	var toggle: Node = _find(focus_pane, func(n): return _is(n, "theme_toggle.gd"))
+	var orb_before: Node = focus_pane._orb
+	var greeting_before: String = focus_pane._greeting.text
+	var orb_spot: Rect2 = orb_before.get_global_rect()
+	var greeting_end: Vector2 = focus_pane._greeting.get_global_rect().end
 	toggle._flip()
 	await _wait(60)
 	check(_class("res://ui/ui.gd").dark, "the toggle switches to dark mode")
 	check(app.state.settings.get("theme") == "dark", "dark mode is saved")
+	check(focus_pane._orb == orb_before and focus_pane._toggle == toggle, "the orb and the toggle carry on through the switch")
+	check(focus_pane._greeting.text == greeting_before and focus_pane._orb.get_global_rect().is_equal_approx(orb_spot)
+		and focus_pane._greeting.get_global_rect().end.is_equal_approx(greeting_end), "the greeting and layout stay put")
+	check(not toggle.disabled and not _class("res://ui/motion.gd").still, "the toggle can be tapped again, and animations are back on")
+	await _wait(30)
+	check(main._fade_layer.get_child_count() == 0 and toggle.z_index == 0, "the old colours have faded away")
 	await _shot("focus_dark")
 	for pane in ["gifts", "stats", "profile"]:
 		app.go(pane)
