@@ -2,8 +2,8 @@ extends Control
 ## App shell. Five panes are laid out like a plus sign with the focus screen
 ## in the middle: gifts to the left, completed projects to the right, your
 ## profile above and stats below. Swipe between them, use the arrow keys
-## (Esc comes back to the middle), or tap the minimap to open it up and pick
-## one. Every pane is built once and kept, so each one is as you left it when
+## (Esc comes back to the middle), click the big faint arrows at the edges
+## (computers), or open the minimap in the bottom left corner and pick one. Every pane is built once and kept, so each one is as you left it when
 ## you come back. Full-screen flows (choosing a focus, the walk, the end of a
 ## walk) open over everything through a growing circle.
 ## Screens ask to move with App.go().
@@ -28,8 +28,8 @@ const PHONE_MIN_SHORT_SIDE := 360.0
 ## Computers: the window's short side in design units, whatever its size.
 const DESKTOP_SHORT_SIDE := 600.0
 const MIN_DESKTOP_SCALE := 0.75
-## The debug "phone size" switch shows the app at this size, letterboxed.
-const PHONE_VIEW := Vector2i(390, 844)
+## The minimap's gap from the bottom left corner.
+const MAP_INSET := 18.0
 ## A drag becomes a swipe once it moves this far...
 const SWIPE_START := 16.0
 ## ...and goes through when let go past this much of the screen, or flicked.
@@ -45,7 +45,10 @@ var _flow_layer := Control.new()
 var _flows: Array[CircleReveal] = []
 var _modal_layer := Control.new()
 var _minimap: Minimap
+var _arrows := {}  # Vector2i direction -> NavArrow
 var _bg := ColorRect.new()
+## The window settings last put in place, so only a change to them moves it.
+var _window_applied := ""
 
 var _press := false
 var _press_pos := Vector2.ZERO
@@ -59,6 +62,7 @@ var _synthetic := false
 
 
 func _ready() -> void:
+	_apply_window()
 	_fit_design_size()
 	UI.set_dark(UI.wants_dark(str(App.state.settings.get("theme", "auto"))))
 	theme = UI.build_theme()
@@ -76,12 +80,19 @@ func _ready() -> void:
 		var pane: Pane = load(PANES[pane_name][1]).new()
 		pane.name = pane_name.capitalize()
 		pane.visible = cell == _at
+		pane.arrows = _ways_from(cell)
 		_world.add_child(pane)
 		_panes[cell] = pane
 		_names[cell] = pane_name
 
 	add_child(Cursor.new())
+	for dir in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+		var arrow := NavArrow.new(dir)
+		arrow.pressed.connect(func(d: Vector2i): _go_cell(_at + d))
+		add_child(arrow)
+		_arrows[dir] = arrow
 	_minimap = Minimap.new()
+	_minimap.hover_grow = not App.phone_layout()
 	_minimap.cells = _names
 	_minimap.picked.connect(_go_cell)
 	add_child(_minimap)
@@ -108,22 +119,17 @@ func _ready() -> void:
 
 
 ## On phones the design size is the screen's own size in points, so text
-## stays its intended size. On computers everything scales with the window:
-## its short side is always DESKTOP_SHORT_SIDE design units, so a bigger
-## window draws everything bigger (never below MIN_DESKTOP_SCALE).
+## stays its intended size; the debug phone view does the same with a
+## phone's width. On computers everything scales with the window: its short
+## side is always DESKTOP_SHORT_SIDE design units, so a bigger window draws
+## everything bigger (never below MIN_DESKTOP_SCALE).
 func _fit_design_size() -> void:
 	var window := get_window()
-	# Debug builds can show a phone's screen in the window, with bars round it.
-	var aspect := Window.CONTENT_SCALE_ASPECT_KEEP if App.debug_phone_view() else Window.CONTENT_SCALE_ASPECT_EXPAND
-	if window.content_scale_aspect != aspect:
-		window.content_scale_aspect = aspect
-	if App.debug_phone_view():
-		if window.content_scale_size != PHONE_VIEW:
-			window.content_scale_size = PHONE_VIEW
-		return
 	var side: float
-	if OS.has_feature("mobile"):
-		var points := Vector2(DisplayServer.window_get_size()) / _screen_scale()
+	if App.debug_phone_view():
+		side = float(Display.PHONE.x)
+	elif OS.has_feature("mobile"):
+		var points := Vector2(DisplayServer.window_get_size()) / Display.screen_scale()
 		side = clampf(minf(points.x, points.y), PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
 	else:
 		var window_size := Vector2(DisplayServer.window_get_size())
@@ -134,11 +140,17 @@ func _fit_design_size() -> void:
 		window.content_scale_size = target
 
 
-## Physical pixels per point: Retina/iOS report it directly; Android via DPI.
-static func _screen_scale() -> float:
-	if OS.get_name() == "Android":
-		return maxf(1.0, DisplayServer.screen_get_dpi() / 160.0)
-	return maxf(1.0, DisplayServer.screen_get_scale())
+## Puts the window settings (and the debug phone view) in place, if they
+## changed since last time.
+func _apply_window() -> void:
+	var s := App.state.settings
+	var want := "%s|%s|%s" % [s.get("window_mode", ""), s.get("resolution", ""), App.debug_phone_view()]
+	if want == _window_applied:
+		return
+	_window_applied = want
+	Display.apply(get_window())
+	if _minimap:
+		_minimap.hover_grow = not App.phone_layout()
 
 
 func _layout() -> void:
@@ -149,12 +161,35 @@ func _layout() -> void:
 	if not _moving and not _swiping:
 		_world.position = -Vector2(_at) * size
 	var insets := UI.safe_insets(self)
-	_minimap.dock(Vector2(size.x * 0.5, size.y - 18.0 - insets["bottom"]))
+	_minimap.dock(Vector2(MAP_INSET + insets["left"], size.y - MAP_INSET - insets["bottom"]))
+	for dir in _arrows:
+		_arrows[dir].dock(size, insets)
+
+
+## The ways on from `cell`: every way from the middle, and back to the
+## middle from a screen at the side.
+func _ways_from(cell: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for dir in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+		if PANES.values().any(func(p): return p[0] == cell + dir) and (cell == Vector2i.ZERO or cell + dir == Vector2i.ZERO):
+			out.append(dir)
+	return out
+
+
+## The edge arrows show (computers only) once you've arrived on a screen,
+## and hide while moving, during walks and while a popup is up.
+func _process(_delta: float) -> void:
+	var show := not App.phone_layout() and not _moving and not _swiping \
+		and _flows.is_empty() and not Modal.is_open()
+	var ways: Array[Vector2i] = _ways_from(_at) if show else ([] as Array[Vector2i])
+	for dir in _arrows:
+		_arrows[dir].appear(ways.has(dir))
 
 
 # --- Light and dark ----------------------------------------------------------
 
 func _on_state_changed() -> void:
+	_apply_window()
 	_fit_design_size()
 	var want := UI.wants_dark(str(App.state.settings.get("theme", "auto")))
 	if want != UI.dark:
@@ -173,6 +208,8 @@ func _switch_palette(dark: bool) -> void:
 	theme = UI.build_theme()
 	_bg.color = UI.BG
 	_minimap.queue_redraw()
+	for dir in _arrows:
+		_arrows[dir].refresh()
 	for cell in _panes:
 		var pane: Pane = _panes[cell]
 		if pane.shown:

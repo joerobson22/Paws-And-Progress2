@@ -65,8 +65,14 @@ static func _arrow(up: bool) -> Texture2D:
 	return Icons.texture("sort_up" if up else "sort_down", ARROW_PX, Color.WHITE, 2.6)
 
 
+## Shows `id` as chosen, without telling anyone (it was chosen elsewhere).
+func select(id: String) -> void:
+	current = id
+	_refresh()
+
+
 func _refresh() -> void:
-	text = "%s: %s" % [prefix, _label(current)]
+	text = "%s: %s" % [prefix, _label(current)] if prefix != "" else _label(current)
 	icon = _arrow(reversed) if sortable else null
 
 

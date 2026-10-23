@@ -1,12 +1,14 @@
 class_name Minimap
 extends Control
 ## The little map of the app: five dots laid out like the screens (focus in
-## the middle, one each side), with the one you're on filled in. The
-## highlight glides with you as you swipe. Tap the map and it grows into big
-## tiles from the bottom, each with an icon fading in for its screen (a home
-## for focus, a present for gifts, a tick for completed, a person for your
-## profile and a bar chart for stats); tap one to go there. Tapping anywhere
-## else, or Esc, shrinks it back. The arrow keys move between screens too.
+## the middle, one each side), with the one you're on filled in, sitting in
+## the bottom left corner. The highlight glides with you as you swipe. It
+## grows up and to the right into big tiles, each with an icon fading in for
+## its screen (a home for focus, a present for gifts, a tick for completed, a
+## person for your profile and a bar chart for stats); pick one to go there.
+## With a mouse it grows while the pointer is over it, and shrinks a moment
+## after the pointer leaves. On phones a tap grows it, and tapping it again
+## (or anywhere else, or Esc) shrinks it back.
 
 signal picked(cell: Vector2i)
 
@@ -16,38 +18,71 @@ const GAP := Vector2(5.0, 8.0)
 const PAD := Vector2(9.0, 12.0)
 const ICONS := {"focus": "home", "gifts": "gift", "completed": "check", "profile": "user", "stats": "stats"}
 const ICON_PX := 24
+## With a mouse: how long it stays big after the pointer leaves it.
+const LINGER := 0.3
 
+## True: grows under the pointer (computers). False: grows when tapped.
+var hover_grow := true
 var cells: Dictionary = {}  # Vector2i -> name, for the icons
 var open := false
 var _at := Vector2.ZERO  # highlight position in cell units (animates)
 ## 0 small to 1 big (animates).
 var _grow := 0.0
 var _hover: Variant = null
-## Where its bottom middle sits, in its parent.
+## Where its bottom left corner sits, in its parent.
 var _dock := Vector2.ZERO
+## Bumped each time the pointer comes or goes, so a stale shrink is dropped.
+var _visit := 0
+## True while the pointer is over it.
+var _inside := false
 
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape = Cursor.HOVER
-	mouse_exited.connect(func(): _set_hover(null))
+	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
 	_apply()
 
 
-## Pins its bottom middle to `point`, so it grows upwards and outwards.
+## Pins its bottom left corner to `point`, so it grows up and to the right.
 func dock(point: Vector2) -> void:
 	_dock = point
 	_apply()
 
 
 ## Moves the highlight to `cell`, gliding unless `instant`. Going somewhere
-## (by swiping, the keys or a tap) shrinks the map back.
+## shrinks the map back, unless the pointer is resting on it.
 func show_cell(cell: Vector2i, instant: bool = false) -> void:
 	if instant:
 		_set_at(Vector2(cell))
 	else:
 		Motion.method(self, "at", _set_at, _at, Vector2(cell))
-	shrink(instant)
+	if not (hover_grow and _pointer_over()):
+		shrink(instant)
+
+
+func _pointer_over() -> bool:
+	return _inside and is_visible_in_tree()
+
+
+func _on_mouse_entered() -> void:
+	_inside = true
+	_visit += 1
+	if hover_grow and modulate.a > 0.5:
+		grow()
+
+
+func _on_mouse_exited() -> void:
+	_inside = false
+	_set_hover(null)
+	_visit += 1
+	if not hover_grow or not open:
+		return
+	var visit := _visit
+	await get_tree().create_timer(LINGER).timeout
+	if visit == _visit and not _pointer_over():
+		shrink()
 
 
 func grow() -> void:
@@ -97,7 +132,7 @@ func _gap() -> float:
 func _apply() -> void:
 	var side := lerpf(PAD.x, PAD.y, _grow) * 2.0 + _cell() * 3.0 + _gap() * 2.0
 	size = Vector2(side, side)
-	position = Vector2(roundf(_dock.x - side * 0.5), _dock.y - side)
+	position = Vector2(_dock.x, _dock.y - side)
 	queue_redraw()
 
 
@@ -149,14 +184,18 @@ func _gui_input(e: InputEvent) -> void:
 			grow()
 			return
 		var cell = _cell_at(e.position)
-		if cell != null:
-			if Vector2(cell).distance_to(_at) < 0.5:
-				shrink()
+		var here: bool = cell != null and Vector2(cell).distance_to(_at) < 0.5
+		# A tap on the big map's own background, or on where you are,
+		# shrinks it (with a mouse it just stays while you're over it).
+		if not hover_grow and (cell == null or here):
+			shrink()
+		if cell != null and not here:
 			picked.emit(cell)
 
 
-## While it's big, a tap anywhere else (or Esc) only shrinks it back, so
-## nothing underneath gets tapped or swiped by accident.
+## While it's big, a tap anywhere else (or Esc) shrinks it back. On phones
+## that tap does nothing else, so nothing underneath gets tapped or swiped
+## by accident; a mouse click goes through, as the map only lingers briefly.
 func _input(e: InputEvent) -> void:
 	if not open:
 		return
@@ -165,5 +204,6 @@ func _input(e: InputEvent) -> void:
 		shrink()
 	elif e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT and e.pressed \
 			and not get_global_rect().has_point(e.position):
-		get_viewport().set_input_as_handled()
+		if not hover_grow:
+			get_viewport().set_input_as_handled()
 		shrink()

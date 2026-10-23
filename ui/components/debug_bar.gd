@@ -1,9 +1,9 @@
 class_name DebugBar
 extends VBoxContainer
 ## Only in debug builds (runs from the editor, debug exports). On the focus
-## screen, in the top left: a switch that unlocks every animal and place,
-## and one that shows the app at a phone's proportions (off: the desktop
-## layout filling the window).
+## screen, small, beside the home icon in the top left: a switch that
+## unlocks every animal and place, and one that gives the window a phone's
+## shape and lays the app out as on a phone (off: the window as it was).
 ## The walk uses the other two pieces here: a picker to preview each kind
 ## of weather instead of the real one, and buttons that move the walk on.
 
@@ -11,7 +11,14 @@ extends VBoxContainer
 const STEPS := [5, 10, 30, 60]
 
 
+## How big the switches are drawn, so they sit quietly beside the home icon.
+const SCALE := 0.8
+## Each switch's row height, before SCALE: two rows match the icon's height.
+const ROW := 26
+
+
 func _init() -> void:
+	scale = Vector2(SCALE, SCALE)
 	add_theme_constant_override("separation", 4)
 	# Two switches, one under the other, with "DEBUG" by the first.
 	var grid := GridContainer.new()
@@ -27,6 +34,7 @@ func _init() -> void:
 
 func _switch(grid: GridContainer, title: String, tip: String, on: bool, setting: String) -> void:
 	var sw := Switch.new(on)
+	sw.custom_minimum_size.y = ROW
 	sw.accessibility_name = tip
 	sw.toggled.connect(func(value: bool): App.set_setting(setting, value))
 	grid.add_child(sw)

@@ -56,44 +56,102 @@ func _run() -> void:
 	await _wait(20)
 	await _shot("focus")
 
-	# Tapping the map grows it, with an icon fading in on each screen's tile:
-	# tapping elsewhere shrinks it without going anywhere, and tapping a tile
-	# goes there. The arrow keys move between screens and Esc comes back.
+	# The map sits in the bottom left corner. With a mouse it grows up and to
+	# the right while the pointer is over it (an icon fading in on each
+	# screen's tile), stays big while the pointer moves over its tiles, and
+	# shrinks a moment after the pointer leaves. Clicking a tile goes there.
 	var map: Control = main._minimap
 	var small: Vector2 = map.size
 	check(map.mouse_default_cursor_shape == Control.CURSOR_CAN_DROP, "the map shows the open hand")
 	var any_button: Button = _find(main, func(n): return n is Button and n.is_visible_in_tree())
 	check(any_button != null and any_button.mouse_default_cursor_shape == Control.CURSOR_CAN_DROP, "buttons show the open hand")
-	check(map._grow == 0.0 and not map.open, "the map starts small, with no icons")
-	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
+	check(map._grow == 0.0 and not map.open and map.hover_grow, "the map starts small, with no icons, and grows under the pointer")
+	var corner := Vector2(main.MAP_INSET, main.size.y - main.MAP_INSET)
+	check(map.get_global_rect().position.x == corner.x and is_equal_approx(map.get_global_rect().end.y, corner.y),
+		"it sits in the bottom left corner")
+	await _point(map.get_global_rect().get_center())
 	await _wait(30)
 	check(map.open and map._grow > 0.99 and map.size.x > small.x * 2.0 and main._at == Vector2i.ZERO,
-		"tapping the map grows it, without going anywhere")
-	check(is_equal_approx(map.get_global_rect().end.y, main.size.y - 18.0) and is_equal_approx(map.get_global_rect().get_center().x, main.size.x * 0.5),
-		"it grows up from where it sat")
+		"pointing at the map grows it, without going anywhere")
+	check(map.get_global_rect().position.x == corner.x and is_equal_approx(map.get_global_rect().end.y, corner.y),
+		"up and to the right, from the corner")
 	await _shot("map_open")
+	var stats_tile: Vector2 = map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center()
+	await _point(stats_tile)
+	await _wait(30)
+	check(map.open, "moving over its tiles keeps it big")
+	await _drag(stats_tile, stats_tile, 1)
+	await _wait(40)
+	check(main._at == Vector2i(0, 1) and map.open, "clicking the stats tile goes there, and the map stays big under the pointer")
+	await _point(main.size * Vector2(0.6, 0.4))
+	await _wait(10)
+	check(map.open, "it lingers a moment after the pointer leaves...")
+	await _wait(30)
+	check(not map.open and map._grow < 0.01, "...then shrinks")
+	await _key(KEY_ESCAPE)
+	await _wait(30)
+
+	# On phones a tap grows it; tapping where you are (or anywhere else, or
+	# Esc) shrinks it back, and tapping another tile goes there.
+	map.hover_grow = false
+	await _point(main.size * 0.5)
+	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
+	await _wait(30)
+	check(map.open and main._at == Vector2i.ZERO, "on phones, tapping the map grows it")
+	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
+	await _wait(30)
+	check(not map.open and main._at == Vector2i.ZERO, "and tapping it again shrinks it")
+	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
+	await _wait(30)
 	await _drag(Vector2(main.size.x * 0.5, 40), Vector2(main.size.x * 0.5, 40), 1)
 	await _wait(30)
-	check(not map.open and map._grow < 0.01 and main._at == Vector2i.ZERO, "tapping elsewhere shrinks it again")
+	check(not map.open and map._grow < 0.01 and main._at == Vector2i.ZERO, "tapping elsewhere shrinks it too")
 	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
 	await _wait(30)
 	await _key(KEY_ESCAPE)
 	await _wait(30)
-	check(not map.open and main._at == Vector2i.ZERO, "Esc shrinks it too")
+	check(not map.open and main._at == Vector2i.ZERO, "and Esc")
 	await _drag(map.get_global_rect().get_center(), map.get_global_rect().get_center(), 1)
 	await _wait(30)
-	var stats_tile: Vector2 = map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center()
+	stats_tile = map.get_global_transform_with_canvas() * map._cell_rect(Vector2(0, 1)).get_center()
 	await _drag(stats_tile, stats_tile, 1)
 	await _wait(40)
 	check(main._at == Vector2i(0, 1) and not map.open, "tapping the stats tile goes there, and the map shrinks back")
+	map.hover_grow = true
 	await _key(KEY_ESCAPE)
 	await _wait(30)
 	await _key(KEY_RIGHT)
 	await _wait(30)
-	check(main._at == Vector2i(1, 0), "right arrow opens completed")
+	check(main._at == Vector2i(1, 0), "right arrow key opens completed")
 	await _key(KEY_ESCAPE)
 	await _wait(30)
 	check(main._at == Vector2i.ZERO, "Esc comes back to the middle")
+
+	# Computers get big faint arrows at the edges, once you've arrived: one
+	# on every side of the focus screen, and only the one back home on the
+	# others. Under the pointer an arrow slides out and darkens.
+	var arrows: Dictionary = main._arrows
+	var showing := func(): return arrows.keys().filter(func(d): return arrows[d].visible and arrows[d].modulate.a > 0.99)
+	check(showing.call().size() == 4, "an arrow on every side of the focus screen (%d)" % showing.call().size())
+	var right: Control = arrows[Vector2i.RIGHT]
+	check(right.get_global_rect().end.x == main.size.x and is_equal_approx(right.get_global_rect().get_center().y, main.size.y * 0.5),
+		"the right one sits at the middle of the right edge")
+	var tip_before: Vector2 = right._line.points[1]
+	await _point(right.get_global_rect().get_center())
+	await _wait(20)
+	check(right._hover > 0.99 and right._line.points[1].x > tip_before.x, "under the pointer it slides the way it points")
+	await _shot("arrows_hover")
+	await _drag(right.get_global_rect().get_center(), right.get_global_rect().get_center(), 1)
+	await _wait(5)
+	check(showing.call().is_empty(), "they hide while the screens slide")
+	await _wait(40)
+	check(main._at == Vector2i(1, 0) and showing.call() == [Vector2i.LEFT], "the right arrow opens completed, with just the arrow back")
+	var back: Control = arrows[Vector2i.LEFT]
+	await _drag(back.get_global_rect().get_center(), back.get_global_rect().get_center(), 1)
+	await _wait(40)
+	check(main._at == Vector2i.ZERO, "and that one comes home")
+	await _point(main.size * Vector2(0.5, 0.3))
+	await _wait(10)
 
 	# The orb grows under the pointer.
 	var orb_rect: Rect2 = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "focus_orb.gd")).get_global_rect()
@@ -123,20 +181,26 @@ func _run() -> void:
 		unlock.button_pressed = false
 		await _wait(10)
 		check(not app.is_unlocked("place", "moon"), "and locks it all again")
-		# The second switch shows the app at a phone's size, letterboxed.
-		var desktop: Vector2 = main.size
+		# The second switch lays the app out as on a phone (and, with a real
+		# display, gives the window a phone's shape): the map opens on a tap
+		# and the edge arrows go, as phones swipe.
 		var switches: Array = _all(debug, func(n): return _is(n, "switch.gd"))
 		check(switches.size() == 2, "a phone size switch under the unlock one")
+		check(debug.get_global_rect().size.y <= 46.0, "the debug switches are small, level with the home icon (%.0f)" % debug.get_global_rect().size.y)
 		switches[1].button_pressed = true
-		await _wait(20)
-		check(main.size == Vector2(main.PHONE_VIEW) and root.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_KEEP,
-			"the phone size switch shows the app at a phone's size (%s)" % main.size)
+		await _wait(30)
+		check(root.content_scale_size == Vector2i(390, 390) and app.phone_layout() and not map.hover_grow,
+			"the phone size switch lays the app out at a phone's width")
+		check(arrows.values().all(func(a): return not a.visible), "with no edge arrows")
+		if DisplayServer.get_name() != "headless":
+			check(absf(main.size.x - 390.0) < 1.0 and main.size.y > 780.0, "in a phone-shaped window (%s)" % main.size)
 		await _shot("debug_phone")
 		# The pane rebuilt at the new size, so find its switch again.
 		debug = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "debug_bar.gd"))
 		_all(debug, func(n): return _is(n, "switch.gd"))[1].button_pressed = false
-		await _wait(20)
-		check(main.size == desktop and root.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_EXPAND, "and back to filling the window")
+		await _wait(30)
+		check(not app.phone_layout() and map.hover_grow and root.content_scale_size != Vector2i(390, 390), "and back to the computer layout")
+		check(showing.call().size() == 4, "with its arrows")
 
 	# The location question: asked once, a moment after the focus screen shows.
 	app.state.settings.erase("location")
@@ -415,8 +479,26 @@ func _run() -> void:
 		await _wait(20)
 	profile_pane.open_settings()
 	await _wait(25)
+	check(main._arrows.values().all(func(a): return not a.visible), "the edge arrows hide while a popup is up")
+	# Computers can pick the window's mode and size; picking a size goes
+	# back to a window.
+	var pickers: Array = _all(modal_class.top().body, func(n): return _is(n, "dropdown.gd"))
+	check(pickers.size() == 2 and pickers[0].text == "Windowed", "settings offer the window mode and size (%d)" % pickers.size())
 	await _shot("settings")
+	if pickers.size() == 2:
+		pickers[0].pressed.emit()
+		await _wait(10)
+		await _tap_menu(pickers[0], "Maximised")
+		await _wait(15)
+		check(app.state.settings.get("window_mode") == "maximised" and pickers[0].text == "Maximised", "picking Maximised saves it")
+		pickers[1].pressed.emit()
+		await _wait(10)
+		await _tap_menu(pickers[1], "1280 × 720")
+		await _wait(15)
+		check(app.state.settings.get("resolution") == "1280x720" and app.state.settings.get("window_mode") == "windowed" and pickers[0].text == "Windowed",
+			"picking a size saves it and goes back to a window")
 	_close_modal()
+	await _wait(20)
 
 	app.go("stats")
 	await _wait(50)
@@ -866,6 +948,15 @@ func _find(node: Node, match: Callable) -> Node:
 		if deeper:
 			return deeper
 	return null
+
+
+## Moves the pointer to `at` with no button down, as a mouse hovering.
+func _point(at: Vector2) -> void:
+	var m := InputEventMouseMotion.new()
+	m.position = at
+	m.global_position = at
+	root.push_input(m, true)
+	await process_frame
 
 
 func _key(code: Key) -> void:

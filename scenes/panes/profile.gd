@@ -188,6 +188,9 @@ func open_settings() -> void:
 	s.add_child(_toggle("Keep the screen on", "Stops your phone or laptop sleeping during a walk.", "keep_screen_on"))
 	s.add_child(UI.divider())
 	s.add_child(_location_toggle())
+	for row in Display.settings_rows(get_window()):
+		s.add_child(UI.divider())
+		s.add_child(row)
 	m.body.add_child(s)
 	var about := UI.para("Paws & Progress %s  ·  Fonts: Fredoka and Nunito (SIL Open Font License)" % ProjectSettings.get_setting("application/config/version", ""), 13, UI.INK_FAINT)
 	about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

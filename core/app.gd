@@ -157,10 +157,17 @@ func debug_unlock_all() -> bool:
 	return OS.is_debug_build() and bool(state.settings.get("debug_unlock_all", false))
 
 
-## The debug-only "phone size" switch: the window shows the app at a phone's
-## proportions, letterboxed, instead of filling it (see main.gd).
+## The debug-only "phone size" switch: the window takes a phone's shape and
+## the app lays itself out as on a phone (see main.gd).
 func debug_phone_view() -> bool:
 	return OS.is_debug_build() and bool(state.settings.get("debug_phone_view", false))
+
+
+## True on phones and tablets, and in the debug phone view: swiping and a
+## tap-to-open map rather than edge arrows and a map that opens under the
+## pointer.
+func phone_layout() -> bool:
+	return OS.has_feature("mobile") or debug_phone_view()
 
 
 ## The walk's debug time buttons: the walk started `minutes` earlier.

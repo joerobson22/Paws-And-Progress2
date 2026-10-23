@@ -63,6 +63,8 @@ const SERIES := [
 
 const RADIUS := 18
 const WIDE_BREAKPOINT := 900.0
+## The side of a screen's icon tile (icon_tile).
+const ICON_TILE := 44
 
 static var _fonts: Dictionary = {}
 
@@ -309,17 +311,22 @@ static func trimmed(text: String, size: int = 15, colour: Color = INK, display: 
 static func title_row(title: String, icon: String = "") -> HBoxContainer:
 	var row := hbox(14)
 	if icon != "":
-		var tile := panel(ACCENT, 14, 0)
-		tile.custom_minimum_size = Vector2(44, 44)
-		tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tile.add_child(icon_rect(icon, 24, ON_COLOUR))
-		row.add_child(tile)
+		row.add_child(icon_tile(icon))
 	var words := label(title, 32, INK, true, 600)
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(words)
 	return row
+
+
+## A screen's app-map icon in a green tile, as beside its title.
+static func icon_tile(icon: String) -> PanelContainer:
+	var tile := panel(ACCENT, 14, 0)
+	tile.custom_minimum_size = Vector2(ICON_TILE, ICON_TILE)
+	tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.add_child(icon_rect(icon, 24, ON_COLOUR))
+	return tile
 
 
 ## A panel's own scrolling area, the one part of a screen that scrolls (the
