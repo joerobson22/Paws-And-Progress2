@@ -1,6 +1,6 @@
 extends Control
-## Focus complete. It carries straight on from the walk's scene: a quarter-
-## black sheet settles over the scenery so the animal stands out, the camera
+## Focus complete. It carries straight on from the walk's scene: the scenery
+## dims by a quarter so the animal stands out, the camera
 ## zooms in on it holding its gift (glowing in the gift's rarity colour), and
 ## the words fade in. Then your level bar appears with "+X xp" underneath and
 ## fills, X counting down as it goes, popping and starting again at each new
@@ -8,22 +8,24 @@ extends Control
 ##
 ## Easter egg: press and hold the gift to take it. Drag it about, and let go
 ## with a flick to throw it (up the screen throws it into the distance, to
-## the sides off the screen). Your pet runs after it, wading if it lands in
+## the sides across it, curving in so it lands where you can see it). Your
+## pet runs after it, behind anything standing nearer, wading if it lands in
 ## water, and brings it back. You can take it again once they're home.
 ## params: {"session", "gift", "scene": {biome, scroll, clock, walker, animal, unit}}
 
 var params := {}
 
-## How strongly the sheet darkens the scenery.
-const SHEET_ALPHA := 0.25
+## How much the scenery (and you) dim around the animal.
+const DIM := 0.25
 ## Throws slower than this (pixels a second) just put the gift back.
 const THROW_SPEED := 450.0
+## An upward flick this fast (screen heights a second) throws about two
+## thirds of the way to the far side; faster ones creep closer to it.
+const THROW_DEPTH := 0.9
 
 var _stage := Control.new()
 var _scenery: Scenery
-var _back_actors := Node2D.new()
-var _front_actors := Node2D.new()
-var _sheet := ColorRect.new()
+var _dim := 0.0
 var _walker: CharacterView
 var _animal: AnimalView
 var _glow: _Glow
@@ -51,7 +53,8 @@ var _velocity := Vector2.ZERO
 var _last_pointer := Vector2.ZERO
 var _last_time := 0
 var _fly: GiftArt
-var _fly_state := {}  # x, z, h, vx, vz, vh
+var _fly_state := {}  # from, to (x, z), h, vh, t, time
+var _ripple: _Ripple
 
 
 func _ready() -> void:
@@ -72,26 +75,21 @@ func _ready() -> void:
 	_scenery.scroll = float(scene.get("scroll", 0.0))
 	_scenery.size = size
 	_stage.add_child(_scenery)
-	_stage.add_child(_back_actors)
-	_sheet.color = Color(0, 0, 0, 0)
-	_sheet.size = size
-	_sheet.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_stage.add_child(_sheet)
-	_stage.add_child(_front_actors)
-	# The growth stays in front of everyone, darkened with the rest.
+	# Everyone stands among the scenery's layers, by depth. The growth stays
+	# in front of them all, dimmed with the rest.
 	_scenery.front_into(_stage)
 
 	var feet := _scenery.path_y()
 	_walker = CharacterView.new()
 	_walker.scale = Vector2(_unit, _unit)
 	_walker.position = scene.get("walker", Vector2(size.x * 0.38, feet))
-	_back_actors.add_child(_walker)
+	_scenery.stand(_walker, _walker.position.y)
 	_glow = _Glow.new()
 	_glow.colour = Content.rarity_colour(roll.get("rarity", "common")) if not roll.is_empty() else UI.ACCENT
 	_glow.strength = 0.0
 	# Only a gift glows: with nothing found, nothing lights up.
 	_glow.visible = _gift_id != ""
-	_front_actors.add_child(_glow)
+	_scenery.add_child(_glow)
 	if _project:
 		_animal = AnimalView.new()
 		_animal.animal_id = _project.animal_id
@@ -102,7 +100,8 @@ func _ready() -> void:
 		_rest_scale = _unit
 		_animal.position = _rest
 		_animal.scale = Vector2(_unit, _unit)
-		_front_actors.add_child(_animal)
+		_scenery.add_child(_animal)
+		_stand_actors()
 		_glow.radius = 70.0 * _unit
 		_place_glow()
 
@@ -212,11 +211,11 @@ func _word(l: Label) -> Label:
 # --- The sequence ------------------------------------------------------------
 
 func _play() -> void:
-	# The sheet settles and the camera moves in on the animal.
+	# The scenery dims and the camera moves in on the animal.
 	var zoom := _zoom_target()
 	var t := Motion.tween(self, "zoom")
 	t.set_parallel(true)
-	t.tween_property(_sheet, "color:a", SHEET_ALPHA, Motion.time(0.6))
+	t.tween_property(self, "_dim", DIM, Motion.time(0.6))
 	t.tween_property(_stage, "scale", Vector2.ONE * zoom["scale"], Motion.time(1.0))
 	t.tween_property(_stage, "position", zoom["position"], Motion.time(1.0))
 	t.tween_property(_glow, "strength", 1.0 if _gift_id != "" else 0.0, Motion.time(1.0))
@@ -327,9 +326,11 @@ func _pick_up(pointer: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
-	# The growth in front darkens with the sheet, and no tall plant stands
-	# between you and your pet while it's at home.
-	_scenery.front_tint = Color.WHITE.darkened(_sheet.color.a)
+	# Everything but the animal dims, and no tall plant stands between you
+	# and your pet while it's at home.
+	var shade := Color.WHITE.darkened(_dim)
+	_scenery.shade = shade
+	_walker.modulate = shade
 	if _animal:
 		var reach := 140.0 * _unit
 		_scenery.front_gap = Vector2(_rest.x - reach, _rest.x + reach)
@@ -338,6 +339,23 @@ func _process(delta: float) -> void:
 		_held.position = at.lerp(_hold_target, minf(1.0, delta * 18.0)) - _held.size * 0.5
 	elif _state == "flying":
 		_fly_step(delta)
+	_stand_actors()
+
+
+## Puts everyone in front of what's further back and behind what's nearer:
+## the pet goes behind you, and behind the trees, as it runs off.
+func _stand_actors() -> void:
+	_scenery.stand(_walker, _walker.position.y)
+	if not _animal:
+		return
+	_scenery.stand(_animal, _animal.position.y)
+	_scenery.stand(_glow, _animal.position.y - 0.5)
+	if is_instance_valid(_fly) and _fly.get_parent():
+		# A touch nearer than where it'll land, so it leaves your hand in
+		# front of your pet rather than behind it.
+		_scenery.stand(_fly, _ground_y(_fly_state["z"]) + 6.0 * _unit)
+	if is_instance_valid(_ripple):
+		_scenery.stand(_ripple, _ripple.position.y - 1.0)
 
 
 func _let_go() -> void:
@@ -365,11 +383,15 @@ func _near_y() -> float:
 	return _rest.y
 
 
-## The furthest a throw can land: the far shore (or the treeline), but never
-## above what the zoomed-in camera can see, so the fetch stays in view.
+## The furthest a throw can land: the far shore (or the far edge of the
+## ground, behind the trees standing on it), but never above what the
+## zoomed-in camera can see, so the fetch stays in view.
 func _far_y() -> float:
 	var water := _scenery.water_band()
-	var far := water.x + 8.0 * _unit if water != Vector2.ZERO else _stage.size.y * 0.6
+	var ground := _scenery.ground_layer()
+	var far := _stage.size.y * float(ground.get("y", 0.6)) + 4.0 * _unit
+	if water != Vector2.ZERO:
+		far = water.x + 8.0 * _unit
 	var top_in_view := -_stage.position.y / _stage.scale.y + 50.0 * _unit
 	return minf(maxf(far, top_in_view), _near_y() - 10.0 * _unit)
 
@@ -394,33 +416,54 @@ func _throw(v: Vector2) -> void:
 	Audio.play("whoosh", 1.1, -4.0)
 	var k := _stage.scale.x
 	var start := (_held.position + _held.size * 0.5 - _stage.position) / k
-	var speed := v / k
 	_fly = GiftArt.new(_gift_id, 0.6)
 	_fly.size = Vector2(46, 46) * _unit
 	_fly.pivot_offset = _fly.size * 0.5
-	_front_actors.add_child(_fly)
+	_scenery.add_child(_fly)
 	_held.queue_free()
-	_fly_state = {
-		"x": start.x, "z": 0.0, "h": maxf(0.0, _near_y() - start.y),
-		"vx": speed.x * 0.85,
-		"vz": clampf(-speed.y / 700.0, 0.0, 1.4),
-		"vh": clampf(-speed.y * 0.3, 80.0, 700.0) * _unit + 160.0 * _unit,
-	}
+	# Up the screen throws it away from you: the faster, the further.
+	var z := 1.0 - exp(-maxf(0.0, -v.y / size.y) / THROW_DEPTH)
+	# Across, it curves in so that it (and your pet fetching it) lands in
+	# view: a hard throw to the side lands near the edge, never past it.
+	var left := -_stage.position.x / k
+	var half := size.x / k * 0.5
+	var margin := minf(100.0 * _unit * _perspective(z) + 8.0, half * 0.5)
+	var middle := left + half
+	var reach := half - margin
+	var x := middle + reach * tanh((start.x + v.x / k * 0.45 - middle) / reach)
+	var h := maxf(0.0, _near_y() - start.y)
+	var g := 1500.0 * _unit
+	# A longer throw stays up longer, but its arc never leaves the top of
+	# the screen.
+	var top := -_stage.position.y / k + 40.0 * _unit
+	var room := maxf(0.0, (_ground_y(z * 0.5) - top) / _perspective(z * 0.5))
+	var time := lerpf(0.6, 1.0, z)
+	var vh := 0.0
+	for i in 12:
+		vh = (g * time * time * 0.5 - h) / time
+		if time <= 0.35 or h + maxf(0.0, vh) ** 2 / (2.0 * g) <= maxf(room, h):
+			break
+		time *= 0.9
+	_fly_state = {"from": start.x, "to": x, "far": z, "x": start.x, "z": 0.0,
+		"h0": h, "h": h, "vh": vh, "g": g, "t": 0.0, "time": time}
 	_fly_step(0.0)
 
 
-## One frame of the gift's flight: across, away and up, falling back down.
+## One frame of the gift's flight: across, away and up, falling back down
+## where the throw aimed.
 func _fly_step(dt: float) -> void:
 	var f := _fly_state
-	f["x"] += f["vx"] * dt * _perspective(f["z"])
-	f["z"] = minf(1.0, f["z"] + f["vz"] * dt)
-	f["h"] += f["vh"] * dt
-	f["vh"] -= 1500.0 * _unit * dt
+	f["t"] = minf(f["t"] + dt, f["time"])
+	var t: float = f["t"]
+	var p: float = t / f["time"]
+	f["x"] = lerpf(f["from"], f["to"], p)
+	f["z"] = f["far"] * p
+	f["h"] = maxf(0.0, f["h0"] + f["vh"] * t - f["g"] * t * t * 0.5)
 	var s := _perspective(f["z"])
 	_fly.position = Vector2(f["x"], _ground_y(f["z"]) - f["h"] * s) - _fly.size * 0.5
 	_fly.scale = Vector2.ONE * s
 	_fly.rotation += dt * 6.0
-	if f["h"] <= 0.0 and f["vh"] < 0.0:
+	if p >= 1.0:
 		_land()
 
 
@@ -431,11 +474,10 @@ func _land() -> void:
 	_fly.rotation = 0.0
 	if spot.y < _bank_y():
 		Audio.play("splash", 1.0, -2.0)
-		var ripple := _Ripple.new()
-		ripple.position = spot
-		ripple.scale = Vector2.ONE * _perspective(f["z"]) * _unit
-		_front_actors.add_child(ripple)
-		_front_actors.move_child(ripple, 0)
+		_ripple = _Ripple.new()
+		_ripple.position = spot
+		_ripple.scale = Vector2.ONE * _perspective(f["z"]) * _unit
+		_scenery.add_child(_ripple)
 		Motion.float_loop(_fly, 3.0 * _unit, 1.4)
 	else:
 		Audio.play("pop", 0.7, -8.0)
@@ -445,6 +487,8 @@ func _land() -> void:
 
 ## The animal runs out to the gift, picks it up, and runs back with it.
 func _fetch(spot: Vector2, z: float) -> void:
+	# The animal isn't dimmed, but the water it wades into is.
+	_animal.water_colour = _scenery.water_colour() * _scenery.shade
 	_animal.walking = true
 	_animal.running = true
 	var out_scale := _rest_scale * _perspective(z)

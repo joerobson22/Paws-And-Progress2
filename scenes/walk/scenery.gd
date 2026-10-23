@@ -7,7 +7,9 @@ extends Control
 ## only the few animated layers (water, reeds, fronds) redraw as they move.
 ## Weather (snow, wind, stars, fireflies) is a thin layer on top. Layers
 ## marked "front" (the jungle's big leaves and vines) go in `front`, which a
-## host can lift in front of its walker and pet with front_into().
+## host can lift in front of its walker and pet with front_into(). A host can
+## instead stand() its walker and pet among the layers, so a pet running off
+## into the distance goes behind the trees standing nearer than it.
 ##
 ## The light follows the real clock (see DayCycle), with the real sunrise
 ## and sunset where you are once you've allowed it (Outdoors): the sky
@@ -27,6 +29,9 @@ const LIGHT_EVERY := 5.0
 const FRONT_GROUP := "scenery_front"
 ## A storm flashes about this often, in seconds.
 const STORM_EVERY := 7.0
+## Layers that grow up from the bottom of the screen (or hang from the top),
+## so stand nearer than anyone on the path.
+const NEAREST := ["reeds", "fronds", "drifts", "undergrowth", "stalks", "vines"]
 
 ## Ground-layer pixels walked so far; every layer scrolls by this × its parallax.
 var scroll: float = 0.0
@@ -71,6 +76,12 @@ var front_tint := Color.WHITE
 ## A stretch of the screen (from x, to x) kept clear of tall plants, so one
 ## never stands in front of the pet everyone's looking at. Empty: none.
 var front_gap := Vector2.ZERO
+## Multiplied into everything the scenery draws, but not into anyone stood
+## in it, e.g. to dim the scene behind a pet in the spotlight.
+var shade := Color.WHITE:
+	set(v):
+		shade = v
+		_update_shade()
 
 
 func _ready() -> void:
@@ -78,9 +89,11 @@ func _ready() -> void:
 	clip_contents = true
 	_sky = _Sky.new()
 	_sky.scenery = self
+	_sky.set_meta("foot", -INF)
 	add_child(_sky)
 	_clouds = _Clouds.new()
 	_clouds.scenery = self
+	_clouds.set_meta("foot", -INF)
 	add_child(_clouds)
 	front = Control.new()
 	front.name = "SceneryFront"
@@ -91,6 +104,7 @@ func _ready() -> void:
 		if layer["kind"] == "planet":
 			continue  # drawn with the sky
 		var node := Node2D.new()
+		node.set_meta("foot", 1.0 if NEAREST.has(str(layer["kind"])) else float(layer["y"]))
 		if layer.get("front", false):
 			front.add_child(node)
 		else:
@@ -103,6 +117,7 @@ func _ready() -> void:
 	resized.connect(_rebuild)
 	Outdoors.changed.connect(_update_light)
 	_update_light()
+	_update_shade()
 
 
 func _notification(what: int) -> void:
@@ -115,6 +130,27 @@ func _notification(what: int) -> void:
 ## whatever was added before it, like the walker and the pet.
 func front_into(parent: Node) -> void:
 	front.reparent(parent, false)
+
+
+## Draws `actor` (one of the scenery's own children, or a child of a node
+## standing in the same place) among the layers by how far back its feet are:
+## in front of the layers further back, behind any standing nearer (and
+## behind everyone nearer). Call it again as the actor moves.
+func stand(actor: CanvasItem, feet_y: float) -> void:
+	if actor.get_parent() == null:
+		add_child(actor)
+	elif actor.get_parent() != self:
+		actor.reparent(self, false)
+	var foot := feet_y / maxf(1.0, size.y)
+	actor.set_meta("foot", foot)
+	var at := 0
+	for child in get_children():
+		if child == actor:
+			continue
+		if float(child.get_meta("foot", INF)) > foot:
+			break
+		at += 1
+	move_child(actor, at)
 
 
 func _process(delta: float) -> void:
@@ -134,11 +170,11 @@ func _process(delta: float) -> void:
 	if front.get_parent() != self:
 		front.position = position
 		front.size = size
-		front.modulate = modulate * front_tint
+		front.modulate = modulate * front_tint * shade
 		front.visible = visible
 	else:
 		front.size = size
-		front.modulate = front_tint
+		front.modulate = front_tint * shade
 
 
 ## The hour of the day shown.
@@ -161,13 +197,20 @@ func _update_light() -> void:
 			_light[key] = c.lerp(Color(grey * 0.96, grey, grey * 1.04), o * 0.85).darkened(o * 0.2)
 		_light["tint"] = (_light["tint"] as Color).lerp((_light["tint"] as Color) * Color(0.8, 0.82, 0.86), o)
 	_light["glow"] = 1.0 - clampf(o * 1.15, 0.0, 1.0)
-	var t := tint()
-	for layer in _layers:
-		layer["node"].modulate = t
+	_update_shade()
 	if _sky:
 		_sky.queue_redraw()
 	if _clouds:
 		_clouds.queue_redraw()
+
+
+func _update_shade() -> void:
+	var t := tint() * shade
+	for layer in _layers:
+		layer["node"].modulate = t
+	for node in [_sky, _clouds, _fx]:
+		if node:
+			node.modulate = shade
 
 
 ## The weather as this place shows it now (see Weather.KINDS; "blizzard"
