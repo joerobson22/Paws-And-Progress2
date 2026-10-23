@@ -52,6 +52,34 @@ static func progress(achievements: Array, focused_seconds: int, found: Array, gi
 	return out
 
 
+## The order to show them in where there's only room for some (the
+## profile): the ones you've earned first, hardest won first (the full
+## collection, then the most hours, then each animal's set), then the ones
+## you're closest to, by how much of the way there you are. Takes rows from
+## progress().
+static func showcase(rows: Array) -> Array:
+	var effort := func(r: Dictionary) -> float:
+		match str(r["kind"]):
+			"all_gifts":
+				return 1e9
+			"hours":
+				return 1e6 + float(r["goal"])
+		return float(r["goal"])
+	var earned := rows.filter(func(r): return r["earned"])
+	var rest := rows.filter(func(r): return not r["earned"])
+	earned.sort_custom(func(a, b): return effort.call(a) > effort.call(b))
+	var share := func(r: Dictionary) -> float: return float(r["have"]) / maxf(1.0, float(r["goal"]))
+	# Stable on ties, so equal shares keep the list's own order.
+	var order := {}
+	for i in rest.size():
+		order[rest[i]["id"]] = i
+	rest.sort_custom(func(a, b):
+		var sa: float = share.call(a)
+		var sb: float = share.call(b)
+		return sa > sb if not is_equal_approx(sa, sb) else order[a["id"]] < order[b["id"]])
+	return earned + rest
+
+
 ## 10000 as "10,000".
 static func grouped(n: int) -> String:
 	var s := str(n)

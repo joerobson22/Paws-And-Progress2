@@ -15,9 +15,9 @@ var imported_from_v1 := false
 ## Set when this launch found a walk still running from before the app was
 ## closed: {session, biome}. The shell shows the focus ended screen for it.
 var ended_walk := {}
-## Friends for the leaderboard: [{name, weekly_seconds, walking, look}].
-## Filled by the friends service once accounts exist (roadmap phase 4);
-## never saved locally.
+## Friends for the leaderboard and their profiles (the shape is in
+## Friends). Filled by the friends service once accounts exist (roadmap
+## phase 4); never saved locally. Debug builds start with sample friends.
 var friends: Array = []
 
 var _xp := 0
@@ -30,6 +30,8 @@ const HEARTBEAT := 30.0
 
 func _ready() -> void:
 	rng.randomize()
+	if OS.is_debug_build():
+		friends = Friends.sample()
 	state = SaveSystem.read()
 	if state == null:
 		state = _first_launch_state()

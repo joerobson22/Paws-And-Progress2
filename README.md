@@ -68,19 +68,14 @@ smaller than 800 × 560 points, so layouts never squash.
   animal and place, the other turns the window into a phone's shape and lays
   the app out as on a phone (tap-to-open map, no edge arrows); turning it off
   puts the window back as it was.
-- **Gifts** (left): a shelf for your three favourites (they grow and glint
-  under the pointer; tap one for a closer look and its trade-in), and three
-  rings for how your collection's coming along: gifts discovered (green),
-  pets' gift tables completed (blue) and cosmetics unlocked from gifts
-  (purple). The pencil by the shelf opens the shelf editor, with every gift
-  you've found (sort by rarity, A–Z or animal; pick the same one again and
-  its arrow flips over to reverse it). There it's all drag and drop: onto an empty spot to put a gift
-  up, onto a full one to swap it in, along the shelf to rearrange, and off it
-  to take one down. Gifts on the shelf are greyed out in the collection. On a
-  phone, press and hold a gift first, as dragging scrolls the list. Tap any
-  gift for its trade-in (10 commons for a rare, 5 rares for an epic, 3 epics
-  for a legendary); trading away the last of a shelf gift takes it off the
-  shelf.
+- **Gifts** (left): three rings under "Collection stats" for how your
+  collection's coming along: gifts discovered (green), pets' gift tables
+  completed (blue) and cosmetics unlocked from gifts (purple). Under them,
+  every gift you have, eight to a row (five on a phone), each with its count;
+  only this list scrolls. Sort by rarity, A–Z or pet type (pick the same one
+  again and its arrow flips over to reverse it). Tap a gift for a closer look
+  and its trade-in (10 commons for a rare, 5 rares for an epic, 3 epics for a
+  legendary); trading away the last of a shelf gift takes it off the shelf.
 - **Completed** (right): four headline numbers (projects finished, their
   total focus time, the biggest by focus time and the longest from start to
   finish), then a scrolling list with a panel per finished project. "Sort by"
@@ -89,17 +84,30 @@ smaller than 800 × 560 points, so layouts never squash.
   First, an A* and a 9 share the top band, university first). Tap the circled
   "?" in a panel's corner to give it a GCSE, A-Level or university grade, and
   tap the grade to change it.
-- **Profile** (up): your character (the pencil customises it) with your level
-  badge in the bottom left (it shines under the pointer; tap it for every
-  reward) and your XP along the bottom, and your account details. Your
-  achievements fill the rest of the screen, as many as fit, so the page never
-  scrolls; tap them for the full list with how far along each one is: 10, 50,
-  100, 500, 1,000 and 10,000 hours focused, every gift found, and a set for
-  each animal's gifts (`data/achievements.json`). The settings are behind the
-  gear in the top right.
-- **Stats** (down): this week's focus split by project, past weeks with any
-  focus in them, your streak (one rest day allowed after three days in a row)
-  and the friends leaderboard.
+- **Profile** (up): one card with your character (the pencil customises it),
+  your level badge in the bottom left (it shines under the pointer; tap it
+  for every reward) and your XP along the bottom. Beside it, your details at
+  the top and your gift shelf of three favourites at the bottom. The shelf's
+  pencil opens the shelf editor, with every gift you have (sorted the same
+  way as on Gifts). There it's all drag and drop: onto an empty spot to put a
+  gift up, onto a full one to swap it in, along the shelf to rearrange, and
+  off it to take one down. Gifts on the shelf are greyed out in the
+  collection. On a phone, press and hold a gift first, as dragging scrolls
+  the list. Under the card, as many achievements as fit: earned ones first
+  (hardest won first), then the ones you're closest to. "See all" lists every
+  one with how far along it is: 10, 50, 100, 500, 1,000 and 10,000 hours
+  focused, every gift found, and a set for each animal's gifts
+  (`data/achievements.json`). The page never scrolls. The settings are
+  behind the gear in the top right.
+- **Stats** (down): this week's focus split by project (the projects scroll
+  sideways under the chart), past weeks with any focus in them, your streak
+  as a flame with the days beside it (a blue shield on the flame when you've
+  earned a rest day: one allowed after three days in a row), and the friends
+  leaderboard, which scrolls inside its card. "See full" lists everyone in a
+  popup. Tap a friend's face or name for their profile: their character,
+  where they study, when they joined, their week, their gift shelf (tap a
+  gift for a look) and their achievements. Tap yours for your profile. The
+  page never scrolls. Debug builds come with sample friends (`core/friends.gd`).
 
 On a walk, the button in the corner is a pie chart of the gift your pet will
 bring back. For the first ten minutes a dark green slice sweeps round; then it
@@ -189,6 +197,7 @@ core/            game logic, no UI
   levels.gd        XP from the walk log, levels, and what each one unlocks
   stats.gd         weekly totals, records, streaks (from the session log)
   achievements.gd  achievements and how far along each one is
+  friends.gd       the leaderboard order, and sample friends for debug builds
   collection.gd    the gifts screen's rings: discovered, gift tables, cosmetics
   display.gd       the computer window: mode, size, minimum, debug phone view
   models/          ProjectData, FocusSession resources
@@ -206,8 +215,10 @@ ui/
   ui.gd            palette, type, theme and builders every screen uses
   motion.gd        every animation: one ease-in-out tween style and timings
   modal.gd         popups, confirmations, prompts, colour picker
-  components/      orb, minimap, edge arrow, carousel, gift tile, gift button, project
-                   panel, character and animal drawings, ...
+  components/      orb, minimap, edge arrow, carousel, gift tile, grid, shelf and
+                   details popup, medal card, stat panel, gift button,
+                   leaderboard, friend profile, profile card pieces,
+                   project panel, character and animal drawings, ...
 tests/           headless unit tests and the smoke run
 ```
 

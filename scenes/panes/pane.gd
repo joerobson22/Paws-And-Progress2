@@ -15,12 +15,13 @@ var scroll: ScrollContainer
 ## sets them; computers only), so its content keeps clear of them.
 var arrows: Array[Vector2i] = []
 
-## Room kept clear under a screen's content for the minimap, when the
-## content reaches the bottom left corner (phones).
+## Room kept clear under a screen's content for the minimap on phones,
+## where the content is as wide as the screen.
 const BOTTOM_CLEAR := 96
 ## The usual gap above and below a screen's content.
 const EDGE_GAP := 26
-## Content starting left of this keeps BOTTOM_CLEAR free for the minimap.
+## On computers content keeps this far in from the sides, clear of the
+## minimap in the bottom left corner (and the edge arrows).
 const MAP_CLEAR_X := 88.0
 
 var _dirty := true
@@ -161,23 +162,23 @@ func frame(max_width: float = 680.0, gap: int = 18) -> VBoxContainer:
 func margins(max_width: float) -> Dictionary:
 	var insets := UI.safe_insets(self)
 	var phone := App.phone_layout()
-	var gutter := 32.0 if wide else 18.0
-	var room := float(NavArrow.ROOM + 8)
-	var side := gutter
-	if not phone and (arrows.has(Vector2i.LEFT) or arrows.has(Vector2i.RIGHT)):
-		side = maxf(side, room)
+	var side := 32.0 if wide else 18.0
+	var bottom := float(EDGE_GAP)
+	if phone:
+		# Full width, so leave the bottom free for the minimap.
+		bottom = BOTTOM_CLEAR
+	else:
+		# Narrower instead, clear of the minimap in the corner and the edge
+		# arrows, so the content can go all the way down.
+		side = maxf(side, MAP_CLEAR_X)
+		if arrows.has(Vector2i.DOWN):
+			bottom = float(NavArrow.ROOM + 8)
+	var top := float(EDGE_GAP)
+	if not phone and arrows.has(Vector2i.UP):
+		top = float(NavArrow.ROOM + 8)
 	var left := side + float(insets["left"])
 	var right := side + float(insets["right"])
 	var width := maxf(0.0, minf(max_width, size.x - left - right))
-	var top := float(EDGE_GAP)
-	if not phone and arrows.has(Vector2i.UP):
-		top = maxf(top, room)
-	var bottom := float(EDGE_GAP)
-	if not phone and arrows.has(Vector2i.DOWN):
-		bottom = maxf(bottom, room)
-	# The column is centred, so this is where it starts.
-	if phone or left + (size.x - left - right - width) * 0.5 < MAP_CLEAR_X:
-		bottom = maxf(bottom, BOTTOM_CLEAR)
 	return {"width": width, "left": left, "right": right,
 		"top": top + float(insets["top"]), "bottom": bottom + float(insets["bottom"])}
 

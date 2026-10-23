@@ -54,3 +54,19 @@ func test_gift_sets() -> void:
 	check(not _row(Achievements.progress(list, 0, one_short, gifts), "animal_staffy")["earned"], "one missing")
 	var everything: Array = gifts.map(func(g): return g["id"])
 	check(_row(Achievements.progress(list, 0, everything, gifts), "all_gifts")["earned"], "the full collection")
+
+
+func test_showcase_order() -> void:
+	# 120 hours and every staffy gift: 10, 50 and 100 hours, and the staffy set.
+	var staffy := gifts.filter(func(g): return g["animal"] == "staffy").map(func(g): return g["id"])
+	var rows := Achievements.progress(list, 120 * 3600, staffy, gifts)
+	var shown := Achievements.showcase(rows)
+	eq(shown.slice(0, 4).map(func(r): return r["id"]), ["focus_100", "focus_50", "focus_10", "animal_staffy"], "earned first, hardest won first")
+	eq(shown.size(), rows.size(), "every achievement is still there")
+	# Then the closest: 120 of 500 hours is further along than anything else.
+	eq(shown[4]["id"], "focus_500", "then the one you're closest to")
+	var shares: Array = shown.slice(4).map(func(r): return float(r["have"]) / r["goal"])
+	var sorted := shares.duplicate()
+	sorted.sort()
+	sorted.reverse()
+	eq(shares, sorted, "the rest by how far along they are")

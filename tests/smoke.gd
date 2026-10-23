@@ -151,6 +151,17 @@ func _run() -> void:
 	await _drag(back.get_global_rect().get_center(), back.get_global_rect().get_center(), 1)
 	await _wait(40)
 	check(main._at == Vector2i.ZERO, "and that one comes home")
+	# On every screen the content keeps clear of the map and the arrows.
+	for cell in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+		main._go_cell(cell)
+		await _wait(60)
+		var margin: Node = _find(main._panes[cell], func(n): return n is MarginContainer)
+		var column: Control = margin.get_child(0) if margin and margin.get_child_count() > 0 else null
+		check(column != null and _clear_of_shell(column.get_global_rect()),
+			"%s keeps clear of the map and arrows (%s)" % [main._names[cell], column.get_global_rect() if column else "no column"])
+		await _shot("shell_" + main._names[cell])
+	main._go_cell(Vector2i.ZERO)
+	await _wait(40)
 	await _point(main.size * Vector2(0.5, 0.3))
 	await _wait(10)
 
@@ -223,122 +234,61 @@ func _run() -> void:
 	await _shot("gifts")
 	var gifts_pane: Node = main._panes[Vector2i(-1, 0)]
 	var modal_class := _class("res://ui/modal.gd")
-	# The gifts screen is the shelf and three rings: gifts discovered, pets'
-	# gift tables completed and cosmetics unlocked. The collection itself is in
-	# the shelf editor.
+	var details := _class("res://ui/components/gift_details.gd")
+	# The gifts screen: three rings (gifts discovered, pets' gift tables
+	# completed and cosmetics unlocked), then every gift you have, with its
+	# count, in a list that scrolls on its own. The shelf is on the profile.
 	var counts: Dictionary = _class("res://core/collection.gd").progress(app.state.inventory, _content().gifts, _content().animals)
-	var rings: Array = gifts_pane._rings
+	var rings: Array = _all(gifts_pane._stats, func(n): return _is(n, "progress_ring.gd"))
 	check(rings.size() == 3 and is_equal_approx(rings[0].value, float(counts["found"]) / counts["gifts"])
 		and is_equal_approx(rings[1].value, float(counts["tables"]) / counts["animals"])
 		and is_equal_approx(rings[2].value, float(counts["cosmetics"]) / counts["wearables"]), "three rings (%s)" % [counts])
-	check(_find(gifts_pane, func(n): return _is(n, "gift_tile.gd") and not n._plain) == null, "no collection on the gifts screen itself")
-	# Tapping a shelf gift has a closer look, with no shelf buttons: putting
-	# gifts up and taking them down is all done by dragging, in the editor.
-	var on_shelf: Control = _find(gifts_pane._slots[0], func(n): return _is(n, "gift_tile.gd"))
-	check(on_shelf != null and not on_shelf.draggable, "the shelf on the screen doesn't drag")
-	if on_shelf:
-		await _drag(on_shelf.get_global_rect().get_center(), on_shelf.get_global_rect().get_center(), 1)
+	check(_find(gifts_pane, func(n): return _is(n, "gift_shelf.gd")) == null, "no shelf on the gifts screen")
+	var have: int = app.state.inventory.keys().filter(func(id): return app.state.gift_count(id) > 0).size()
+	var grid_tiles: Array = _all(gifts_pane._grid, func(n): return _is(n, "gift_tile.gd"))
+	check(grid_tiles.size() == have and gifts_pane._grid.columns == (8 if gifts_pane.wide else 5),
+		"every gift you have, %d to a row (%d of %d)" % [gifts_pane._grid.columns, grid_tiles.size(), have])
+	check(grid_tiles.all(func(t): return t.tappable and not t.draggable and _find(t, func(n): return n is Label and n.text.begins_with("×")) != null),
+		"each shows how many you have and can be tapped")
+	# The screens are made to fit a window at least 600 tall (a headless run's
+	# is much smaller, so only the bigger runs check the fit).
+	var roomy: bool = main.size.y >= 590.0
+	check(not roomy or _fits(gifts_pane), "the gifts screen fits without scrolling (%s in %s)" % [gifts_pane.get_child(0).get_combined_minimum_size(), gifts_pane.size])
+	check(gifts_pane.scroll.is_ancestor_of(gifts_pane._grid) and gifts_pane._stats.get_global_rect().end.y < gifts_pane.scroll.get_global_rect().position.y,
+		"only the gifts scroll, under the stats")
+	var sort_on_gifts: Node = _find(gifts_pane, func(n): return _is(n, "dropdown.gd"))
+	check(sort_on_gifts != null and sort_on_gifts.text.begins_with("Sort by"), "a Sort by menu over the gifts")
+	if sort_on_gifts:
+		sort_on_gifts._open()
+		await _wait(15)
+		check(_find(sort_on_gifts._menu, func(n): return n is Button and n.text == "Pet type") != null, "it can sort by pet type")
+		await _shot("gifts_sort")
+		sort_on_gifts._close()
+		await _wait(15)
+	# Tapping a gift has a closer look, with its trade-in.
+	var first_tile: Control = grid_tiles[0] if grid_tiles.size() > 0 else null
+	if first_tile and not roomy:
+		# Too small a window for the list to show: open it directly.
+		details.open(first_tile.gift_id)
+		await _wait(25)
+	elif first_tile:
+		gifts_pane.scroll.ensure_control_visible(first_tile)
+		await _wait(5)
+		var at_first := first_tile.get_global_rect().intersection(gifts_pane.scroll.get_global_rect()).get_center()
+		await _drag(at_first, at_first, 1)
 		await _wait(25)
 	check(modal_class.is_open() and _find(modal_class.top(), func(n): return n is Button and n.text.contains("shelf")) == null,
-		"a shelf gift opens its details, with no shelf buttons")
+		"a gift opens its details, with no shelf buttons")
 	await _shot("gifts_popup")
 	if modal_class.is_open():
 		_close_modal()
 	await _wait(20)
 
-	# The pencil opens the shelf editor, where it's all drag and drop.
-	var pencil_button: Button = _find(gifts_pane, func(n): return n is Button and n.accessibility_name == "Arrange your shelf")
-	check(pencil_button != null, "a pencil by the shelf")
-	if pencil_button:
-		await _drag(pencil_button.get_global_rect().get_center(), pencil_button.get_global_rect().get_center(), 1)
-		await _wait(30)
-	var editor: Node = _find(modal_class.top(), func(n): return _is(n, "shelf_editor.gd")) if modal_class.is_open() else null
-	check(editor != null, "the pencil opens the shelf editor")
-	if editor:
-		var editor_modal: Node = modal_class.top()
-		await _shot("shelf_editor")
-		var common: Control = _editor_tile(editor, "staffy_common")
-		check(common != null and common.mouse_filter == Control.MOUSE_FILTER_IGNORE, "a shelf gift is greyed out in the collection")
-		# Putting one up: hold a gift and drop it on the empty middle spot.
-		var rare_at: Vector2 = await _shown_point(_editor_tile(editor, "staffy_rare"))
-		await _drag(rare_at, editor._slots[1].get_global_rect().get_center(), 12, 0.5)
-		await _wait(30)
-		check(app.state.shelf()[1] == "staffy_rare", "holding a gift and dropping it on an empty spot (shelf is %s)" % [app.state.shelf()])
-		# Swapping one in: with a mouse, just drag another onto the first spot.
-		var replaced: String = app.state.shelf()[0]
-		var incoming: Control = _find(editor._grid, func(n): return _is(n, "gift_tile.gd") and n.draggable)
-		var incoming_id: String = incoming.gift_id
-		var incoming_at: Vector2 = await _shown_point(incoming)
-		await _drag(incoming_at, editor._slots[0].get_global_rect().get_center(), 12)
-		await _wait(30)
-		var back_down: Control = _editor_tile(editor, replaced)
-		check(app.state.shelf()[0] == incoming_id and not app.state.shelf().has(replaced) and back_down != null and back_down.draggable,
-			"dropping a gift on a full spot swaps it in, and the old one's back in the collection (shelf is %s)" % [app.state.shelf()])
-		# Moving one along: drag the first to the last, and they swap.
-		var before: Array = app.state.shelf()
-		await _drag(editor._slots[0].get_global_rect().get_center(), editor._slots[2].get_global_rect().get_center(), 10)
-		await _wait(30)
-		var after: Array = app.state.shelf()
-		check(after[2] == before[0] and after[0] == before[2] and main._at == Vector2i(-1, 0),
-			"dragging a shelf gift along swaps them, without leaving the screen (%s -> %s)" % [before, after])
-		# Taking one down: drag it off the shelf.
-		await _drag(editor._slots[1].get_global_rect().get_center(), editor_modal._scroll.get_global_rect().get_center(), 10)
-		await _wait(30)
-		check(app.state.shelf()[1] == "", "dragging a gift off the shelf takes it down (shelf is %s)" % [app.state.shelf()])
-		# Tapping a gift in the collection has a closer look, over the editor.
-		var look: Control = _find(editor._grid, func(n): return _is(n, "gift_tile.gd") and n.draggable)
-		var at_look: Vector2 = await _shown_point(look)
-		await _drag(at_look, at_look, 1)
-		await _wait(25)
-		check(modal_class.top() != editor_modal and app.state.shelf()[1] == "", "tapping a gift in the editor opens its details")
-		if modal_class.top() != editor_modal:
-			_close_modal()
-			await _wait(20)
-
-		# The sort menu: picking an option sorts by it straight away; picking it
-		# again flips its arrow, and only then reverses and closes by itself.
-		var sort: Node = _find(editor_modal, func(n): return _is(n, "dropdown.gd"))
-		check(sort.text.begins_with("Sort by"), "the menu says Sort by (%s)" % sort.text)
-		sort._open()
-		await _wait(15)
-		await _shot("gift_filter")
-		await _tap_menu(sort, "A–Z")
-		await _wait(15)
-		check(app.state.settings.get("gift_sort") == "name" and not app.state.settings.get("gift_sort_reversed") and not is_instance_valid(sort._menu),
-			"sort by A-Z, and the menu closes")
-		sort._open()
-		await _wait(15)
-		await _tap_menu(sort, "A–Z")
-		await _wait(6)
-		check(sort._flipping and is_instance_valid(sort._menu) and not app.state.settings.get("gift_sort_reversed"), "the arrow flips before anything changes")
-		await _shot("gift_sort_flip")
-		await _tap_menu(sort, "Rarity")
-		# Animations run on real time, which a slow display stretches out.
-		for i in 60:
-			if not sort._flipping and not is_instance_valid(sort._menu):
-				break
-			await _wait(5)
-		check(app.state.settings.get("gift_sort") == "name" and app.state.settings.get("gift_sort_reversed") == true and not is_instance_valid(sort._menu),
-			"then A-Z reverses and the menu closes by itself (taps during the flip do nothing)")
-		var shown := []
-		for t in _all(editor._grid, func(n): return _is(n, "gift_tile.gd")):
-			shown.append(_content().gift(t.gift_id)["name"].to_lower())
-		var sorted := shown.duplicate()
-		sorted.sort()
-		sorted.reverse()
-		check(shown.size() > 10 and shown == sorted, "Z-A order in the collection")
-		sort._open()
-		await _wait(15)
-		await _tap_menu(sort, "Rarity")
-		await _wait(15)
-		_close_modal()
-		await _wait(20)
-
 	# Trading in ten commons for a rare.
 	var rares: int = app.state.gift_count("staffy_rare")
-	gifts_pane.show_gift("staffy_common")
+	details.open("staffy_common")
 	await _wait(20)
-	gifts_pane._trade(modal_class.top(), "staffy_common")
+	details.trade(modal_class.top(), "staffy_common")
 	await _wait(25)
 	check(app.state.gift_count("staffy_common") == 2 and app.state.gift_count("staffy_rare") == rares + 1, "trade in")
 	await _shot("trade_result")
@@ -349,13 +299,15 @@ func _run() -> void:
 	app.state.inventory["staffy_common"] = 10
 	app.place_on_shelf("staffy_common", 0)
 	await _wait(10)
-	gifts_pane.show_gift("staffy_common")
+	details.open("staffy_common")
 	await _wait(20)
-	gifts_pane._trade(modal_class.top(), "staffy_common")
+	details.trade(modal_class.top(), "staffy_common")
 	await _wait(25)
-	check(not app.state.shelf().has("staffy_common") and _find(gifts_pane._slots[0], func(n): return _is(n, "gift_tile.gd")) == null,
-		"trading away all of a shelf gift takes it off the shelf")
+	check(not app.state.shelf().has("staffy_common"), "trading away all of a shelf gift takes it off the shelf")
 	_close_modal()
+	await _wait(10)
+	app.state.inventory["staffy_common"] = 12
+	app.place_on_shelf("staffy_common", 0)
 	await _wait(10)
 
 	# A drag the other way goes back to the middle; a short drag snaps back.
@@ -472,27 +424,45 @@ func _run() -> void:
 		if modal_class.is_open():
 			_close_modal()
 		await _wait(15)
-	# Details at the top; the achievements fill the rest of the screen with as
-	# many medals as fit, and tapping them lists every one in a popup.
+	# The card holds your details and, along its bottom, your shelf: only to
+	# look at, with a pencil for the editor. Under it, your best achievements
+	# (earned first) end in "See all", which lists every one in a popup.
+	check(not roomy or _fits(profile_pane), "the profile fits without scrolling (%s in %s)" % [profile_pane.get_child(0).get_combined_minimum_size(), profile_pane.size])
+	var shelf: Node = _find(profile_pane, func(n): return _is(n, "gift_shelf.gd"))
+	check(shelf != null and shelf.get_global_rect().end.y <= picture.get_global_rect().end.y + 1.0, "the shelf is in the card")
+	if shelf:
+		var shelf_gifts: Array = _all(shelf, func(n): return _is(n, "gift_tile.gd"))
+		check(shelf_gifts.size() == 2 and shelf_gifts.all(func(t): return t.mouse_filter == Control.MOUSE_FILTER_IGNORE),
+			"two gifts on the shelf, only to look at")
 	var medals: Array = _all(profile_pane, func(n): return n is VBoxContainer and n.get_script() != null and "info" in n and n.info is Dictionary and n.info.has("earned"))
-	check(medals.size() >= 3, "achievements on the profile (%d)" % medals.size())
-	check(medals.any(func(m): return m.info["earned"]) and medals.any(func(m): return not m.info["earned"]), "some earned, some still to get")
-	var medal_card: Control = _find(profile_pane, func(n): return n is PanelContainer and "rows" in n)
-	if main.size.y >= 700.0:
-		var page_column: Control = profile_pane.scroll.get_child(0)
-		check(page_column.get_combined_minimum_size().y <= profile_pane.scroll.size.y + 1.0 and medal_card.get_global_rect().end.y <= main.size.y - 80.0,
-			"the achievements fit on the screen, clear of the minimap")
+	check(medals.size() >= 2, "achievements on the profile (%d)" % medals.size())
+	var earned_first := true
+	for i in range(1, medals.size()):
+		if medals[i].info["earned"] and not medals[i - 1].info["earned"]:
+			earned_first = false
+	# The sample data has 7 earned.
+	check(medals[0].info["earned"] and earned_first and (medals.size() <= 7 or medals.any(func(m): return not m.info["earned"])),
+		"earned ones first, then the closest")
+	for m in medals:
+		var disc: Control = m.get_child(0)
+		var card_rect: Rect2 = m.get_parent().get_parent().get_global_rect()
+		if not card_rect.encloses(disc.get_global_rect()):
+			check(false, "%s's medal isn't clipped" % m.info["name"])
+			break
+	check(medals.all(func(m): return m.get_child(1).get_line_count() == 1 and m.get_child(1).text_overrun_behavior != TextServer.OVERRUN_NO_TRIMMING),
+		"medal names stay on one line")
+	var see_all: Control = _find(profile_pane, func(n): return n is Control and n.accessibility_name == "See every achievement")
+	check(see_all != null and (not roomy or _clear_of_shell(see_all.get_global_rect())), "See all, clear of the minimap and the arrows")
 	var every: int = profile_pane.achievement_rows().size()
-	if medal_card:
-		# On a short window the page scrolls, so bring it into view first.
-		profile_pane.scroll.ensure_control_visible(medal_card)
-		await _wait(5)
-		# Its right side: the bottom left corner can be under the minimap.
-		var on_card: Vector2 = Vector2(medal_card.get_global_rect().end.x - 40.0, medal_card.get_global_rect().position.y + 40.0)
-		await _drag(on_card, on_card, 1)
+	if see_all and not roomy:
+		see_all.get_parent().get_parent().get_parent().open_list(profile_pane.achievement_rows())
+		await _wait(25)
+	elif see_all:
+		var on_more := see_all.get_global_rect().get_center()
+		await _drag(on_more, on_more, 1)
 		await _wait(25)
 	check(modal_class.is_open() and _find(modal_class.top().header, func(n): return n is Label and n.text == "Achievements") != null,
-		"tapping the achievements opens them, titled \"Achievements\"")
+		"See all opens them, titled \"Achievements\"")
 	if modal_class.is_open():
 		var listed: Array = _all(modal_class.top().body, func(n): return "diameter" in n)
 		check(listed.size() == every, "every achievement in the list (%d of %d)" % [listed.size(), every])
@@ -501,6 +471,19 @@ func _run() -> void:
 		await _shot("achievements")
 		_close_modal()
 		await _wait(20)
+
+	# The pencil by the shelf opens the shelf editor, where it's all drag
+	# and drop.
+	var pencil_button: Button = _find(profile_pane, func(n): return n is Button and n.accessibility_name == "Arrange your shelf")
+	check(pencil_button != null, "a pencil by the shelf")
+	if pencil_button:
+		await _drag(pencil_button.get_global_rect().get_center(), pencil_button.get_global_rect().get_center(), 1)
+		await _wait(30)
+	var editor: Node = _find(modal_class.top(), func(n): return _is(n, "shelf_editor.gd")) if modal_class.is_open() else null
+	check(editor != null, "the pencil opens the shelf editor")
+	if editor:
+		await _shelf_editor(editor)
+
 	profile_pane.open_settings()
 	await _wait(25)
 	check(main._arrows.values().all(func(a): return not a.visible), "the edge arrows hide while a popup is up")
@@ -533,6 +516,7 @@ func _run() -> void:
 	await _wait(25)
 	await _shot("stats_popup")
 	_close_modal()
+	await _stats_and_friends(main)
 	main._panes[Vector2i(0, 1)]._select_week(main._panes[Vector2i(0, 1)]._week - 7)
 	await _wait(10)
 
@@ -908,13 +892,193 @@ func _fill_sample_data() -> void:
 	app.state.inventory["bird_epic"] = 1
 	app.state.place_on_shelf("staffy_common", 0)
 	app.state.place_on_shelf("bird_epic", 2)
-	app.friends = [
-		{"name": "Sam", "weekly_seconds": 9 * 3600, "walking": true, "look": {"skin_tone": 3, "hair_tone": 0, "cosmetics": {"hair": "hair_curly", "hat": "hat_beanie"}}},
-		{"name": "Priya", "weekly_seconds": 6 * 3600 + 1200, "walking": false, "look": {"skin_tone": 2, "hair_tone": 0, "cosmetics": {"hair": "hair_long", "face": "face_smile"}}},
-		{"name": "Alex", "weekly_seconds": 2 * 3600, "walking": false, "look": {"skin_tone": 0, "hair_tone": 3, "cosmetics": {"hair": "hair_bun", "hat": "hat_cap"}}},
-	]
+	app.friends = _class("res://core/friends.gd").sample()
 	app.state_changed.emit()
 
+
+## Stats fits the screen, with the friends leaderboard under the chart;
+## "See full" lists everyone, and tapping a friend opens their profile.
+func _stats_and_friends(main: Node) -> void:
+	var app := _app()
+	var modal_class := _class("res://ui/modal.gd")
+	var stats_pane: Control = main._panes[Vector2i(0, 1)]
+	check(stats_pane.scroll == null, "stats doesn't scroll as a page")
+	var streak: Label = _find(stats_pane, func(n): return n is Label and n.text.ends_with(" days"))
+	check(streak != null and _find(stats_pane, func(n): return n is Label and n.text == "streak") == null, "the streak just says how many days")
+	var chips: Array = _all(stats_pane._legend, func(n): return n is Button)
+	check(chips.size() > 1 and chips.all(func(b): return b.text.split("  ")[0].length() <= 13), "project names in the strip are cut to 10 letters")
+	check(chips.any(func(b): return b.text.begins_with("Dissertati...")), "a long name ends in ...")
+	check(stats_pane._legend.get_parent().get_parent() is ScrollContainer, "the projects scroll sideways")
+	var board: Control = _find(stats_pane, func(n): return _is(n, "leaderboard.gd"))
+	check(board != null and board.rows.size() == app.friends.size() + 1, "the leaderboard has you and every friend")
+	if board == null:
+		return
+	if main.size.y >= 590:
+		check(_clear_of_shell(board.get_global_rect()) and board.get_global_rect().end.y <= main.size.y,
+			"the leaderboard fits, clear of the map and the arrows")
+		check(stats_pane._chart.size.y >= 100.0, "the chart keeps room to read")
+		var board_rect: Rect2 = board.get_global_rect()
+		var seen_me := func(n): return n is Control and n.has_meta("press") and n.accessibility_name == "Your profile" and n.is_visible_in_tree() and board_rect.encloses(n.get_global_rect())
+		check(_all(board, seen_me).size() == 1, "your row always shows on the leaderboard card")
+	check(_find(board, func(n): return n is TextureRect and n.texture == _class("res://ui/icons.gd").texture("trophy", 22, _class("res://ui/ui.gd").ACCENT)) != null, "a trophy by the heading")
+	var full: Button = _find(board, func(n): return n is Button and n.text == "See full")
+	check(full != null, "a See full button")
+	if full:
+		await _tap_control(full, main)
+	check(modal_class.is_open() and _find(modal_class.top(), func(n): return n is Label and n.text == "Friend leaderboard") != null, "See full opens the whole leaderboard")
+	if modal_class.is_open():
+		check(_all(modal_class.top().body, func(n): return n.has_meta("press")).size() == app.friends.size() + 1, "everyone is in it")
+		await _shot("leaderboard_full")
+		_close_modal()
+		await _wait(20)
+
+	# Tapping a friend's name opens their profile, over everything.
+	var friend_row: Control = _find(board, func(n): return n.has_meta("press") and n.accessibility_name == "Mei's profile")
+	check(friend_row != null, "friends' names can be tapped")
+	if friend_row:
+		await _tap_control(friend_row, main)
+	var popup: Node = modal_class.top() if modal_class.is_open() else null
+	check(popup != null and _find(popup, func(n): return n is Label and n.text == "Mei") != null, "it opens their profile")
+	if popup:
+		check(_find(popup, func(n): return n is Label and n.text == "University of York") != null, "with where they study")
+		check(_find(popup, func(n): return _is(n, "medal_card.gd")) != null, "and their achievements")
+		await _shot("friend_profile")
+		var tile: Control = _find(popup, func(n): return _is(n, "gift_tile.gd"))
+		check(tile != null and tile.tappable, "their shelf gifts can be tapped")
+		if tile:
+			await _tap_control(tile, main)
+			var details: Node = modal_class.top()
+			check(details != popup and _find(details, func(n): return n is Label and n.text.begins_with("You have")) == null
+				and _find(details, func(n): return n is Button and n.text.begins_with("Trade")) == null, "their gift shows without a count or trade-in")
+			await _shot("friend_gift")
+			_close_modal()
+			await _wait(20)
+		_close_modal()
+		await _wait(20)
+
+	# Tapping yourself goes to your profile.
+	var me_row: Control = _find(board, func(n): return n.has_meta("press") and n.accessibility_name == "Your profile")
+	if me_row:
+		await _tap_control(me_row, main)
+		await _wait(20)
+	check(main._at == main.PANES["profile"][0] and not modal_class.is_open(), "tapping yourself goes to your profile")
+	app.go("stats")
+	await _wait(50)
+
+
+## Taps `c`, scrolling it into view first. In the CI's tiny window it may
+## still be out of sight, so there it presses it directly.
+func _tap_control(c: Control, main: Node) -> void:
+	var n: Node = c.get_parent()
+	while n and not n is ScrollContainer:
+		n = n.get_parent()
+	if n:
+		(n as ScrollContainer).ensure_control_visible(c)
+		await _wait(5)
+	var at := c.get_global_rect().get_center()
+	if main.size.y >= 590 and Rect2(Vector2.ZERO, main.size).has_point(at):
+		await _drag(at, at, 1)
+	elif c is BaseButton:
+		c.pressed.emit()
+	elif c.has_meta("press"):
+		c.get_meta("press").tapped.emit()
+	elif _is(c, "gift_tile.gd"):
+		c.tapped.emit(c.gift_id)
+	await _wait(30)
+
+
+## The shelf editor, open from the profile: putting gifts up, swapping,
+## moving and taking them down, all by dragging, and the sort menu.
+func _shelf_editor(editor: Node) -> void:
+	var app := _app()
+	var main := _main()
+	var modal_class := _class("res://ui/modal.gd")
+	var editor_modal: Node = modal_class.top()
+	await _shot("shelf_editor")
+	var common: Control = _editor_tile(editor, "staffy_common")
+	check(common != null and common.mouse_filter == Control.MOUSE_FILTER_IGNORE, "a shelf gift is greyed out in the collection")
+	check(_all(editor._grid, func(n): return n is Label and n.text.begins_with("×")).is_empty(), "no counts in the editor")
+	# Putting one up: hold a gift and drop it on the empty middle spot.
+	var rare_at: Vector2 = await _shown_point(_editor_tile(editor, "staffy_rare"))
+	await _drag(rare_at, editor._slots[1].get_global_rect().get_center(), 12, 0.5)
+	await _wait(30)
+	check(app.state.shelf()[1] == "staffy_rare", "holding a gift and dropping it on an empty spot (shelf is %s)" % [app.state.shelf()])
+	# Swapping one in: with a mouse, just drag another onto the first spot.
+	var replaced: String = app.state.shelf()[0]
+	var incoming: Control = _find(editor._grid, func(n): return _is(n, "gift_tile.gd") and n.draggable)
+	var incoming_id: String = incoming.gift_id
+	var incoming_at: Vector2 = await _shown_point(incoming)
+	await _drag(incoming_at, editor._slots[0].get_global_rect().get_center(), 12)
+	await _wait(30)
+	var back_down: Control = _editor_tile(editor, replaced)
+	check(app.state.shelf()[0] == incoming_id and not app.state.shelf().has(replaced) and back_down != null and back_down.draggable,
+		"dropping a gift on a full spot swaps it in, and the old one's back in the collection (shelf is %s)" % [app.state.shelf()])
+	# Moving one along: drag the first to the last, and they swap.
+	var before: Array = app.state.shelf()
+	await _drag(editor._slots[0].get_global_rect().get_center(), editor._slots[2].get_global_rect().get_center(), 10)
+	await _wait(30)
+	var after: Array = app.state.shelf()
+	check(after[2] == before[0] and after[0] == before[2] and main._at == Vector2i(0, -1),
+		"dragging a shelf gift along swaps them, without leaving the screen (%s -> %s)" % [before, after])
+	# Taking one down: drag it off the shelf.
+	await _drag(editor._slots[1].get_global_rect().get_center(), editor_modal._scroll.get_global_rect().get_center(), 10)
+	await _wait(30)
+	check(app.state.shelf()[1] == "", "dragging a gift off the shelf takes it down (shelf is %s)" % [app.state.shelf()])
+	# Tapping a gift in the editor does nothing: details live on the gifts screen.
+	var look: Control = _find(editor._grid, func(n): return _is(n, "gift_tile.gd") and n.draggable)
+	var at_look: Vector2 = await _shown_point(look)
+	await _drag(at_look, at_look, 1)
+	await _wait(25)
+	check(modal_class.top() == editor_modal and app.state.shelf()[1] == "", "tapping a gift in the editor does nothing")
+	if modal_class.top() != editor_modal:
+		_close_modal()
+		await _wait(20)
+
+	# The sort menu: picking an option sorts by it straight away; picking it
+	# again flips its arrow, and only then reverses and closes by itself.
+	var sort: Node = _find(editor_modal, func(n): return _is(n, "dropdown.gd"))
+	check(sort.text.begins_with("Sort by"), "the menu says Sort by (%s)" % sort.text)
+	sort._open()
+	await _wait(15)
+	await _shot("gift_filter")
+	await _tap_menu(sort, "A–Z")
+	await _wait(15)
+	check(app.state.settings.get("gift_sort") == "name" and not app.state.settings.get("gift_sort_reversed") and not is_instance_valid(sort._menu),
+		"sort by A-Z, and the menu closes")
+	sort._open()
+	await _wait(15)
+	await _tap_menu(sort, "A–Z")
+	await _wait(6)
+	check(sort._flipping and is_instance_valid(sort._menu) and not app.state.settings.get("gift_sort_reversed"), "the arrow flips before anything changes")
+	await _shot("gift_sort_flip")
+	await _tap_menu(sort, "Rarity")
+	# Animations run on real time, which a slow display stretches out.
+	for i in 60:
+		if not sort._flipping and not is_instance_valid(sort._menu):
+			break
+		await _wait(5)
+	check(app.state.settings.get("gift_sort") == "name" and app.state.settings.get("gift_sort_reversed") == true and not is_instance_valid(sort._menu),
+		"then A-Z reverses and the menu closes by itself (taps during the flip do nothing)")
+	var shown := []
+	for t in _all(editor._grid, func(n): return _is(n, "gift_tile.gd")):
+		shown.append(_content().gift(t.gift_id)["name"].to_lower())
+	var sorted := shown.duplicate()
+	sorted.sort()
+	sorted.reverse()
+	check(shown.size() > 10 and shown == sorted, "Z-A order in the collection")
+	sort._open()
+	await _wait(15)
+	await _tap_menu(sort, "Rarity")
+	await _wait(15)
+	_close_modal()
+	await _wait(20)
+
+
+## Whether a pane's content fits on its screen, with nothing cut off at the
+## bottom (the screens don't scroll).
+func _fits(pane: Control) -> bool:
+	var margin: Control = pane.get_child(0)
+	return margin.get_combined_minimum_size().y <= pane.size.y + 1.0
 
 ## Presses at `from`, optionally holds still for `hold` seconds, drags to
 ## `to` over a few frames and lets go.
@@ -987,6 +1151,21 @@ func _find(node: Node, match: Callable) -> Node:
 		if deeper:
 			return deeper
 	return null
+
+
+## True if `rect` keeps clear of the minimap (small) and the showing edge
+## arrows, so nothing on a screen sits under them.
+func _clear_of_shell(rect: Rect2) -> bool:
+	var main := _main()
+	var map: Control = main._minimap
+	var map_rect := Rect2(Vector2(main.MAP_INSET, main.size.y - main.MAP_INSET - map.CELL.x * 3.0 - map.GAP.x * 2.0 - map.PAD.x * 2.0),
+		Vector2.ONE * (map.CELL.x * 3.0 + map.GAP.x * 2.0 + map.PAD.x * 2.0))
+	if rect.intersects(map_rect):
+		return false
+	for dir in main._ways_from(main._at):
+		if not _app().phone_layout() and rect.intersects(main._arrows[dir].get_global_rect()):
+			return false
+	return true
 
 
 ## Moves the pointer to `at` with no button down, as a mouse hovering.

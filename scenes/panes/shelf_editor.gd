@@ -1,22 +1,23 @@
 class_name ShelfEditor
 extends Control
-## Arranging the shelf, in a popup from the pencil on the gifts screen: the
-## three spots stay along the top with every gift you've found scrolling
-## below (in the order picked from "Sort by"). It's all drag and drop:
-## drag a gift onto an empty spot to put it there, onto a full one to swap
-## it in, along the shelf to move it, or off the shelf to take it down.
+## Arranging the shelf, in a popup from the pencil by the shelf on your
+## profile: the three spots stay along the top with every gift you have
+## scrolling below (in the order picked from "Sort by"). It's all drag and
+## drop: drag a gift onto an empty spot to put it there, onto a full one to
+## swap it in, along the shelf to move it, or off the shelf to take it down.
 ## Gifts already on the shelf are greyed out below. On a computer, gifts
 ## pick up as soon as you drag them; on a phone or tablet dragging scrolls
-## the list, so press and hold one first. Tap any gift for a closer look. Every change saves
-## straight away, and being a popup, none of it can move the app between
-## screens.
+## the list, so press and hold one first. There's no tapping here: details
+## and trade-ins are on the gifts screen. Every change saves straight away,
+## and being a popup, none of it can move the app between screens.
 
-const SORTS := [["rarity", "Rarity"], ["name", "A–Z"], ["animal", "Animal"]]
+## Gifts per row in the collection.
+const PER_ROW := 5
 
 var modal: Modal
 var _shelf_box: VBoxContainer
-var _grid: GridContainer
-var _slots: Array[Slot] = []
+var _grid: GiftGrid
+var _slots: Array[GiftShelf.Slot] = []
 var _ghost: GiftArt
 var _drag_id := ""
 var _drag_from := -1
@@ -36,17 +37,16 @@ static func open() -> Modal:
 	m.header.add_child(editor._shelf_box)
 	var how := "Drag gifts onto the shelf, along it and off it." if _quick() \
 		else "Hold a gift to pick it up, then drag it onto the shelf, along it or off it."
-	m.header.add_child(UI.para(how + " Tap one for a closer look.", 13, UI.INK_SOFT))
+	m.header.add_child(UI.para(how, 13, UI.INK_SOFT))
 	var head := UI.hbox(8)
 	var cap := UI.caption("Your collection")
 	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(cap)
 	head.add_child(UI.spacer())
-	head.add_child(Dropdown.for_setting(SORTS, "gift_sort", "rarity"))
+	head.add_child(GiftGrid.sort_menu())
 	m.header.add_child(head)
-	editor._grid = GridContainer.new()
-	editor._grid.add_theme_constant_override("h_separation", 10)
-	editor._grid.add_theme_constant_override("v_separation", 10)
+	var per_row := PER_ROW if m.body.custom_minimum_size.x >= 420.0 else 4
+	editor._grid = GiftGrid.new(per_row, editor._collection_tile)
 	m.body.add_child(editor._grid)
 	# The editor itself lies over the whole popup, so the gift being dragged
 	# draws on top of everything.
@@ -65,72 +65,31 @@ static func _quick() -> bool:
 	return OS.has_feature("pc")
 
 
-## Rarity puts the rarest first; A–Z is by name; animal follows the cast,
-## commonest first within each. `reversed` flips the whole order.
-static func sort_gifts(ids: Array, by: String, reversed: bool) -> Array:
-	var order := {}
-	for i in Content.animals.size():
-		order[Content.animals[i]["id"]] = i
-	var key := func(id: String) -> Array:
-		var g := Content.gift(id)
-		var rarity := GiftRoller.RARITIES.find(g["rarity"])
-		match by:
-			"name":
-				return [str(g["name"]).to_lower()]
-			"animal":
-				return [order.get(g["animal"], 99), rarity]
-			_:
-				return [-rarity, str(g["name"]).to_lower()]
-	var out := ids.duplicate()
-	out.sort_custom(func(a, b): return key.call(a) < key.call(b))
-	if reversed:
-		out.reverse()
-	return out
-
-
 ## Rebuilds the shelf and the collection from the saved state.
 func refresh() -> void:
-	for c in _shelf_box.get_children() + _grid.get_children():
-		c.get_parent().remove_child(c)
+	for c in _shelf_box.get_children():
+		_shelf_box.remove_child(c)
 		c.queue_free()
-	_slots.clear()
-	var row := UI.hbox(10)
-	var shelf := App.state.shelf()
-	for i in shelf.size():
-		var slot := Slot.new()
-		slot.custom_minimum_size = Vector2(0, 104)
-		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var id: String = shelf[i]
-		if id != "" and App.state.gift_count(id) > 0:
-			var tile := GiftTile.new(id, App.state.gift_count(id), true)
-			tile.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-			tile.draggable = true
-			tile.quick_drag = true
-			tile.lifted.connect(_lift.bind(i))
-			tile.tapped.connect(GiftsPane.show_gift)
-			slot.add_child(tile)
-			slot.filled = true
-		row.add_child(slot)
-		_slots.append(slot)
-	_shelf_box.add_child(row)
-	var plank := Plank.new()
-	plank.custom_minimum_size.y = 18
-	_shelf_box.add_child(plank)
+	var shelf := GiftShelf.new(GiftShelf.mine(), 104, func(tile: GiftTile, i: int):
+		tile.draggable = true
+		tile.quick_drag = true
+		tile.lifted.connect(_lift.bind(i)))
+	_slots = shelf.slots
+	_shelf_box.add_child(shelf)
+	_grid.refresh()
 
-	_grid.columns = 5 if modal.body.custom_minimum_size.x >= 420.0 else 4
-	# Found gifts you have at least one of: a traded-away gift can't go up.
-	var ids: Array = App.state.inventory.keys().filter(func(gift): return not Content.gift(gift).is_empty() and App.state.gift_count(gift) > 0)
-	for id in sort_gifts(ids, str(App.state.settings.get("gift_sort", "rarity")), bool(App.state.settings.get("gift_sort_reversed", false))):
-		var tile := GiftTile.new(id, App.state.gift_count(id))
-		tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if shelf.has(id):
-			tile.set_on_shelf()
-		else:
-			tile.draggable = true
-			tile.quick_drag = _quick()
-			tile.lifted.connect(_lift.bind(-1))
-			tile.tapped.connect(GiftsPane.show_gift)
-		_grid.add_child(tile)
+
+## A gift in the collection: just its picture, with no count, to drag up
+## onto the shelf.
+func _collection_tile(id: String) -> GiftTile:
+	var tile := GiftTile.new(id)
+	if App.state.shelf().has(id):
+		tile.set_on_shelf()
+	else:
+		tile.draggable = true
+		tile.quick_drag = _quick()
+		tile.lifted.connect(_lift.bind(-1))
+	return tile
 
 
 # --- Dragging ----------------------------------------------------------------
@@ -239,35 +198,3 @@ func _drop() -> void:
 	_off_shelf = false
 
 
-
-## One spot on the shelf: dashed when empty, lit up while a gift hovers over it.
-class Slot extends Control:
-	var filled := false
-	var highlight := false:
-		set(v):
-			highlight = v
-			queue_redraw()
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_PASS
-
-	func _draw() -> void:
-		var r := Rect2(Vector2(4, 4), size - Vector2(8, 8))
-		if highlight:
-			draw_style_box(UI.box(UI.ACCENT_SOFT, UI.ACCENT, 20), r)
-		elif not filled:
-			var c := r.get_center()
-			var d := minf(r.size.x, r.size.y) * 0.62
-			draw_arc(c, d * 0.5, 0, TAU, 40, UI.LINE, 2.0, true)
-			var plus := Icons.texture("plus", 20, UI.INK_FAINT)
-			draw_texture(plus, c - Vector2(10, 10))
-
-
-## The shelf itself: a soft plank under the three spots.
-class Plank extends Control:
-	func _draw() -> void:
-		var b := UI.box(UI.SHELF, Color.TRANSPARENT, 7)
-		b.shadow_color = Color(0, 0, 0, 0.08)
-		b.shadow_size = 6
-		b.shadow_offset = Vector2(0, 3)
-		draw_style_box(b, Rect2(Vector2(0, 2), Vector2(size.x, 10)))

@@ -1,44 +1,34 @@
 extends Pane
-## Your profile, above the focus screen. At the top: your character head to
-## toe (the pencil changes how they look) with your level badge in the
-## bottom left and your XP filling a bar along the bottom (tap the badge for
-## everything levelling up unlocks), and your account details. Under them,
-## your achievements fill the rest of the screen, as many medals as fit, so
-## the page never needs scrolling; tap them for the full list. The gear in
-## the top right opens the settings.
+## Your profile, above the focus screen. One card at the top: your
+## character head to toe on the left (the pencil changes how they look),
+## with your level badge in the bottom left and your XP filling a bar along
+## the bottom (tap the badge for everything levelling up unlocks). On the
+## right, your details at the top and your gift shelf at the bottom, with a
+## pencil to arrange it. Under the card, as many of your best achievements
+## as fit; "See all" lists every one. It all fits the screen without scrolling. The
+## gear in the top right opens the settings.
 
 
 func build() -> void:
-	var col := page(720, 16, true)
+	var col := frame(720, 14)
 	var head := title_row("Profile")
 	head.add_child(UI.round_button("gear", "Settings", open_settings, UI.SURFACE, UI.INK, 44))
 	col.add_child(head)
-	var p := App.state.profile
 
-	var me := UI.card(UI.SURFACE, 18)
-	var body: BoxContainer
-	if wide:
-		body = UI.hbox(24)
-	else:
-		body = UI.vbox(12)
+	var me := UI.card(UI.SURFACE, 14)
+	# On a tall screen the card and the achievements share the spare room:
+	# the character grows, and more medals fit.
+	me.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var body := UI.hbox(22 if wide else 14)
 	me.add_child(body)
 	col.add_child(me)
 	body.add_child(_figure())
-
-	var info := UI.vbox(2)
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.alignment = BoxContainer.ALIGNMENT_CENTER
-	var username := str(p.get("username", ""))
-	info.add_child(_field("Username", username if username != "" else "Add your name", username == "",
-		_edit.bind("username", "Your name", "What should we call you?", 24)))
-	info.add_child(UI.divider())
-	var school := str(p.get("institution", ""))
-	info.add_child(_field("School, college or university", school if school != "" else "Add where you study", school == "",
-		_edit.bind("institution", "Where do you study?", "e.g. University of Leeds", 60)))
-	info.add_child(UI.divider())
-	var joined := int(p.get("created_unix", 0))
-	info.add_child(_field("Joined", Stats.format_date(joined, App.tz_bias()) if joined > 0 else "Today", false, Callable()))
-	body.add_child(info)
+	var side := UI.vbox(8)
+	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side.add_child(_details())
+	side.add_child(UI.spacer(true))
+	side.add_child(_shelf())
+	body.add_child(side)
 
 	col.add_child(_achievements())
 
@@ -46,10 +36,10 @@ func build() -> void:
 ## The character, with a pencil in the corner to change how they look. Your
 ## level badge sits in the bottom left with your XP filling a bar along the
 ## bottom; the badge shines under the pointer, and tapping it shows every
-## reward levelling up brings.
+## reward levelling up brings. It's as tall as the card.
 func _figure() -> Control:
-	var figure := UI.character_portrait({}, Vector2(230 if wide else 0, 300 if wide else 250), false, UI.ACCENT_SOFT, 48.0)
-	var pencil := UI.round_button("edit", "Customise your character", Customise.open, UI.SURFACE, UI.INK, 36)
+	var figure := UI.character_portrait({}, Vector2(220 if wide else 128, 0), false, UI.ACCENT_SOFT, 48.0)
+	var pencil := UI.round_button("edit", "Customise your character", Customise.open, UI.SURFACE, UI.INK, 34)
 	figure.add_child(pencil)
 
 	var level := LevelBar.new(App.xp(), false, false)
@@ -65,27 +55,30 @@ func _figure() -> Control:
 	figure.resized.connect(func():
 		pencil.size = pencil.get_combined_minimum_size()
 		pencil.position = Vector2(figure.size.x - pencil.size.x - 8, 8)
-		level.size = Vector2(figure.size.x - 20, level.get_combined_minimum_size().y)
-		level.position = Vector2(10, figure.size.y - level.size.y - 10))
+		level.size = Vector2(figure.size.x - 16, level.get_combined_minimum_size().y)
+		level.position = Vector2(8, figure.size.y - level.size.y - 8))
 	return figure
 
 
-## A labelled detail; tappable to edit when `on_tap` is given.
-func _field(title: String, value: String, placeholder: bool, on_tap: Callable) -> Control:
-	var row := UI.hbox(10)
-	row.custom_minimum_size.y = 52
-	var text := UI.vbox(0)
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.alignment = BoxContainer.ALIGNMENT_CENTER
-	text.add_child(UI.caption(title))
-	text.add_child(UI.trimmed(value, 18, UI.INK_FAINT if placeholder else UI.INK, false, 800))
-	row.add_child(text)
-	if on_tap.is_valid():
-		var b := UI.round_button("edit", "Edit %s" % title.to_lower(), on_tap, UI.SURFACE_SOFT, UI.INK, 38, false)
-		row.add_child(b)
-		row.mouse_filter = Control.MOUSE_FILTER_STOP
-		Press.attach(row).tapped.connect(on_tap)
-	return row
+## Your name, where you study and when you joined: small, at the top.
+func _details() -> Control:
+	var p := App.state.profile
+	var username := str(p.get("username", ""))
+	var school := str(p.get("institution", ""))
+	var joined := int(p.get("created_unix", 0))
+	return ProfileCard.details([
+		ProfileCard.field("Username", username if username != "" else "Add your name", username == "",
+			_edit.bind("username", "Your name", "What should we call you?", 24)),
+		ProfileCard.field("School, college or university", school if school != "" else "Add where you study", school == "",
+			_edit.bind("institution", "Where do you study?", "e.g. University of Leeds", 60)),
+		ProfileCard.field("Joined", Stats.format_date(joined, App.tz_bias()) if joined > 0 else "Today"),
+	])
+
+
+## Your gift shelf, along the bottom of the card, with a pencil that opens
+## the shelf editor. The gifts here are only to look at.
+func _shelf() -> Control:
+	return ProfileCard.shelf(GiftShelf.new(GiftShelf.mine(), 66.0 if wide else 60.0), ShelfEditor.open)
 
 
 func _edit(key: String, title: String, placeholder: String, max_length: int) -> void:
@@ -103,74 +96,17 @@ static func achievement_rows() -> Array:
 		focused, App.state.inventory.keys(), Content.gifts)
 
 
-## The achievements under your details: a heading, then a card stretching
-## to the bottom of the screen with as many medals as fit in it. Tapping it
-## opens the full list.
+## The achievements under the card: a heading with how many you have, then
+## your best medals filling the rest of the screen, ending in "See all".
 func _achievements() -> Control:
 	var rows := achievement_rows()
-	var section := UI.vbox(10)
+	var section := UI.vbox(8)
 	section.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var head := UI.hbox(8)
-	head.add_child(UI.caption("Achievements"))
-	head.add_child(UI.spacer())
-	head.add_child(UI.caption("%d of %d" % [rows.filter(func(r): return r["earned"]).size(), rows.size()], UI.INK_FAINT))
-	section.add_child(head)
-	var card := _MedalCard.new(rows)
-	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	Press.attach(card).tapped.connect(open_achievements)
-	section.add_child(card)
+	section.add_child(ProfileCard.achievements_head(rows))
+	var medals := MedalCard.new(rows)
+	medals.shrank.connect(func(): section.size_flags_vertical = Control.SIZE_FILL)
+	section.add_child(medals)
 	return section
-
-
-## Every achievement, each with what it's for and how far along you are. The
-## title stays at the top while the list scrolls.
-func open_achievements() -> void:
-	var rows := achievement_rows()
-	var m := Modal.open(480)
-	m.header.add_child(m.heading_row("Achievements"))
-	m.header.add_child(UI.para("%d of %d earned" % [rows.filter(func(r): return r["earned"]).size(), rows.size()], 14, UI.INK_SOFT, 700))
-	var list := UI.vbox(12)
-	var group := ""
-	for r in rows:
-		var kind := "Focus" if r["kind"] == "hours" else "Gifts"
-		if kind != group:
-			group = kind
-			var cap := UI.caption(kind)
-			if list.get_child_count() > 0:
-				list.add_child(UI.divider())
-			list.add_child(cap)
-		list.add_child(_achievement_row(r))
-	m.body.add_child(list)
-
-
-## One achievement in the full list: its medal, its name and what it's for,
-## and a bar showing how far along you are (a tick once it's yours).
-func _achievement_row(r: Dictionary) -> Control:
-	var earned: bool = r["earned"]
-	var row := UI.hbox(14)
-	var disc := _Disc.new(r, 48.0)
-	disc.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(disc)
-	var words := UI.vbox(2)
-	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var top := UI.hbox(8)
-	var title := UI.trimmed(r["name"], 16, UI.INK if earned else UI.INK_SOFT, false, 800)
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(title)
-	if earned:
-		top.add_child(UI.icon_rect("check", 16, UI.ACCENT))
-	words.add_child(top)
-	words.add_child(UI.para(r["description"], 13, UI.INK_SOFT, 700))
-	var progress := UI.hbox(10)
-	var bar := _Bar.new(float(r["have"]) / maxf(1.0, float(r["goal"])))
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	progress.add_child(bar)
-	var unit := "hours" if r["kind"] == "hours" else "gifts"
-	progress.add_child(UI.label("%s of %s %s" % [Achievements.grouped(r["have"]), Achievements.grouped(r["goal"]), unit], 12, UI.INK_FAINT, false, 800))
-	words.add_child(progress)
-	row.add_child(words)
-	return row
 
 
 # --- Settings ----------------------------------------------------------------
@@ -351,160 +287,3 @@ class _Track extends Control:
 			draw_line(Vector2(x, mid), Vector2(x, mid + mid * below), UI.ACCENT, w)
 		draw_circle(Vector2(x, mid), 8.0, UI.ACCENT if reached else UI.SURFACE, true, -1.0, true)
 		draw_arc(Vector2(x, mid), 8.0, 0, TAU, 24, UI.ACCENT if reached else UI.LINE, 3.0, true)
-
-
-## An achievement's disc: in colour once earned (green for hours, gold for
-## every gift, blue for an animal's set), grey before, with a ring round it
-## showing how far along you are. Hours and gifts have an icon; animal sets
-## show the animal.
-class _Disc extends Control:
-	var info: Dictionary
-	var diameter := 52.0
-
-	func _init(row: Dictionary, side: float) -> void:
-		info = row
-		diameter = side
-		custom_minimum_size = Vector2(side, side)
-		size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		if row["animal"] != "":
-			var pet := AnimalView.new()
-			pet.animal_id = row["animal"]
-			pet.colours = Content.animal_default_colours(row["animal"])
-			pet.scale = Vector2.ONE * 0.3 * side / 52.0
-			pet.position = Vector2(side * 0.42, side * 0.78)
-			pet.modulate = Color.WHITE if row["earned"] else Color(1, 1, 1, 0.35)
-			add_child(pet)
-		else:
-			var px := int(side * 0.46)
-			var icon := UI.icon_rect(str(row["icon"]), px, Color.WHITE if row["earned"] else UI.INK_FAINT)
-			icon.position = Vector2(side - px, side - px) * 0.5
-			add_child(icon)
-		UI.ignore_mouse(self)
-
-	func _draw() -> void:
-		var c := size * 0.5
-		var r := diameter * 0.5
-		if info["earned"]:
-			var fill := UI.ACCENT
-			if info["kind"] == "all_gifts":
-				fill = Content.rarity_colour("legendary")
-			elif info["kind"] == "animal":
-				fill = Content.rarity_colour("rare").lerp(Color.WHITE, 0.55)
-			draw_circle(c, r, fill, true, -1.0, true)
-			draw_arc(c, r - 3.0, 0, TAU, 40, Color(1, 1, 1, 0.6), 2.0, true)
-		else:
-			draw_circle(c, r, UI.SURFACE_SOFT, true, -1.0, true)
-			var share := float(info["have"]) / maxf(1.0, float(info["goal"]))
-			if share > 0.0:
-				draw_arc(c, r - 2.0, -PI * 0.5, -PI * 0.5 + TAU * share, 48, UI.ACCENT, 3.0, true)
-
-
-## One medal on the profile: its disc with its name under (two lines at most,
-## so every medal takes the same room).
-class _Medal extends VBoxContainer:
-	const HEIGHT := 84.0
-	var info: Dictionary
-
-	func _init(row: Dictionary) -> void:
-		info = row
-		add_theme_constant_override("separation", 4)
-		custom_minimum_size = Vector2(64, HEIGHT)
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(_Disc.new(row, 52.0))
-		var name_label := UI.label(row["name"], 11, UI.INK if row["earned"] else UI.INK_FAINT, false, 800)
-		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		name_label.max_lines_visible = 2
-		name_label.custom_minimum_size.x = 64
-		add_child(name_label)
-
-
-## The achievements card: as many medals as fit in the room it's given, in
-## order. If they don't all fit, the last spot says how many more there are.
-## Its size comes from the page, never from the medals, so it always ends
-## at the bottom of the screen.
-class _MedalCard extends PanelContainer:
-	const GAP := 10.0
-	var rows: Array
-	var _room := Control.new()
-	var _grid: GridContainer
-
-	func _init(list: Array) -> void:
-		rows = list
-		var b := UI.with_shadow(UI.box(UI.SURFACE, Color.TRANSPARENT, 24))
-		b.set_content_margin_all(16)
-		add_theme_stylebox_override("panel", b)
-		mouse_filter = Control.MOUSE_FILTER_STOP
-		mouse_default_cursor_shape = Cursor.HOVER
-		accessibility_name = "See every achievement"
-		# A plain Control: the medals inside don't make the card any taller.
-		_room.custom_minimum_size.y = _Medal.HEIGHT
-		_room.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_room.clip_contents = true
-		add_child(_room)
-		_room.resized.connect(_fit, CONNECT_DEFERRED)
-
-	func _fit() -> void:
-		if is_instance_valid(_grid):
-			_grid.queue_free()
-		var w := _room.size.x
-		var columns := clampi(int((w + GAP) / (64.0 + 16.0)), 4, 8)
-		var lines := maxi(1, floori((_room.size.y + GAP) / (_Medal.HEIGHT + GAP)))
-		var room := columns * lines
-		var shown := rows.size() if rows.size() <= room else room - 1
-		_grid = GridContainer.new()
-		_grid.columns = columns
-		_grid.add_theme_constant_override("h_separation", 8)
-		_grid.add_theme_constant_override("v_separation", int(GAP))
-		_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		for i in shown:
-			var medal := _Medal.new(rows[i])
-			medal.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			_grid.add_child(medal)
-		if shown < rows.size():
-			_grid.add_child(_More.new(rows.size() - shown))
-		_room.add_child(_grid)
-		_grid.size = Vector2(w, 0)
-		var h := _grid.get_combined_minimum_size().y
-		_grid.size = Vector2(w, h)
-		_grid.position = Vector2(0, maxf(0.0, (_room.size.y - h) * 0.5))
-
-
-## The last spot when not every medal fits: how many more there are.
-class _More extends VBoxContainer:
-	func _init(more: int) -> void:
-		add_theme_constant_override("separation", 4)
-		custom_minimum_size = Vector2(64, _Medal.HEIGHT)
-		size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var disc := Control.new()
-		disc.custom_minimum_size = Vector2(52, 52)
-		disc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		disc.draw.connect(func():
-			disc.draw_circle(disc.size * 0.5, 26.0, UI.SURFACE_SOFT, true, -1.0, true))
-		var plus := UI.label("+%d" % more, 17, UI.INK_SOFT, true, 600)
-		plus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		plus.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		plus.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		disc.add_child(plus)
-		add_child(disc)
-		var words := UI.label("See all", 11, UI.INK_SOFT, false, 800)
-		words.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		add_child(words)
-
-
-## A thin progress bar for the achievements list.
-class _Bar extends Control:
-	var share := 0.0
-
-	func _init(fraction: float) -> void:
-		share = clampf(fraction, 0.0, 1.0)
-		custom_minimum_size = Vector2(60, 6)
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	func _draw() -> void:
-		draw_style_box(UI.box(UI.SURFACE_SOFT, Color.TRANSPARENT, 3), Rect2(Vector2.ZERO, size))
-		if share > 0.0:
-			draw_style_box(UI.box(UI.ACCENT, Color.TRANSPARENT, 3), Rect2(Vector2.ZERO, Vector2(maxf(size.y, size.x * share), size.y)))

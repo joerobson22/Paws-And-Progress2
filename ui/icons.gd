@@ -47,6 +47,7 @@ const PATHS := {
 	"sort_up": "M6 15l6-6 6 6",
 	"dot": "fill:M12 5.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13z",
 	"calendar": "M4 6h16v14H4zM4 10h16M8 3v5M16 3v5",
+	"shield": "fill:M12 2.5l8 3.2v5.6c0 5-3.4 9.2-8 10.9-4.6-1.7-8-5.9-8-10.9V5.7z",
 	"shelf": "M3 15h18M5 15v4M19 15v4M7 15V9h4v6M13 15v-4h4v4",
 }
 
