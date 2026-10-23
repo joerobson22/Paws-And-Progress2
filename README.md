@@ -59,30 +59,32 @@ Tap a tile to go there, or anywhere else to shrink it back.
   two switches in the top left: one unlocks every animal and place, the
   other shows the app at a phone's proportions (letterboxed in the window)
   instead of the desktop layout.
-- **Gifts** (left): a shelf for your three favourites (they grow and glint
-  under the pointer; tap one for a closer look and its trade-in), and three
-  rings for how your collection's coming along: gifts discovered (green),
-  pets' gift tables completed (blue) and cosmetics unlocked from gifts
-  (purple). The pencil by the shelf opens the shelf editor, with every gift
-  you've found (sort by rarity, A–Z or animal; pick the same one again and
-  its arrow flips over to reverse it). There it's all drag and drop: onto an empty spot to put a gift
-  up, onto a full one to swap it in, along the shelf to rearrange, and off it
-  to take one down. Gifts on the shelf are greyed out in the collection. On a
-  phone, press and hold a gift first, as dragging scrolls the list. Tap any
-  gift for its trade-in (10 commons for a rare, 5 rares for an epic, 3 epics
-  for a legendary); trading away the last of a shelf gift takes it off the
-  shelf.
+- **Gifts** (left): three rings under "Collection stats" for how your
+  collection's coming along: gifts discovered (green), pets' gift tables
+  completed (blue) and cosmetics unlocked from gifts (purple). Under them,
+  every gift you have, eight to a row (five on a phone), each with its count;
+  only this list scrolls. Sort by rarity, A–Z or pet type (pick the same one
+  again and its arrow flips over to reverse it). Tap a gift for a closer look
+  and its trade-in (10 commons for a rare, 5 rares for an epic, 3 epics for a
+  legendary); trading away the last of a shelf gift takes it off the shelf.
 - **Completed** (right): a panel per finished project. Tap the circled "?" in
   its corner to give it a GCSE, A-Level or university grade, and tap the grade
   to change it.
-- **Profile** (up): your character (the pencil customises it) with your level
-  badge in the bottom left (it shines under the pointer; tap it for every
-  reward) and your XP along the bottom, and your account details. Your
-  achievements fill the rest of the screen, as many as fit, so the page never
-  scrolls; tap them for the full list with how far along each one is: 10, 50,
-  100, 500, 1,000 and 10,000 hours focused, every gift found, and a set for
-  each animal's gifts (`data/achievements.json`). The settings are behind the
-  gear in the top right.
+- **Profile** (up): one card with your character (the pencil customises it),
+  your level badge in the bottom left (it shines under the pointer; tap it
+  for every reward) and your XP along the bottom. Beside it, your details at
+  the top and your gift shelf of three favourites at the bottom. The shelf's
+  pencil opens the shelf editor, with every gift you have (sorted the same
+  way as on Gifts). There it's all drag and drop: onto an empty spot to put a
+  gift up, onto a full one to swap it in, along the shelf to rearrange, and
+  off it to take one down. Gifts on the shelf are greyed out in the
+  collection. On a phone, press and hold a gift first, as dragging scrolls
+  the list. Under the card, as many achievements as fit: earned ones first
+  (hardest won first), then the ones you're closest to. "See all" lists every
+  one with how far along it is: 10, 50, 100, 500, 1,000 and 10,000 hours
+  focused, every gift found, and a set for each animal's gifts
+  (`data/achievements.json`). The page never scrolls. The settings are
+  behind the gear in the top right.
 - **Stats** (down): this week's focus split by project, past weeks with any
   focus in them, your streak (one rest day allowed after three days in a row)
   and the friends leaderboard.
@@ -190,8 +192,9 @@ ui/
   ui.gd            palette, type, theme and builders every screen uses
   motion.gd        every animation: one ease-in-out tween style and timings
   modal.gd         popups, confirmations, prompts, colour picker
-  components/      orb, minimap, carousel, gift tile, gift button, project
-                   panel, character and animal drawings, ...
+  components/      orb, minimap, carousel, gift tile, grid, shelf and
+                   details popup, medal card, stat panel, gift button,
+                   project panel, character and animal drawings, ...
 tests/           headless unit tests and the smoke run
 ```
 
