@@ -9,6 +9,7 @@ extends GridContainer
 ## The sort menu's setting, and what it starts as.
 const SETTING := "gift_sort"
 const DEFAULT := "rarity"
+const GROUP := "gift_grids"
 
 var _make: Callable
 
@@ -16,6 +17,7 @@ var _make: Callable
 func _init(per_row: int, make: Callable) -> void:
 	columns = per_row
 	_make = make
+	add_to_group(GROUP)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_theme_constant_override("h_separation", 8)
@@ -42,7 +44,11 @@ static func ids() -> Array:
 		Content.gifts, Content.animals)
 
 
-## The "Sort by" menu for it.
+## The "Sort by" menu for it. A new order just re-fills the grids (every
+## one, so the gifts screen and the shelf editor stay in step) rather than
+## rebuilding the screen they're on.
 static func sort_menu() -> Dropdown:
-	return Dropdown.for_setting(Collection.SORTS, SETTING, DEFAULT)
+	var d := Dropdown.for_setting(Collection.SORTS, SETTING, DEFAULT, true)
+	d.chosen.connect(func(_option, _reversed): d.get_tree().call_group(GROUP, "refresh"))
+	return d
 
