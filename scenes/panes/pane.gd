@@ -40,7 +40,10 @@ func rebuild() -> void:
 	_dirty = false
 	wide = size.x >= UI.WIDE_BREAKPOINT
 	var keep := scroll.scroll_vertical if is_instance_valid(scroll) else 0
+	var kept := keeps()
 	for c in get_children():
+		if c in kept:
+			continue
 		remove_child(c)
 		c.queue_free()
 	scroll = null
@@ -57,6 +60,13 @@ func mark_dirty() -> void:
 ## Subclasses add their content here.
 func build() -> void:
 	pass
+
+
+## Children that survive a rebuild as they are, mid-animation (things whose
+## look doesn't depend on the game state or the palette). build() should
+## only make them if they don't exist yet.
+func keeps() -> Array[Node]:
+	return []
 
 
 func _on_shown() -> void:

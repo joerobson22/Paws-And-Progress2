@@ -4,6 +4,9 @@ extends Pane
 ## in the top right switches between light and dark. Debug builds also get
 ## an unlock-everything switch in the top left (DebugBar).
 
+## Room above the orb for the greeting, whose words sit at the bottom of it.
+const GREETING_BOX := 160.0
+
 var _orb: FocusOrb
 var _greeting: Label
 var _hint: Label
@@ -21,20 +24,30 @@ func build() -> void:
 	_greeting.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_greeting.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	_greeting.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_greeting.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	add_child(_greeting)
-	_orb = FocusOrb.new()
-	_orb.tapped.connect(_on_tapped)
-	add_child(_orb)
+	if not is_instance_valid(_orb):
+		_orb = FocusOrb.new()
+		_orb.tapped.connect(_on_tapped)
+		add_child(_orb)
 	_hint = UI.label("", 15, UI.INK_FAINT, false, 700)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_hint)
-	_toggle = ThemeToggle.new()
-	add_child(_toggle)
+	if not is_instance_valid(_toggle):
+		_toggle = ThemeToggle.new()
+		add_child(_toggle)
+	_toggle.sync()
 	if OS.is_debug_build():
 		_debug = DebugBar.new()
 		add_child(_debug)
 	_update_hint()
 	_place()
+
+
+## The orb keeps drifting and the toggle keeps spinning through a rebuild
+## (neither takes its colours from the palette).
+func keeps() -> Array[Node]:
+	return [_orb, _toggle]
 
 
 func _pick_line() -> void:
@@ -57,8 +70,11 @@ func _place() -> void:
 	_hint.size = Vector2(size.x, 24)
 	_hint.position = Vector2(0, _orb.position.y + d + 28)
 	var w := minf(560.0, size.x - 48.0)
-	_greeting.size = Vector2(w, 0)
-	_greeting.size = Vector2(w, _greeting.get_combined_minimum_size().y)
+	# A tall box with the words at its bottom, rather than one measured to
+	# fit: a wrapping label's measured height isn't stable across rebuilds,
+	# and the words would jump when the colours change.
+	_greeting.size = Vector2(w, GREETING_BOX)
+	# (It can come out taller; its bottom is what stays put.)
 	_greeting.position = Vector2((size.x - w) * 0.5, _orb.position.y - _greeting.size.y - 22.0)
 	var insets := UI.safe_insets(self)
 	_toggle.size = _toggle.custom_minimum_size
