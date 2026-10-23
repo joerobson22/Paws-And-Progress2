@@ -30,11 +30,19 @@ macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
 ## How it's laid out
 
 The app is five screens arranged like a plus sign. Swipe between them, use
-the arrow keys on a keyboard (Esc comes back to the middle), or use the
-little map at the bottom, which shows where you are: tap it and it grows into
-a tile per screen, each with its icon (a home for focus, a present for gifts,
-a tick for completed, a person for your profile and a bar chart for stats).
-Tap a tile to go there, or anywhere else to shrink it back.
+the arrow keys on a keyboard (Esc comes back to the middle), click the big
+faint arrows at the screen's edges (computers only: one on every side of the
+focus screen, and one back home on the others), or use the little map in the
+bottom left corner, which shows where you are. It grows up and to the right
+into a tile per screen, each with its icon (a home for focus, a present for
+gifts, a tick for completed, a person for your profile and a bar chart for
+stats). With a mouse it grows while the pointer is over it and shrinks a
+moment after it leaves; on phones tap it to grow it, and tap it again (or
+anywhere else) to shrink it. Pick a tile to go there.
+
+On computers, Settings also picks the window's mode (windowed, maximised,
+fullscreen or exclusive fullscreen) and its size. The window can't get
+smaller than 800 × 560 points, so layouts never squash.
 
 ```
                  Profile
@@ -56,9 +64,10 @@ Tap a tile to go there, or anywhere else to shrink it back.
   name, its animal and three colours; a locked animal hides the colours):
   while you fill that in the bottom buttons go, the × cancels and the + turns
   into a tick that adopts it. Debug builds (running from the editor) also show
-  two switches in the top left: one unlocks every animal and place, the
-  other shows the app at a phone's proportions (letterboxed in the window)
-  instead of the desktop layout.
+  two small switches beside the home icon in the top left: one unlocks every
+  animal and place, the other turns the window into a phone's shape and lays
+  the app out as on a phone (tap-to-open map, no edge arrows); turning it off
+  puts the window back as it was.
 - **Gifts** (left): three rings under "Collection stats" for how your
   collection's coming along: gifts discovered (green), pets' gift tables
   completed (blue) and cosmetics unlocked from gifts (purple). Under them,
@@ -190,12 +199,14 @@ core/            game logic, no UI
   achievements.gd  achievements and how far along each one is
   friends.gd       the leaderboard order, and sample friends for debug builds
   collection.gd    the gifts screen's rings: discovered, gift tables, cosmetics
+  display.gd       the computer window: mode, size, minimum, debug phone view
   models/          ProjectData, FocusSession resources
 data/            all content: animals, gifts, drop table, places (biomes),
                  levels, cosmetics, grades, achievements, walk quotes,
                  home greetings
 scenes/
-  main.gd          the app shell: panes, swiping, minimap, flows, popups
+  main.gd          the app shell: panes, swiping, minimap, edge arrows,
+                   flows, popups
   panes/           focus, gifts, completed, profile, stats (and their base, Pane)
   choose_focus/    choosing and adopting pets
   walk/            the walk, its chunked scenery, focus complete, focus ended
@@ -204,7 +215,7 @@ ui/
   ui.gd            palette, type, theme and builders every screen uses
   motion.gd        every animation: one ease-in-out tween style and timings
   modal.gd         popups, confirmations, prompts, colour picker
-  components/      orb, minimap, carousel, gift tile, grid, shelf and
+  components/      orb, minimap, edge arrow, carousel, gift tile, grid, shelf and
                    details popup, medal card, stat panel, gift button,
                    leaderboard, friend profile, profile card pieces,
                    project panel, character and animal drawings, ...

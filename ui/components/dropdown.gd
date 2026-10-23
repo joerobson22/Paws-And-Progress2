@@ -5,7 +5,8 @@ extends Button
 ## closes the menu straight away. Picking the one already chosen reverses
 ## it: its arrow flips over, then the menu closes by itself and the new
 ## order applies (nothing in the menu can be tapped while the arrow turns).
-## `sortable` off (e.g. a plain picker) drops the arrows and the reversing.
+## `sortable` off (e.g. a plain picker) drops the arrows and the reversing:
+## picking the one already chosen just reports it again.
 
 signal chosen(option: String, reversed: bool)
 
@@ -71,9 +72,16 @@ static func _arrow(up: bool) -> Texture2D:
 	return Icons.texture("sort_up" if up else "sort_down", ARROW_PX, Color.WHITE, 2.6)
 
 
+## Shows `id` as chosen, without telling anyone (it was chosen elsewhere).
+func select(id: String) -> void:
+	current = id
+	_refresh()
+
+
 func _refresh() -> void:
-	text = "%s: %s" % [prefix, _label(current)]
-	icon = _arrow(reversed) if sortable else null
+	text = "%s: %s" % [prefix, _label(current)] if prefix != "" else _label(current)
+	# A plain picker still shows its arrow down, so it reads as a menu.
+	icon = _arrow(reversed and sortable)
 
 
 func _open() -> void:
@@ -119,7 +127,9 @@ func _open() -> void:
 	# Under the pill, or above it when there's no room underneath.
 	var y := at.end.y + 6.0
 	if y + card.size.y > _menu.size.y - 8.0:
-		y = maxf(8.0, at.position.y - 6.0 - card.size.y)
+		y = at.position.y - 6.0 - card.size.y
+	# Always on the screen, even if the pill itself is partly off it.
+	y = clampf(y, 8.0, maxf(8.0, _menu.size.y - card.size.y - 8.0))
 	card.position = Vector2(clampf(at.end.x - card.size.x, 8.0, _menu.size.x - card.size.x - 8.0), y)
 	card.modulate.a = 0.0
 	var t := Motion.tween(card, "menu")
@@ -137,7 +147,9 @@ func _choose(id: String, arrow: TextureRect) -> void:
 		_apply()
 		return
 	if not sortable:
-		_close()
+		# Picked again: nothing to reverse, but say so (a window size
+		# picked again still takes you out of fullscreen).
+		_apply()
 		return
 	# The same choice again: flip its arrow over, then reverse the order.
 	reversed = not reversed

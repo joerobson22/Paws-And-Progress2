@@ -1,8 +1,9 @@
 extends Pane
 ## The middle of the app: a greeting, and under it the focus orb. Tap the orb
-## (a soft bong) and the choose focus screen grows out of it. The sun or moon
-## in the top right switches between light and dark. Debug builds also get
-## an unlock-everything switch in the top left (DebugBar).
+## (a soft bong) and the choose focus screen grows out of it. A home icon
+## in the top left marks it, as each screen's icon does. The sun or moon in
+## the top right switches between light and dark. Debug builds also get
+## small switches beside the home icon (DebugBar).
 
 ## Room above the orb for the greeting, whose words sit at the bottom of it.
 const GREETING_BOX := 160.0
@@ -11,6 +12,7 @@ var _orb: FocusOrb
 var _greeting: Label
 var _hint: Label
 var _toggle: ThemeToggle
+var _home: Control
 var _debug: DebugBar
 var _line := ""
 ## How many walks there had been when the greeting was picked: a new line
@@ -33,6 +35,8 @@ func build() -> void:
 	_hint = UI.label("", 15, UI.INK_FAINT, false, 700)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_hint)
+	_home = UI.icon_tile(Minimap.ICONS["focus"])
+	add_child(_home)
 	if not is_instance_valid(_toggle):
 		_toggle = ThemeToggle.new()
 		add_child(_toggle)
@@ -76,12 +80,17 @@ func _place() -> void:
 	_greeting.size = Vector2(w, GREETING_BOX)
 	# (It can come out taller; its bottom is what stays put.)
 	_greeting.position = Vector2((size.x - w) * 0.5, _orb.position.y - _greeting.size.y - 22.0)
+	# The home icon sits where the other screens' title icons do, with the
+	# light/dark switch level with it on the right.
 	var insets := UI.safe_insets(self)
+	_home.size = _home.custom_minimum_size
+	_home.position = Vector2((32.0 if wide else 18.0) + insets["left"], float(Pane.EDGE_GAP) + insets["top"])
+	var middle := _home.position.y + _home.size.y * 0.5
 	_toggle.size = _toggle.custom_minimum_size
-	_toggle.position = Vector2(size.x - _toggle.size.x - 18.0 - insets["right"], 18.0 + insets["top"])
+	_toggle.position = Vector2(size.x - _toggle.size.x - (32.0 if wide else 18.0) - insets["right"], middle - _toggle.size.y * 0.5)
 	if is_instance_valid(_debug):
 		_debug.size = _debug.get_combined_minimum_size()
-		_debug.position = Vector2(18.0 + insets["left"], 12.0 + insets["top"])
+		_debug.position = Vector2(_home.position.x + _home.size.x + 12.0, middle - _debug.size.y * DebugBar.SCALE * 0.5)
 
 
 func _update_hint() -> void:
