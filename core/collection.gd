@@ -36,6 +36,38 @@ static func progress(inventory: Dictionary, gifts: Array, animals: Array) -> Dic
 		"cosmetics": wearing, "wearables": wearables}
 
 
+## The ways a collection of gifts can be sorted, as [id, label] for a Dropdown.
+const SORTS := [["rarity", "Rarity"], ["name", "A–Z"], ["animal", "Pet type"]]
+
+
+## `ids` sorted `by` one of SORTS: rarity puts the rarest first (then A–Z);
+## A–Z is by name; pet type follows the cast's order, commonest first within
+## each. `reversed` flips the whole order.
+static func sort_gifts(ids: Array, by: String, reversed: bool, gifts: Array, animals: Array) -> Array:
+	var info := {}
+	for g in gifts:
+		info[g["id"]] = g
+	var cast := {}
+	for i in animals.size():
+		cast[animals[i]["id"]] = i
+	var key := func(id: String) -> Array:
+		var g: Dictionary = info.get(id, {})
+		var name := str(g.get("name", id)).to_lower()
+		var rarity := GiftRoller.RARITIES.find(str(g.get("rarity", "common")))
+		match by:
+			"name":
+				return [name]
+			"animal":
+				return [cast.get(g.get("animal", ""), 99), rarity, name]
+			_:
+				return [-rarity, name]
+	var out := ids.duplicate()
+	out.sort_custom(func(a, b): return key.call(a) < key.call(b))
+	if reversed:
+		out.reverse()
+	return out
+
+
 ## `have` out of `total` as 0..1, and 0 when there's nothing to have.
 static func fraction(have: int, total: int) -> float:
 	return clampf(float(have) / total, 0.0, 1.0) if total > 0 else 0.0
