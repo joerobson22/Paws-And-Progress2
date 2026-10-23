@@ -324,6 +324,9 @@ func _run() -> void:
 	var ask: Control = _find(ungraded_panel, func(n): return n is Button) if ungraded_panel else null
 	check(ask != null and ask.get_child_count() == 1, "an ungraded project shows a \"?\"")
 	if ask:
+		# The list scrolls on its own: bring the panel into view first.
+		main._panes[Vector2i(1, 0)].scroll.ensure_control_visible(ungraded_panel)
+		await _wait(5)
 		# On its animal, top left (the middle can be under the minimap).
 		var on_panel: Vector2 = ungraded_panel.get_global_rect().position + Vector2(56, 44)
 		await _drag(on_panel, on_panel, 1)
@@ -338,6 +341,24 @@ func _run() -> void:
 			_close_modal()
 	app.set_grade(ungraded.id, kept_grade)
 	await _wait(10)
+
+	# Completed's own sort menu re-sorts just its list: the screen around it
+	# (and its stats) stays as it is.
+	var completed_pane: Node = main._panes[Vector2i(1, 0)]
+	var stats_panel: Node = _find(completed_pane, func(n): return _is(n, "stat_panel.gd"))
+	check(stats_panel != null, "completed shows its stats")
+	var done_sort: Node = _find(completed_pane, func(n): return _is(n, "dropdown.gd"))
+	done_sort._open()
+	await _wait(15)
+	await _shot("completed_sort")
+	await _tap_menu(done_sort, "Grade")
+	await _wait(15)
+	var first_panel: Node = _find(completed_pane, func(n): return _is(n, "project_panel.gd"))
+	var best: Array = completed_pane.sort_projects(app.state.completed_projects(), "grade", false)
+	check(app.state.settings.get("completed_sort") == "grade" and first_panel.project_id == best[0].id,
+		"sorting completed by grade puts the best first")
+	check(is_instance_valid(stats_panel), "sorting doesn't rebuild the screen")
+	await _shot("completed_by_grade")
 
 	app.go("profile")
 	await _wait(50)

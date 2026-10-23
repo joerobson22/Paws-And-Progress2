@@ -45,12 +45,18 @@ func _init(options: Array, selected: String, is_reversed: bool = false, label_pr
 
 
 ## A sort menu that reads and saves its choice in the settings: `key` holds
-## the option and `key`_reversed the direction.
-static func for_setting(options: Array, key: String, fallback: String) -> Dropdown:
+## the option and `key`_reversed the direction. Saving tells the whole app
+## the state changed; with `quiet` it only saves, for a screen that re-sorts
+## its own list from `chosen` rather than rebuilding everything.
+static func for_setting(options: Array, key: String, fallback: String, quiet: bool = false) -> Dropdown:
 	var d := Dropdown.new(options, str(App.state.settings.get(key, fallback)), bool(App.state.settings.get(key + "_reversed", false)))
 	d.chosen.connect(func(option: String, is_reversed: bool):
 		App.state.settings[key] = option
-		App.set_setting(key + "_reversed", is_reversed))
+		if quiet:
+			App.state.settings[key + "_reversed"] = is_reversed
+			App.save()
+		else:
+			App.set_setting(key + "_reversed", is_reversed))
 	return d
 
 
