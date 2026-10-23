@@ -116,7 +116,6 @@ static func colour(title: String, start: Color, on_change: Callable, swatches: A
 		for c in swatches:
 			var dot := Button.new()
 			dot.custom_minimum_size = Vector2(34, 34)
-			dot.tooltip_text = "#" + (c as Color).to_html(false)
 			UI.style_button(dot, c, UI.INK, 999)
 			dot.pressed.connect(func():
 				picker.color = c

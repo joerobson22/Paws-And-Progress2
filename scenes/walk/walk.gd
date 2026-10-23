@@ -172,7 +172,7 @@ func _toggle_sound() -> void:
 func _show_sound() -> void:
 	var on := _sound_on()
 	_sound.icon = Icons.texture("sound" if on else "mute", int(40 * 0.42), Color.WHITE, 2.6)
-	_sound.tooltip_text = "Sound off" if on else "Sound on"
+	_sound.accessibility_name = "Sound off" if on else "Sound on"
 
 
 ## Centred text with a soft shadow so it reads over any scenery.
@@ -265,7 +265,7 @@ func _toggle_pause() -> void:
 
 func _apply_paused(paused: bool) -> void:
 	_pause.icon = Icons.texture("play" if paused else "pause", 22, Color.WHITE)
-	_pause.tooltip_text = "Carry on" if paused else "Pause"
+	_pause.accessibility_name = "Carry on" if paused else "Pause"
 	_walker.walking = not paused
 	_animal.walking = not paused
 	var walk_speed := float(Content.animal(_project.animal_id).get("walk_speed", 1.0))

@@ -31,7 +31,7 @@ func _init() -> void:
 	size = custom_minimum_size
 	flat = true
 	focus_mode = Control.FOCUS_ALL
-	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	mouse_default_cursor_shape = Cursor.HOVER
 	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 		add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	resized.connect(func(): pivot_offset = size * 0.5)
@@ -62,7 +62,6 @@ func set_seconds(seconds: int) -> void:
 		if _blend >= 1.0:
 			_from = odds
 	_level = reached
-	tooltip_text = _tip(floor_rarity)
 	queue_redraw()
 
 
@@ -105,17 +104,6 @@ func _set_reveal(v: float) -> void:
 func _set_blend(v: float) -> void:
 	_blend = v
 	queue_redraw()
-
-
-func _tip(floor_rarity: String) -> String:
-	if floor_rarity == "":
-		return "Finish walk (no gift yet)"
-	var parts: Array[String] = []
-	var pct := GiftRoller.percentages_for(_seconds, Content.drop_table)
-	for r in GiftRoller.RARITIES:
-		if int(pct[r]) > 0:
-			parts.append("%d%% %s" % [pct[r], Content.rarity_name(r).to_lower()])
-	return "Finish walk: at least a %s gift (%s)" % [Content.rarity_name(floor_rarity).to_lower(), ", ".join(parts)]
 
 
 func _draw() -> void:

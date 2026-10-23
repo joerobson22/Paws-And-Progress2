@@ -64,8 +64,8 @@ Tap a tile to go there, or anywhere else to shrink it back.
   rings for how your collection's coming along: gifts discovered (green),
   pets' gift tables completed (blue) and cosmetics unlocked from gifts
   (purple). The pencil by the shelf opens the shelf editor, with every gift
-  you've found (filter by rarity, A–Z or animal; pick the same one again to
-  reverse it). There it's all drag and drop: onto an empty spot to put a gift
+  you've found (sort by rarity, A–Z or animal; pick the same one again and
+  its arrow flips over to reverse it). There it's all drag and drop: onto an empty spot to put a gift
   up, onto a full one to swap it in, along the shelf to rearrange, and off it
   to take one down. Gifts on the shelf are greyed out in the collection. On a
   phone, press and hold a gift first, as dragging scrolls the list. Tap any
@@ -82,7 +82,7 @@ Tap a tile to go there, or anywhere else to shrink it back.
   scrolls; tap them for the full list with how far along each one is: 10, 50,
   100, 500, 1,000 and 10,000 hours focused, every gift found, and a set for
   each animal's gifts (`data/achievements.json`). The settings are behind the
-  gear in the top left.
+  gear in the top right.
 - **Stats** (down): this week's focus split by project, past weeks with any
   focus in them, your streak (one rest day allowed after three days in a row)
   and the friends leaderboard.
@@ -206,6 +206,14 @@ tests/           headless unit tests and the smoke run
   bounces, when "Reduce motion" is on).
 - **Popups:** every popup is a `Modal`, so they all open, dim, close and scroll
   the same way.
+- **Screens:** each screen's title carries its icon from the app map
+  (`Pane.title_row`). Screens are laid out with `Pane.frame()`, which never
+  scrolls: content fits the window, and only a panel's own list scrolls
+  (`UI.scroll_area`).
+- **Pointer:** anything tappable shows a grab hand (`ui/cursor.gd`). There are no tooltips.
+- **Sorting:** every sort menu is a `Dropdown` ("Sort by"). Picking the current
+  option again flips its arrow, then reverses the order;
+  `Dropdown.for_setting` remembers the choice.
 
 ## Adding content (no code needed)
 

@@ -42,8 +42,8 @@ func _init(id: String, count: int, plain: bool = false) -> void:
 			Motion.pop(self, 0.08)
 			lifted.emit(self))
 	mouse_filter = Control.MOUSE_FILTER_PASS
-	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	tooltip_text = g.get("name", "")
+	mouse_default_cursor_shape = Cursor.HOVER
+	accessibility_name = g.get("name", "")
 	mouse_entered.connect(_hover.bind(true))
 	mouse_exited.connect(_hover.bind(false))
 	resized.connect(func(): pivot_offset = size * 0.5)
@@ -76,7 +76,7 @@ func set_on_shelf() -> void:
 	modulate = Color(1, 1, 1, 0.55)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
-	tooltip_text = "%s (on your shelf)" % tooltip_text
+	accessibility_name = "%s (on your shelf)" % accessibility_name
 
 
 ## Where the finger went down, in viewport coordinates.

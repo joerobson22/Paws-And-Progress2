@@ -22,7 +22,7 @@ func _init() -> void:
 	_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_icon)
-	tooltip_text = "Switch to light mode" if UI.dark else "Switch to dark mode"
+	accessibility_name = "Switch to light mode" if UI.dark else "Switch to dark mode"
 	pressed.connect(_flip)
 	resized.connect(func(): _icon.pivot_offset = size * 0.5)
 

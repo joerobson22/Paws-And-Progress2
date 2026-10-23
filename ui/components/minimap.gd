@@ -17,7 +17,7 @@ const PAD := Vector2(9.0, 12.0)
 const ICONS := {"focus": "home", "gifts": "gift", "completed": "check", "profile": "user", "stats": "stats"}
 const ICON_PX := 24
 
-var cells: Dictionary = {}  # Vector2i -> name, for tooltips and icons
+var cells: Dictionary = {}  # Vector2i -> name, for the icons
 var open := false
 var _at := Vector2.ZERO  # highlight position in cell units (animates)
 ## 0 small to 1 big (animates).
@@ -29,7 +29,7 @@ var _dock := Vector2.ZERO
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	mouse_default_cursor_shape = Cursor.HOVER
 	mouse_exited.connect(func(): _set_hover(null))
 	_apply()
 
@@ -136,13 +136,6 @@ func _cell_at(p: Vector2) -> Variant:
 		if _cell_rect(Vector2(cell)).grow(_gap() * 0.5 + 1.0).has_point(p):
 			return cell
 	return null
-
-
-func _get_tooltip(at_position: Vector2) -> String:
-	if not open:
-		return "Map of the app"
-	var cell = _cell_at(at_position)
-	return str(cells[cell]).capitalize() if cell != null else ""
 
 
 func _gui_input(e: InputEvent) -> void:
