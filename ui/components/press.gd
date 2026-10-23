@@ -19,6 +19,9 @@ var _timer: SceneTreeTimer
 func _init(owner: Control, watch_hold: bool = false) -> void:
 	_owner = owner
 	_watch_hold = watch_hold
+	# Anything that can be tapped shows the hand.
+	if owner.mouse_default_cursor_shape == Control.CURSOR_ARROW:
+		owner.mouse_default_cursor_shape = Cursor.HOVER
 
 
 ## Makes `control` tappable: wires its input to a new Press and keeps the
