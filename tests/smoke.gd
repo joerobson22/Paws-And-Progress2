@@ -571,7 +571,8 @@ func _run() -> void:
 	await _wait(420)
 	check(finish._home.modulate.a > 0.9, "the home button fades in at the end")
 	check(finish._state == "ready", "the gift can be picked up")
-	check(finish._scenery.front.get_index() > finish._front_actors.get_index(), "the growth stays in front of the pet")
+	check(finish._scenery.front.get_index() > finish._scenery.get_index(), "the growth stays in front of the pet")
+	check(finish._animal.get_index() > finish._walker.get_index(), "the pet stands in front of you at home")
 	await _shot("finish")
 
 	# Easter egg: hold the gift, flick it up into the distance, and wait for
@@ -580,10 +581,30 @@ func _run() -> void:
 	await _drag(gift_at, gift_at + Vector2(30, -150), 4, 0.3)
 	await _wait(20)
 	check(finish._state in ["flying", "fetching"], "a flick throws the gift (state %s)" % finish._state)
+	check(finish._fly_state["far"] > 0.3, "flicking up throws it into the distance")
 	await _wait(30)
 	await _shot("fetch")
+	var behind := false
+	for i in 60:
+		if finish._animal.position.y < finish._walker.position.y - 4.0:
+			behind = finish._animal.get_index() < finish._walker.get_index()
+			break
+		await _wait(5)
+	check(behind, "out in the distance the pet runs behind you")
 	await _wait(400)
 	check(finish._state == "ready" and finish._animal.held_gift == result["gift"]["gift_id"], "the pet brings the gift back")
+	check(finish._animal.get_index() > finish._walker.get_index(), "and stands in front of you again")
+
+	# A hard flick to the side curves in, so it still lands in view.
+	gift_at = finish._gift_on_screen()
+	await _drag(gift_at, gift_at + Vector2(420, -30), 4, 0.3)
+	await _wait(2)
+	var k: float = finish._stage.scale.x
+	var left: float = -finish._stage.position.x / k
+	var to: float = finish._fly_state.get("to", -1.0)
+	check(to > left and to < left + finish.size.x / k, "a hard sideways flick lands on screen (%d in %d..%d)" % [to, left, left + finish.size.x / k])
+	await _wait(400)
+	check(finish._state == "ready", "and the pet brings that one back too")
 
 	app.go("home")
 	await _wait(60)
