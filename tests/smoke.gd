@@ -682,12 +682,24 @@ func _run() -> void:
 	check(main._flows.is_empty(), "back home from the jungle")
 	check(_audio().current_ambience() == "", "the jungle's sounds stop at home")
 
-	# Dark mode: the sun in the corner switches the whole app.
-	var toggle: Node = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "theme_toggle.gd"))
+	# Dark mode: the sun in the corner switches the whole app, fading into
+	# the new colours with nothing on screen moving or starting over.
+	var focus_pane: Node = main._panes[Vector2i.ZERO]
+	var toggle: Node = _find(focus_pane, func(n): return _is(n, "theme_toggle.gd"))
+	var orb_before: Node = focus_pane._orb
+	var greeting_before: String = focus_pane._greeting.text
+	var orb_spot: Rect2 = orb_before.get_global_rect()
+	var greeting_end: Vector2 = focus_pane._greeting.get_global_rect().end
 	toggle._flip()
 	await _wait(60)
 	check(_class("res://ui/ui.gd").dark, "the toggle switches to dark mode")
 	check(app.state.settings.get("theme") == "dark", "dark mode is saved")
+	check(focus_pane._orb == orb_before and focus_pane._toggle == toggle, "the orb and the toggle carry on through the switch")
+	check(focus_pane._greeting.text == greeting_before and focus_pane._orb.get_global_rect().is_equal_approx(orb_spot)
+		and focus_pane._greeting.get_global_rect().end.is_equal_approx(greeting_end), "the greeting and layout stay put")
+	check(not toggle.disabled and not _class("res://ui/motion.gd").still, "the toggle can be tapped again, and animations are back on")
+	await _wait(30)
+	check(main._fade_layer.get_child_count() == 0 and toggle.z_index == 0, "the old colours have faded away")
 	await _shot("focus_dark")
 	for pane in ["gifts", "stats", "profile"]:
 		app.go(pane)
