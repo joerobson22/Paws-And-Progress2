@@ -55,7 +55,7 @@ func _set_xp(v: float) -> void:
 	var p := Levels.progress(int(v), Content.levels)
 	_number.text = str(p["level"])
 	if _caption:
-		_caption.text = "Level %d  ·  %d / %d XP" % [p["level"], p["into"], p["needed"]]
+		_caption.text = Text.t("level_bar.caption", {"level": p["level"], "xp": p["into"], "needed": p["needed"]})
 	_bar.queue_redraw()
 	if level() != before:
 		levelled_up.emit(level())

@@ -17,12 +17,12 @@ static func open() -> Modal:
 	var m := Modal.open(620, false, 20)
 
 	var top := UI.hbox(10)
-	top.add_child(UI.round_button("close", "Cancel", m.close.bind(null), UI.SURFACE_SOFT, UI.INK, 44, false))
-	var title := UI.label("Customise", 22, UI.INK, true, 600)
+	top.add_child(UI.round_button("close", Text.t("common.cancel"), m.close.bind(null), UI.SURFACE_SOFT, UI.INK, 44, false))
+	var title := UI.label(Text.t("customise.title"), 22, UI.INK, true, 600)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
-	top.add_child(UI.round_button("check", "Save", func():
+	top.add_child(UI.round_button("check", Text.t("common.save"), func():
 		App.set_look(draft)
 		m.close(true), UI.SUCCESS, Color.WHITE, 44))
 	m.body.add_child(top)
@@ -49,13 +49,13 @@ static func open() -> Modal:
 				var i := options.find(_current(draft, slot_id, options))
 				draft["cosmetics"][slot_id] = options[posmod(i + step, options.size())]["id"]
 				view.refresh()))
-	rows.add_child(_stepper("Skin",
-		func() -> String: return "Tone %d" % (int(draft["skin_tone"]) + 1),
+	rows.add_child(_stepper(Text.t("customise.skin"),
+		func() -> String: return Text.t("customise.skin_option", {"n": int(draft["skin_tone"]) + 1}),
 		func(step: int):
 			draft["skin_tone"] = posmod(int(draft["skin_tone"]) + step, Content.skin_tones.size())
 			view.refresh()))
-	rows.add_child(_stepper("Hair colour",
-		func() -> String: return "Shade %d" % (int(draft["hair_tone"]) + 1),
+	rows.add_child(_stepper(Text.t("customise.hair"),
+		func() -> String: return Text.t("customise.hair_option", {"n": int(draft["hair_tone"]) + 1}),
 		func(step: int):
 			draft["hair_tone"] = posmod(int(draft["hair_tone"]) + step, Content.hair_tones.size())
 			view.refresh()))
@@ -86,7 +86,7 @@ static func _stepper(title: String, current: Callable, step: Callable) -> Contro
 		step.call(d)
 		value.text = current.call()
 		Motion.pop(value, 0.08, 0.25)
-	h.add_child(UI.round_button("back", "Previous %s" % title.to_lower(), move.bind(-1), UI.SURFACE_SOFT, UI.INK, 34, false))
+	h.add_child(UI.round_button("back", Text.t("customise.previous", {"option": title.to_lower()}), move.bind(-1), UI.SURFACE_SOFT, UI.INK, 34, false))
 	h.add_child(text)
-	h.add_child(UI.round_button("forward", "Next %s" % title.to_lower(), move.bind(1), UI.SURFACE_SOFT, UI.INK, 34, false))
+	h.add_child(UI.round_button("forward", Text.t("customise.next", {"option": title.to_lower()}), move.bind(1), UI.SURFACE_SOFT, UI.INK, 34, false))
 	return h

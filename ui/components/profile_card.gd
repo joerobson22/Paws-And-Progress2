@@ -20,7 +20,7 @@ static func field(title: String, value: String, placeholder: bool = false, on_ta
 	text.add_child(UI.trimmed(value, 15, UI.INK_FAINT if placeholder else UI.INK, false, 800))
 	row.add_child(text)
 	if on_tap.is_valid():
-		var b := UI.round_button("edit", "Edit %s" % title.to_lower(), on_tap, UI.SURFACE_SOFT, UI.INK, 28, false)
+		var b := UI.round_button("edit", Text.t("profile.edit_field", {"field": title.to_lower()}), on_tap, UI.SURFACE_SOFT, UI.INK, 28, false)
 		row.add_child(b)
 		row.mouse_filter = Control.MOUSE_FILTER_STOP
 		Press.attach(row).tapped.connect(on_tap)
@@ -43,12 +43,12 @@ static func shelf(gift_shelf: GiftShelf, on_edit: Callable = Callable()) -> Cont
 	var v := UI.vbox(2)
 	var head := UI.hbox(8)
 	head.custom_minimum_size.y = 28
-	var cap := UI.caption("Gift shelf")
+	var cap := UI.caption(Text.t("shelf.heading"))
 	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	cap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(cap)
 	if on_edit.is_valid():
-		head.add_child(UI.round_button("edit", "Arrange your shelf", on_edit, UI.SURFACE_SOFT, UI.INK, 28, false))
+		head.add_child(UI.round_button("edit", Text.t("shelf.arrange"), on_edit, UI.SURFACE_SOFT, UI.INK, 28, false))
 	v.add_child(head)
 	v.add_child(gift_shelf)
 	return v
@@ -57,7 +57,7 @@ static func shelf(gift_shelf: GiftShelf, on_edit: Callable = Callable()) -> Cont
 ## An achievements heading: the caption, and how many are earned on the right.
 static func achievements_head(rows: Array) -> Control:
 	var head := UI.hbox(8)
-	head.add_child(UI.caption("Achievements"))
+	head.add_child(UI.caption(Text.t("achievements.title")))
 	head.add_child(UI.spacer())
-	head.add_child(UI.caption("%d of %d" % [rows.filter(func(r): return r["earned"]).size(), rows.size()], UI.INK_FAINT))
+	head.add_child(UI.caption(Text.t("achievements.count", {"have": rows.filter(func(r): return r["earned"]).size(), "total": rows.size()}), UI.INK_FAINT))
 	return head

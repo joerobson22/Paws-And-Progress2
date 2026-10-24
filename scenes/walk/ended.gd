@@ -101,17 +101,16 @@ func _build_words(session: FocusSession, project: ProjectData) -> void:
 	margin.add_child(col)
 
 	var seconds := session.focus_seconds if session else 0
-	var pet := Content.pet_called(project) if project else "your pet"
-	var title := _word(UI.label("Focus ended", 40, UI.ON_DARK, true, 600))
+	var pet := Content.pet_called(project) if project else Text.t("pet.fallback")
+	var title := _word(UI.label(Text.t("ended.title"), 40, UI.ON_DARK, true, 600))
 	col.add_child(title)
 	var time := _word(UI.label(SessionClock.format(seconds), 24, UI.ON_DARK_SOFT, true, 500))
 	col.add_child(time)
-	var why := _word(UI.para("You closed the app, so your walk with %s stopped." % pet, 16, UI.ON_DARK))
+	var why := _word(UI.para(Text.t("ended.why", {"pet": pet}), 16, UI.ON_DARK))
 	why.custom_minimum_size.x = minf(440.0, size.x - 48.0)
 	why.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(why)
-	var counted := "It was too short to count, and there's no gift this time." if seconds < 60 else \
-		"Your %s still counts, but there's no gift this time." % Stats.format_duration(seconds)
+	var counted := Text.t("ended.too_short") if seconds < 60 else Text.t("ended.counted", {"time": Stats.format_duration(seconds)})
 	var after := _word(UI.para(counted, 15, UI.ON_DARK_SOFT))
 	after.custom_minimum_size.x = why.custom_minimum_size.x
 	after.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -124,7 +123,7 @@ func _build_words(session: FocusSession, project: ProjectData) -> void:
 	var bottom := UI.hbox()
 	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom.add_child(UI.spacer())
-	_home = UI.round_button("home", "Home", go_back, Color.WHITE, UI.ACCENT.darkened(0.2), 64)
+	_home = UI.round_button("home", Text.t("common.home"), go_back, Color.WHITE, UI.ACCENT.darkened(0.2), 64)
 	_home.modulate.a = 0.0
 	_home.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom.add_child(_home)

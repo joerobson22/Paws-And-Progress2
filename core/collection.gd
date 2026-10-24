@@ -37,10 +37,11 @@ static func progress(inventory: Dictionary, gifts: Array, animals: Array) -> Dic
 
 
 ## The ways a collection of gifts can be sorted, as [id, label] for a Dropdown.
-const SORTS := [["rarity", "Rarity"], ["name", "A–Z"], ["animal", "Pet type"]]
+static func sorts() -> Array:
+	return [["rarity", Text.t("sort.rarity")], ["name", Text.t("sort.a_to_z")], ["animal", Text.t("sort.pet_type")]]
 
 
-## `ids` sorted `by` one of SORTS: rarity puts the rarest first (then A–Z);
+## `ids` sorted `by` one of sorts(): rarity puts the rarest first (then A–Z);
 ## A–Z is by name; pet type follows the cast's order, commonest first within
 ## each. `reversed` flips the whole order.
 static func sort_gifts(ids: Array, by: String, reversed: bool, gifts: Array, animals: Array) -> Array:

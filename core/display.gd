@@ -16,8 +16,6 @@ const MODES := {
 	"fullscreen": DisplayServer.WINDOW_MODE_FULLSCREEN,
 	"exclusive": DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN,
 }
-const MODE_NAMES := [["windowed", "Windowed"], ["maximised", "Maximised"],
-	["fullscreen", "Fullscreen"], ["exclusive", "Exclusive fullscreen"]]
 ## Below this (in points) the layouts would have to squash.
 const MIN_SIZE := Vector2i(800, 560)
 ## The debug phone view's screen, in points.
@@ -104,9 +102,9 @@ static func resolution_options(window: Window) -> Array:
 	var out := []
 	for r in RESOLUTIONS:
 		if r.x <= screen.x and r.y <= screen.y:
-			out.append([key(r), "%d × %d" % [r.x, r.y]])
+			out.append([key(r), Text.t("window.size_option", {"width": r.x, "height": r.y})])
 	if out.is_empty():
-		out.append([key(RESOLUTIONS[0]), "%d × %d" % [RESOLUTIONS[0].x, RESOLUTIONS[0].y]])
+		out.append([key(RESOLUTIONS[0]), Text.t("window.size_option", {"width": RESOLUTIONS[0].x, "height": RESOLUTIONS[0].y})])
 	return out
 
 
@@ -141,11 +139,12 @@ static func settings_rows(window: Window) -> Array[Control]:
 	var rows: Array[Control] = []
 	if OS.has_feature("mobile") or App.debug_phone_view():
 		return rows
-	var mode := Dropdown.new(MODE_NAMES, current_mode(), false, "", false)
-	mode.accessibility_name = "Window mode"
+	var names := MODES.keys().map(func(id): return [id, Text.t("window.modes." + id)])
+	var mode := Dropdown.new(names, current_mode(), false, "", false)
+	mode.accessibility_name = Text.t("window.mode")
 	var options := resolution_options(window)
 	var size := Dropdown.new(options, current_resolution(window, options), false, "", false)
-	size.accessibility_name = "Window size"
+	size.accessibility_name = Text.t("window.size")
 	mode.chosen.connect(func(id: String, _reversed: bool): App.set_setting("window_mode", id))
 	size.chosen.connect(func(id: String, _reversed: bool):
 		App.state.settings["window_mode"] = "windowed"
@@ -154,8 +153,8 @@ static func settings_rows(window: Window) -> Array[Control]:
 	var row := UI.hbox(8)
 	var text := UI.vbox(2)
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_child(UI.label("Window", 16, UI.INK, false, 800))
-	text.add_child(UI.para("Fullscreen or not, and its size.", 13))
+	text.add_child(UI.label(Text.t("window.title"), 16, UI.INK, false, 800))
+	text.add_child(UI.para(Text.t("window.body"), 13))
 	row.add_child(text)
 	row.add_child(mode)
 	row.add_child(size)

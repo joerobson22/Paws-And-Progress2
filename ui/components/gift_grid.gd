@@ -48,7 +48,7 @@ static func ids() -> Array:
 ## one, so the gifts screen and the shelf editor stay in step) rather than
 ## rebuilding the screen they're on.
 static func sort_menu() -> Dropdown:
-	var d := Dropdown.for_setting(Collection.SORTS, SETTING, DEFAULT, true)
+	var d := Dropdown.for_setting(Collection.sorts(), SETTING, DEFAULT, true)
 	d.chosen.connect(func(_option, _reversed): d.get_tree().call_group(GROUP, "refresh"))
 	return d
 

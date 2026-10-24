@@ -36,7 +36,7 @@ func _init(direction: Vector2i) -> void:
 	modulate.a = 0.0
 	visible = false
 	size = HIT if dir.y != 0 else Vector2(HIT.y, HIT.x)
-	accessibility_name = {Vector2i.LEFT: "Go left", Vector2i.RIGHT: "Go right", Vector2i.UP: "Go up", Vector2i.DOWN: "Go down"}.get(dir, "")
+	accessibility_name = Text.t({Vector2i.LEFT: "nav.left", Vector2i.RIGHT: "nav.right", Vector2i.UP: "nav.up", Vector2i.DOWN: "nav.down"}.get(dir, "nav.left"))
 	mouse_entered.connect(_set_hover_target.bind(1.0))
 	mouse_exited.connect(_set_hover_target.bind(0.0))
 	_line.width = 5.0

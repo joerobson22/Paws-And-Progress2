@@ -12,8 +12,6 @@ const CHIP_LETTERS := 10
 ## The least room across for the weeks to sit beside the chart.
 const COLUMNS_FROM := 560.0
 
-const DAY_NAMES := ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-const DAY_WORDS := ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 ## The week being charted (its Monday as a day number); kept while the app runs.
 var _week := -1
@@ -35,7 +33,7 @@ func build() -> void:
 	_columns = wide or (not App.phone_layout() and margins(1000)["width"] >= COLUMNS_FROM)
 	var col := frame(1000 if _columns else 680, 14)
 
-	var head := title_row("Stats")
+	var head := title_row(Text.t("stats.title"))
 	head.add_child(_streak())
 	col.add_child(head)
 
@@ -83,7 +81,7 @@ func build() -> void:
 
 	var mine := Stats.week_total(App.state.sessions, Stats.week_start(today), App.tz_bias())
 	var board := Leaderboard.new(Friends.ranked(App.friends, mine, App.state.active != null),
-		"Friends join you here once accounts arrive: you'll see their weeks, and who's out walking right now.")
+		Text.t("leaderboard.empty"))
 	# At least a row and yours: a friend above you, then your pinned row.
 	board.custom_minimum_size.y = 180 if _columns else 128
 	col.add_child(board)
@@ -98,7 +96,7 @@ func _streak() -> Control:
 	var rest_ready := Stats.rest_day_ready(sessions, App.today(), App.tz_bias())
 	var row := UI.hbox(8)
 	row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.accessibility_name = "%d day streak%s" % [days, ", day off earned" if rest_ready else ""]
+	row.accessibility_name = Text.count("stats.streak_rest" if rest_ready else "stats.streak", days)
 	var flame := Control.new()
 	flame.custom_minimum_size = Vector2(34, 34)
 	flame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -112,7 +110,7 @@ func _streak() -> Control:
 		shield.position = Vector2(17, 16)
 		flame.add_child(shield)
 	row.add_child(flame)
-	row.add_child(UI.label("%d day%s" % [days, "" if days == 1 else "s"], 22, UI.INK, true, 600))
+	row.add_child(UI.label(Text.count("stats.days", days), 22, UI.INK, true, 600))
 	UI.ignore_mouse(row)
 	return row
 
@@ -161,7 +159,7 @@ func _week_button(w: int, seconds: int, best: int, today: int) -> Button:
 	v.offset_right = -14
 	v.offset_top = 10
 	v.offset_bottom = -10
-	var title := "This week" if w == Stats.week_start(today) else ("Last week" if w == Stats.week_start(today) - 7 else "%s – %s" % [Stats.format_day(w), Stats.format_day(w + 6)])
+	var title := Text.t("stats.this_week") if w == Stats.week_start(today) else (Text.t("stats.last_week") if w == Stats.week_start(today) - 7 else Text.t("stats.week_span", {"from": Stats.format_day(w), "to": Stats.format_day(w + 6)}))
 	v.add_child(UI.trimmed(title, 13, UI.INK_SOFT, false, 800))
 	v.add_child(UI.label(Stats.format_duration(seconds), 17, UI.INK, true, 600))
 	v.add_child(UI.progress_line(float(seconds) / best))
@@ -178,7 +176,7 @@ func _select_week(w: int, animate: bool = true) -> void:
 		UI.style_button(b, UI.ACCENT_SOFT if week == w else UI.SURFACE, UI.INK, 18, week != w)
 	var today := App.today()
 	var this_week := Stats.week_start(today)
-	_chart_title.text = "This week" if w == this_week else "Week of %s" % Stats.format_day(w)
+	_chart_title.text = Text.t("stats.this_week") if w == this_week else Text.t("stats.week_of", {"day": Stats.format_day(w)})
 	_chart_total.text = Stats.format_duration(Stats.week_total(App.state.sessions, w, App.tz_bias()))
 	_chart.set_days(Stats.daily_project_totals(App.state.sessions, w, App.tz_bias()), Stats.weekday(today) if w == this_week else -1, animate)
 
@@ -188,17 +186,17 @@ func _select_week(w: int, animate: bool = true) -> void:
 	var ids := by_project.keys()
 	ids.sort_custom(func(a, b): return by_project[a] > by_project[b])
 	if ids.is_empty():
-		_legend.add_child(UI.label("No focus this week yet.", 14, UI.INK_FAINT, false, 700))
+		_legend.add_child(UI.label(Text.t("stats.no_focus"), 14, UI.INK_FAINT, false, 700))
 	for id in ids:
 		_legend.add_child(_legend_chip(id, by_project[id]))
 
 
 func _legend_chip(project_id: String, seconds: int) -> Control:
 	var p := App.state.project(project_id)
-	var title: String = p.name if p else "Deleted project"
+	var title: String = p.name if p else Text.t("stats.deleted_project")
 	if title.length() > CHIP_LETTERS:
 		title = title.left(CHIP_LETTERS).strip_edges() + "..."
-	var b := UI.button("%s  %s" % [title, Stats.format_duration(seconds)], _show_project.bind(project_id, -1), "quiet")
+	var b := UI.button(Text.t("stats.chip", {"project": title, "time": Stats.format_duration(seconds)}), _show_project.bind(project_id, -1), "quiet")
 	b.custom_minimum_size.y = 34
 	b.add_theme_font_size_override("font_size", 13)
 	b.icon = Icons.texture("dot", 12, UI.series_colour(project_id))
@@ -222,27 +220,25 @@ func _show_project(project_id: String, day: int) -> void:
 	if p == null:
 		return
 	var week := Stats.project_totals_in_week(App.state.sessions, _week, App.tz_bias())
-	var extra := "%s this week" % Stats.format_duration(int(week.get(project_id, 0)))
+	var extra := Text.t("stats.time_this_week", {"time": Stats.format_duration(int(week.get(project_id, 0)))})
 	if day >= 0:
 		var days := Stats.daily_project_totals(App.state.sessions, _week, App.tz_bias())
-		extra = "%s on %s" % [Stats.format_duration(int(days[day].get(project_id, 0))), DAY_WORDS[day]]
+		extra = Text.t("stats.time_on_day", {"time": Stats.format_duration(int(days[day].get(project_id, 0))), "day": Text.list("dates.days_long")[day]})
 	var m := Modal.open(560, true, 18)
 	var top := UI.hbox(8)
 	top.add_child(UI.spacer())
-	top.add_child(UI.round_button("close", "Close", m.close.bind(null), UI.SURFACE_SOFT, UI.INK, 36, false))
+	top.add_child(UI.round_button("close", Text.t("common.close"), m.close.bind(null), UI.SURFACE_SOFT, UI.INK, 36, false))
 	m.body.add_child(top)
 	var panel := ProjectPanel.new(p, extra, false, true)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	m.body.add_child(panel)
 	if not p.is_complete():
-		m.body.add_child(UI.para("Still in progress. Its panel moves to Completed when you finish it.", 13, UI.INK_FAINT))
+		m.body.add_child(UI.para(Text.t("stats.in_progress"), 13, UI.INK_FAINT))
 
 
 ## The week's bars: one per day, stacked by project, tappable piece by piece.
 class _Chart extends Control:
 	signal segment_tapped(project_id: String, day: int)
-
-	const DAYS := ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 	var days: Array[Dictionary] = []
 	var today_index := -1
@@ -318,4 +314,4 @@ class _Chart extends Control:
 				_pieces.append([r, id, i])
 				y -= seg + 2.0
 			var day_colour := UI.ACCENT if i == today_index else UI.INK_SOFT
-			draw_string(font, Vector2(area.position.x + col * i, size.y - 6), DAYS[i], HORIZONTAL_ALIGNMENT_CENTER, col, 12, day_colour)
+			draw_string(font, Vector2(area.position.x + col * i, size.y - 6), Text.list("dates.days_short")[i], HORIZONTAL_ALIGNMENT_CENTER, col, 12, day_colour)

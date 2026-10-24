@@ -39,11 +39,11 @@ func _init(list: Array, note: String = "") -> void:
 	var trophy := UI.icon_rect("trophy", 22, UI.ACCENT)
 	trophy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(trophy)
-	var title := UI.trimmed("Friends leaderboard", 20, UI.INK, true, 600)
+	var title := UI.trimmed(Text.t("leaderboard.title"), 20, UI.INK, true, 600)
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	head.add_child(title)
 	if list.size() > 1:
-		var full := UI.button("See full", open_full.bind(list), "quiet")
+		var full := UI.button(Text.t("leaderboard.see_full"), open_full.bind(list), "quiet")
 		full.custom_minimum_size = Vector2(0, 32)
 		full.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		full.add_theme_font_size_override("font_size", 13)
@@ -125,7 +125,7 @@ func _whole_rows(room: float) -> float:
 ## top while the list scrolls.
 static func open_full(list: Array) -> void:
 	var m := Modal.open(480)
-	m.header.add_child(m.heading_row("Friend leaderboard"))
+	m.header.add_child(m.heading_row(Text.t("leaderboard.full_title")))
 	var room := MarginContainer.new()
 	room.add_child(_list(list))
 	m.body.add_child(room)
@@ -156,7 +156,7 @@ static func row(rank: int, f: Dictionary) -> Control:
 	var who := UI.hbox(12)
 	who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	who.mouse_filter = Control.MOUSE_FILTER_STOP
-	who.accessibility_name = "Your profile" if me else "%s's profile" % f.get("name", "")
+	who.accessibility_name = Text.t("leaderboard.your_profile") if me else Text.t("leaderboard.their_profile", {"name": f.get("name", "")})
 	var face := UI.character_portrait(f.get("look", {}), Vector2(40, 40), true)
 	face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	who.add_child(face)

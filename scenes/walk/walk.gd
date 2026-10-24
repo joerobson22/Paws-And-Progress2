@@ -114,7 +114,7 @@ func _build_hud(clock: SessionClock) -> void:
 
 	var bottom := UI.hbox()
 	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_pause = UI.round_button("pause", "Pause", _toggle_pause, UI.GLASS, Color.WHITE, 52, false)
+	_pause = UI.round_button("pause", Text.t("walk.pause"), _toggle_pause, UI.GLASS, Color.WHITE, 52, false)
 	_pause.size_flags_vertical = Control.SIZE_SHRINK_END
 	bottom.add_child(_pause)
 	bottom.add_child(UI.spacer())
@@ -149,7 +149,7 @@ func _build_hud(clock: SessionClock) -> void:
 		weather.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(weather)
 	row.add_child(UI.spacer())
-	_sound = UI.round_button("sound", "Sound", _toggle_sound, UI.GLASS, Color.WHITE, 40, false)
+	_sound = UI.round_button("sound", Text.t("walk.sound"), _toggle_sound, UI.GLASS, Color.WHITE, 40, false)
 	row.add_child(_sound)
 	_show_sound()
 
@@ -172,7 +172,7 @@ func _toggle_sound() -> void:
 func _show_sound() -> void:
 	var on := _sound_on()
 	_sound.icon = Icons.texture("sound" if on else "mute", int(40 * 0.42), Color.WHITE, 2.6)
-	_sound.accessibility_name = "Sound off" if on else "Sound on"
+	_sound.accessibility_name = Text.t("walk.sound_off" if on else "walk.sound_on")
 
 
 ## Centred text with a soft shadow so it reads over any scenery.
@@ -265,7 +265,7 @@ func _toggle_pause() -> void:
 
 func _apply_paused(paused: bool) -> void:
 	_pause.icon = Icons.texture("play" if paused else "pause", 22, Color.WHITE)
-	_pause.accessibility_name = "Carry on" if paused else "Pause"
+	_pause.accessibility_name = Text.t("walk.carry_on" if paused else "walk.pause")
 	_walker.walking = not paused
 	_animal.walking = not paused
 	var walk_speed := float(Content.animal(_project.animal_id).get("walk_speed", 1.0))
@@ -282,9 +282,9 @@ func _on_gift_pressed() -> void:
 	if GiftRoller.min_rarity(seconds, Content.drop_table) == "":
 		var left := int(Content.drop_table.get("min_seconds", 600)) - seconds
 		var minutes := ceili(left / 60.0)
-		Modal.confirm("End your walk?",
-			"%s hasn't found a gift yet. %s more and it will." % [Content.pet_called(_project, true), "1 minute" if minutes == 1 else "%d minutes" % minutes],
-			"End walk", "danger", "Keep walking").closed.connect(func(ok):
+		Modal.confirm(Text.t("walk.end_title"),
+			Text.t("walk.end_body", {"pet": Content.pet_called(_project, true), "time": Text.count("walk.minutes", minutes)}),
+			Text.t("walk.end"), "danger", Text.t("walk.keep_walking")).closed.connect(func(ok):
 				if ok:
 					_end())
 		return

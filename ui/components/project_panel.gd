@@ -64,15 +64,15 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 	for id in ids:
 		flow.add_child(_gift_chip(id, gifts[id]))
 	if ids.is_empty():
-		flow.add_child(UI.label("No gifts", 13, UI.INK_FAINT, false, 700))
+		flow.add_child(UI.label(Text.t("project.no_gifts"), 13, UI.INK_FAINT, false, 700))
 	right.add_child(flow)
 
 	right.add_child(UI.spacer(true))
 	var bias := App.tz_bias()
-	var when := Stats.format_date(p.created_unix, bias) + " – " + \
-		(Stats.format_date(p.completed_unix, bias) if p.is_complete() else "now")
+	var when := Text.t("project.dates", {"from": Stats.format_date(p.created_unix, bias),
+		"to": Stats.format_date(p.completed_unix, bias) if p.is_complete() else Text.t("project.now")})
 	if extra != "":
-		when = extra + "  ·  " + when
+		when = Text.t("project.extra_and_dates", {"extra": extra, "dates": when})
 	var dates := UI.label(when, 12, UI.INK_FAINT, false, 700)
 	dates.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	dates.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -88,7 +88,7 @@ static func _gift_chip(gift_id: String, count: int) -> Control:
 	var art := GiftArt.new(gift_id)
 	art.custom_minimum_size = Vector2(26, 26)
 	h.add_child(art)
-	var n := UI.label("×%d" % count, 13, Content.rarity_text_colour(Content.gift(gift_id).get("rarity", "common")), false, 800)
+	var n := UI.label(Text.t("gift.count", {"n": count}), 13, Content.rarity_text_colour(Content.gift(gift_id).get("rarity", "common")), false, 800)
 	n.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(n)
 	return h
@@ -110,13 +110,13 @@ class _GradeButton extends Button:
 			add_theme_stylebox_override(state, StyleBoxEmpty.new())
 		if grade_ref == "":
 			custom_minimum_size = Vector2(SIZE, SIZE)
-			accessibility_name = "Give it a grade"
+			accessibility_name = Text.t("project.add_grade")
 		else:
 			var badge := UI.grade_badge(grade_ref, int(SIZE))
 			badge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			custom_minimum_size = badge.custom_minimum_size
 			add_child(badge)
-			accessibility_name = "%s · change the grade" % badge.accessibility_name
+			accessibility_name = Text.t("project.change_grade", {"grade": badge.accessibility_name})
 		_cover = Control.new()
 		_cover.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		_cover.mouse_filter = Control.MOUSE_FILTER_IGNORE

@@ -13,18 +13,18 @@ static func list(data: Dictionary, animals: Array, gifts: Array) -> Array:
 	for f in data.get("focus", []):
 		var hours := int(f["hours"])
 		out.append({"id": f["id"], "name": f["name"], "kind": "hours", "goal": hours, "icon": "clock", "animal": "",
-			"description": "Focus for %s hours in total" % grouped(hours)})
+			"description": Text.t("achievements.hours_description", {"hours": grouped(hours)})})
 	var all: Dictionary = data.get("all_gifts", {})
-	out.append({"id": all.get("id", "all_gifts"), "name": all.get("name", "Full collection"), "kind": "all_gifts",
-		"goal": gifts.size(), "icon": "gift", "animal": "", "description": "Find every gift"})
+	out.append({"id": all.get("id", "all_gifts"), "name": all.get("name", Text.t("achievements.all_gifts_name")), "kind": "all_gifts",
+		"goal": gifts.size(), "icon": "gift", "animal": "", "description": Text.t("achievements.all_gifts_description")})
 	var each: Dictionary = data.get("animal_gifts", {})
 	for a in animals:
 		var count := gifts.filter(func(g): return g["animal"] == a["id"]).size()
 		if count == 0:
 			continue
-		out.append({"id": "animal_%s" % a["id"], "name": str(each.get("name", "{animal} set")).replace("{animal}", a["name"]),
+		out.append({"id": "animal_%s" % a["id"], "name": Text.fill(str(each.get("name", Text.t("achievements.animal_name"))), {"animal": a["name"]}),
 			"kind": "animal", "goal": count, "icon": "", "animal": a["id"],
-			"description": "Find all %d of the %s's gifts" % [count, str(a["name"]).to_lower()]})
+			"description": Text.t("achievements.animal_description", {"count": count, "animal": str(a["name"]).to_lower()})})
 	return out
 
 

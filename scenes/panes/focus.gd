@@ -94,7 +94,7 @@ func _place() -> void:
 
 
 func _update_hint() -> void:
-	_hint.text = "Tap to adopt your first pet" if App.state.active_projects().is_empty() else "Tap to focus"
+	_hint.text = Text.t("focus.hint_first_pet" if App.state.active_projects().is_empty() else "focus.hint")
 
 
 ## Only the hint (and, after a walk, the greeting) depend on the game state.

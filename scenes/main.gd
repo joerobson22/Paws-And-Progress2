@@ -365,9 +365,8 @@ func _maybe_ask_location() -> void:
 	await get_tree().create_timer(1.5).timeout
 	if Outdoors.asked() or not _flows.is_empty() or Modal.is_open() or _at != Vector2i.ZERO:
 		return
-	var m := Modal.confirm("Bring your weather along?",
-		"Your walks can follow the real sunrise, sunset and weather where you are. Your rough location comes from your internet connection and is only used to look those up. You can change this in settings.",
-		"Allow", "accent", "Not now")
+	var m := Modal.confirm(Text.t("weather_prompt.title"), Text.t("weather_prompt.body"),
+		Text.t("weather_prompt.allow"), "accent", Text.t("weather_prompt.not_now"))
 	Outdoors.set_enabled(await m.closed == true)
 
 

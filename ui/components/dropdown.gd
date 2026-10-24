@@ -23,7 +23,7 @@ var _menu: Control
 var _flipping := false
 
 
-func _init(options: Array, selected: String, is_reversed: bool = false, label_prefix: String = "Sort by", can_reverse: bool = true) -> void:
+func _init(options: Array, selected: String, is_reversed: bool = false, label_prefix: String = "", can_reverse: bool = true) -> void:
 	_options = options
 	current = selected
 	reversed = is_reversed and can_reverse
@@ -50,7 +50,7 @@ func _init(options: Array, selected: String, is_reversed: bool = false, label_pr
 ## the state changed; with `quiet` it only saves, for a screen that re-sorts
 ## its own list from `chosen` rather than rebuilding everything.
 static func for_setting(options: Array, key: String, fallback: String, quiet: bool = false) -> Dropdown:
-	var d := Dropdown.new(options, str(App.state.settings.get(key, fallback)), bool(App.state.settings.get(key + "_reversed", false)))
+	var d := Dropdown.new(options, str(App.state.settings.get(key, fallback)), bool(App.state.settings.get(key + "_reversed", false)), Text.t("common.sort_by"))
 	d.chosen.connect(func(option: String, is_reversed: bool):
 		App.state.settings[key] = option
 		if quiet:
@@ -79,7 +79,7 @@ func select(id: String) -> void:
 
 
 func _refresh() -> void:
-	text = "%s: %s" % [prefix, _label(current)] if prefix != "" else _label(current)
+	text = Text.t("common.labelled", {"label": prefix, "value": _label(current)}) if prefix != "" else _label(current)
 	# A plain picker still shows its arrow down, so it reads as a menu.
 	icon = _arrow(reversed and sortable)
 

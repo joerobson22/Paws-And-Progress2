@@ -32,14 +32,13 @@ static func open() -> Modal:
 	var m := Modal.open(560)
 	var editor := ShelfEditor.new()
 	editor.modal = m
-	m.header.add_child(m.heading_row("Your shelf"))
+	m.header.add_child(m.heading_row(Text.t("shelf.title")))
 	editor._shelf_box = UI.vbox(0)
 	m.header.add_child(editor._shelf_box)
-	var how := "Drag gifts onto the shelf, along it and off it." if _quick() \
-		else "Hold a gift to pick it up, then drag it onto the shelf, along it or off it."
+	var how := Text.t("shelf.how_mouse" if _quick() else "shelf.how_touch")
 	m.header.add_child(UI.para(how, 13, UI.INK_SOFT))
 	var head := UI.hbox(8)
-	var cap := UI.caption("Your collection")
+	var cap := UI.caption(Text.t("gifts.your_collection"))
 	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(cap)
 	head.add_child(UI.spacer())
