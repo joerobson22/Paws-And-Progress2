@@ -1144,6 +1144,17 @@ func _accounts(main: Node) -> void:
 	await _wait(10)
 	go = _find(profile_pane, func(n): return n is Button and n.text == "Start walking")
 	check(go != null and not go.disabled, "then it's ready")
+	if main.size.y >= 590:
+		var fields: Control = _find(profile_pane, func(n): return n is Label and n.text == "JOINED")
+		var shelf_cap: Control = _find(profile_pane, func(n): return n is Label and n.text == "GIFT SHELF")
+		check(fields != null and shelf_cap != null, "the card has its details and shelf")
+		if fields and shelf_cap:
+			var gap: float = shelf_cap.get_global_rect().position.y - fields.get_global_rect().end.y
+			check(gap < 200.0,
+				"no big gap between the details and the shelf (%d)" % gap)
+		if main.size.y > main.size.x * 1.5:
+			check(_find(profile_pane, func(n): return _is(n, "medal_card.gd") and n.is_visible_in_tree()) != null,
+				"a tall screen shows the achievements to come under the setup")
 	await _shot("account_ready")
 	if go:
 		await _tap_control(go, main)
@@ -1159,6 +1170,9 @@ func _accounts(main: Node) -> void:
 	if board:
 		check(_find(board, func(n): return n is Label and n.text == "No friends yet!" and n.is_visible_in_tree()) != null, "and says so")
 		check(_find(board, func(n): return n.has_meta("press")) == null and _find(board, func(n): return n is Button) == null, "not even your own row")
+		var stats_pane: Control = main._panes[Vector2i(0, 1)]
+		check(stats_pane._weeks.is_empty() and _find(stats_pane, func(n): return n is Button and _find(n, func(l): return l is Label and l.text == "This week") != null) == null,
+			"with only this week there are no weeks to pick between")
 	await _shot("leaderboard_empty")
 
 	# Back to the first account, then delete the new one.
