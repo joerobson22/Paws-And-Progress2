@@ -654,5 +654,5 @@ static func grade_badge(grade_ref: String, diameter: int = 44) -> Control:
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	p.add_child(l)
-	p.accessibility_name = "%s %s" % [g.get("scale_name", ""), g.get("name", "")]
+	p.accessibility_name = Text.t("project.grade_name", {"scale": g.get("scale_name", ""), "grade": g.get("name", "")})
 	return p

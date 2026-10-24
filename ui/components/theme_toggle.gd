@@ -28,7 +28,7 @@ func _init() -> void:
 	_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_icon)
-	accessibility_name = "Switch to light mode" if UI.dark else "Switch to dark mode"
+	accessibility_name = Text.t("theme.to_light" if UI.dark else "theme.to_dark")
 	pressed.connect(_flip)
 	mouse_entered.connect(func(): _hover(true))
 	mouse_exited.connect(func(): _hover(false))

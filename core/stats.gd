@@ -10,7 +10,6 @@ const STREAK_MIN_SECONDS := 600
 ## This many work days in a row earn one rest day: missing the next day
 ## doesn't break the streak.
 const REST_DAY_AFTER := 3
-const MONTHS := ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 static func local_day(unix: int, bias_minutes: int) -> int:
@@ -167,17 +166,17 @@ static func format_duration(seconds: int) -> String:
 	@warning_ignore("integer_division")
 	var m := (seconds / 60) % 60
 	if h > 0:
-		return "%dh %02dm" % [h, m]
-	return "%dm" % m
+		return Text.t("dates.hours_minutes", {"h": h, "m": "%02d" % m})
+	return Text.t("dates.minutes", {"m": m})
 
 
 ## "3 Jan 2026" for a unix time, in local time.
 static func format_date(unix: int, bias_minutes: int) -> String:
 	var d := Time.get_datetime_dict_from_unix_time(unix + bias_minutes * 60)
-	return "%d %s %d" % [d["day"], MONTHS[int(d["month"]) - 1], d["year"]]
+	return Text.t("dates.date", {"day": d["day"], "month": Text.list("dates.months")[int(d["month"]) - 1], "year": d["year"]})
 
 
 ## "13 Oct" for a local day number.
 static func format_day(day: int) -> String:
 	var d := Time.get_datetime_dict_from_unix_time(day * SECONDS_PER_DAY)
-	return "%d %s" % [d["day"], MONTHS[int(d["month"]) - 1]]
+	return Text.t("dates.day", {"day": d["day"], "month": Text.list("dates.months")[int(d["month"]) - 1]})

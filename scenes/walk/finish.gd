@@ -142,7 +142,7 @@ func _build_words(session: FocusSession, roll: Dictionary) -> void:
 	margin.add_child(col)
 
 	var seconds := session.focus_seconds if session else 0
-	var title := _word(UI.label("Focus complete", 40, UI.ON_DARK, true, 600))
+	var title := _word(UI.label(Text.t("finish.title"), 40, UI.ON_DARK, true, 600))
 	col.add_child(title)
 	var time := _word(UI.label(SessionClock.format(seconds), 24, UI.ON_DARK_SOFT, true, 500))
 	col.add_child(time)
@@ -152,14 +152,14 @@ func _build_words(session: FocusSession, roll: Dictionary) -> void:
 	found.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var colour := Content.rarity_colour(roll.get("rarity", "common"))
 	if roll.is_empty():
-		found.add_child(_word(UI.label("No gift this time", 24, UI.ON_DARK, true, 600)))
-		var why := "Walks under a minute aren't saved." if seconds < 60 else \
-			"Focus for %d minutes or more and your pet finds you one." % floori(Content.drop_table.get("min_seconds", 600) / 60.0)
+		found.add_child(_word(UI.label(Text.t("finish.no_gift"), 24, UI.ON_DARK, true, 600)))
+		var why := Text.t("finish.too_short") if seconds < 60 else \
+			Text.t("finish.no_gift_why", {"minutes": floori(Content.drop_table.get("min_seconds", 600) / 60.0)})
 		found.add_child(_word(UI.para(why, 15, UI.ON_DARK_SOFT)))
 	else:
 		var g := Content.gift(_gift_id)
-		var finder := Content.pet_called(_project, true) if _project else "Your pet"
-		found.add_child(_word(UI.label("%s found you %s gift" % [finder, UI.a(Content.rarity_name(roll["rarity"]).to_lower())], 16, colour.lightened(0.4), false, 800)))
+		var finder := Content.pet_called(_project, true) if _project else Text.t("pet.fallback_start")
+		found.add_child(_word(UI.label(Text.t("finish.found", {"pet": finder, "a_rarity": UI.a(Content.rarity_name(roll["rarity"]).to_lower())}), 16, colour.lightened(0.4), false, 800)))
 		found.add_child(_word(UI.label(g.get("name", "?"), 30, UI.ON_DARK, true, 600)))
 		var desc := _word(UI.para(g.get("description", ""), 15, UI.ON_DARK_SOFT))
 		desc.custom_minimum_size.x = minf(420.0, size.x - 48.0)
@@ -182,16 +182,16 @@ func _build_words(session: FocusSession, roll: Dictionary) -> void:
 	level_row.modulate.a = 0.0
 	col.add_child(UI.spacer())
 	col.add_child(level_row)
-	_xp_label = _word(UI.label("+%d xp" % earned, 18, UI.ON_DARK, true, 600))
+	_xp_label = _word(UI.label(Text.t("finish.xp", {"xp": earned}), 18, UI.ON_DARK, true, 600))
 	_xp_label.modulate.a = 0.0
 	col.add_child(_xp_label)
-	_bar.shown_changed.connect(func(xp: int): _xp_label.text = "+%d xp" % maxi(0, _xp_to - xp))
+	_bar.shown_changed.connect(func(xp: int): _xp_label.text = Text.t("finish.xp", {"xp": maxi(0, _xp_to - xp)}))
 	_bar.levelled_up.connect(_on_level_up)
 
 	var bottom := UI.hbox()
 	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom.add_child(UI.spacer())
-	_home = UI.round_button("home", "Home", go_back, Color.WHITE, UI.ACCENT.darkened(0.2), 64)
+	_home = UI.round_button("home", Text.t("common.home"), go_back, Color.WHITE, UI.ACCENT.darkened(0.2), 64)
 	_home.modulate.a = 0.0
 	_home.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom.add_child(_home)
@@ -257,7 +257,7 @@ func _zoom_target() -> Dictionary:
 func _on_level_up(level: int) -> void:
 	var unlocked: Array = Levels.rewards(Content.levels).filter(func(r): return int(r["level"]) == level)
 	var names := unlocked.map(func(r): return Content.biome(r["id"]).get("name", "") if r["type"] == "place" else Content.animal(r["id"]).get("name", ""))
-	Toast.show_text("Level %d!%s" % [level, (" %s unlocked" % ", ".join(names)) if not names.is_empty() else ""], "star")
+	Toast.show_text(Text.t("finish.level_up", {"level": level}) if names.is_empty() else Text.t("finish.level_up_unlocks", {"level": level, "unlocked": ", ".join(names)}), "star")
 
 
 func _place_glow() -> void:

@@ -27,9 +27,9 @@ static func open(f: Dictionary) -> void:
 	var school := str(f.get("institution", ""))
 	var joined := int(f.get("joined_unix", 0))
 	side.add_child(ProfileCard.details([
-		ProfileCard.field("School, college or university", school if school != "" else "Not added yet", school == ""),
-		ProfileCard.field("Joined", Stats.format_date(joined, App.tz_bias()) if joined > 0 else "Recently"),
-		ProfileCard.field("This week", Stats.format_duration(int(f.get("weekly_seconds", 0)))),
+		ProfileCard.field(Text.t("profile.school"), school if school != "" else Text.t("friend.school_empty"), school == ""),
+		ProfileCard.field(Text.t("profile.joined"), Stats.format_date(joined, App.tz_bias()) if joined > 0 else Text.t("friend.joined_unknown")),
+		ProfileCard.field(Text.t("stats.this_week"), Stats.format_duration(int(f.get("weekly_seconds", 0)))),
 	]))
 	side.add_child(UI.spacer(true))
 	var shelf := GiftShelf.new(f.get("shelf", ["", "", ""]), 60.0, func(tile: GiftTile, _i: int):

@@ -52,7 +52,7 @@ smaller than 800 × 560 points, so layouts never squash.
                   Stats
 ```
 
-- **Focus** (middle): a greeting (from a long list in `data/greetings.json`)
+- **Focus** (middle): a greeting (from a long list in `data/text.json`)
   above the orb (it grows under the pointer), and the sun/moon switch for dark
   mode. Tap the orb and the choose focus screen grows out of it, set in the
   place you'll walk (holding still, with the place's growth in front of your
@@ -184,6 +184,7 @@ CI runs all three on every push (`.github/workflows/ci.yml`). With a display,
 core/            game logic, no UI
   app.gd           autoload "App": state, saving, walks, trades, navigation
   content.gd       autoload "Content": loads data/*.json
+  text.gd          every word on screen, from data/text.json
   outdoors.gd      autoload "Outdoors": location (with permission), weather
   day_cycle.gd     the sky and light at any hour
   sun_times.gd     sunrise and sunset anywhere, worked out on the device
@@ -202,8 +203,8 @@ core/            game logic, no UI
   display.gd       the computer window: mode, size, minimum, debug phone view
   models/          ProjectData, FocusSession resources
 data/            all content: animals, gifts, drop table, places (biomes),
-                 levels, cosmetics, grades, achievements, walk quotes,
-                 home greetings
+                 levels, cosmetics, grades, achievements, and text.json
+                 (every word on screen, home greetings and walk quotes)
 scenes/
   main.gd          the app shell: panes, swiping, minimap, edge arrows,
                    flows, popups
@@ -224,6 +225,8 @@ tests/           headless unit tests and the smoke run
 
 ## Consistent by construction
 
+- **Words:** screens never write their own text. Every line comes from
+  `data/text.json` through `Text` (see below).
 - **Look:** screens never style things themselves. Colours, type, buttons,
   cards, tags, badges and portraits all come from `ui/ui.gd`, so a change there
   shows up everywhere. Its palette has a light and a dark set; switching
@@ -242,6 +245,35 @@ tests/           headless unit tests and the smoke run
   option again flips its arrow, then reverses the order;
   `Dropdown.for_setting` remembers the choice.
 
+## Changing the words (no code needed)
+
+Every word the app shows is in `data/text.json`, grouped by screen
+(`"profile"`, `"stats"`, ...), with buttons and words used everywhere under
+`"common"`. Change the text on the right and it changes in the app; leave the
+names on the left alone.
+
+```json
+"delete_title": "Delete {project}?",
+"days": { "one": "{n} day", "other": "{n} days" },
+```
+
+- Words in `{braces}` are filled in by the app. Keep them, but move them
+  wherever reads best.
+- A `"one"` / `"other"` pair is the line for one thing and for many.
+- Small headings over lists are put in capitals by the app, so write them
+  normally.
+- **Home greetings:** add a line to `"greetings"`, under the time of day it's
+  for (`"morning"`, `"afternoon"`, `"evening"`, `"night"`) or `"anytime"`.
+  `{name}` becomes the player's name.
+- **Walk quotes:** add a line to `"quotes"`.
+- Names and descriptions of animals, gifts, places, clothes, grades and
+  achievements stay with the rest of their details in the other `data/` files.
+
+In code, `Text.t("profile.title")` gets a line,
+`Text.t("choose_focus.say_hello", {"pet": name})` fills one in,
+`Text.count("stats.days", n)` picks one or many, and `Text.list("quotes")`
+gets a list. The unit tests check that every key the code uses is in the file.
+
 ## Adding content (no code needed)
 
 - **Animal:** add an entry to `data/animals.json` (with its `dive`) and its four
@@ -253,11 +285,9 @@ tests/           headless unit tests and the smoke run
 - **Grades:** `data/grades.json`.
 - **Achievements:** `data/achievements.json` (hour goals; the gift sets come
   from the animals and gifts).
-- **Walk quotes:** `data/quotes.json`.
 - **Place:** add a stack of layers to `data/biomes.json` (and an icon), and
   give it a level in `data/levels.json`.
 - **Level rewards and XP:** `data/levels.json`.
-- **Home greetings:** `data/greetings.json`.
 
 ## Art and sound status
 

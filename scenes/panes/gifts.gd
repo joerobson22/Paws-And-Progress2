@@ -15,14 +15,14 @@ func build() -> void:
 	_stats = null
 	_grid = null
 	var col := frame(760, 16)
-	col.add_child(title_row("Gifts"))
+	col.add_child(title_row(Text.t("gifts.title")))
 	var counts := Collection.progress(App.state.inventory, Content.gifts, Content.animals)
 	col.add_child(_progress(counts))
 
 	var section := UI.vbox(8)
 	section.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var head := UI.hbox(8)
-	var cap := UI.caption("Your collection")
+	var cap := UI.caption(Text.t("gifts.your_collection"))
 	cap.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(cap)
 	head.add_child(UI.spacer())
@@ -31,8 +31,8 @@ func build() -> void:
 	if GiftGrid.ids().is_empty():
 		var empty := UI.card(UI.SURFACE, 24)
 		var v := UI.vbox(6)
-		v.add_child(UI.label("No gifts yet", 20, UI.INK, true, 600))
-		v.add_child(UI.para("Focus for %d minutes and your pet dives into the bushes to find you one." % floori(Content.drop_table.get("min_seconds", 600) / 60.0)))
+		v.add_child(UI.label(Text.t("gifts.empty_title"), 20, UI.INK, true, 600))
+		v.add_child(UI.para(Text.t("gifts.empty_body", {"minutes": floori(Content.drop_table.get("min_seconds", 600) / 60.0)})))
 		empty.add_child(v)
 		section.add_child(empty)
 		return
@@ -64,14 +64,14 @@ func _tile(id: String) -> GiftTile:
 ## cosmetics in purple (the common, rare and epic colours).
 func _progress(counts: Dictionary) -> Control:
 	var section := UI.vbox(8)
-	section.add_child(UI.caption("Collection stats"))
+	section.add_child(UI.caption(Text.t("gifts.collection_stats")))
 	_stats = StatPanel.new(3)
 	section.add_child(_stats)
 	var diameter := clampf(size.y * 0.12, 64.0, 104.0)
 	var stats := [
-		["Discovered", "%d of %d gifts" % [counts["found"], counts["gifts"]], counts["found"], counts["gifts"], "common"],
-		["Pet tables", "%d of %d complete" % [counts["tables"], counts["animals"]], counts["tables"], counts["animals"], "rare"],
-		["Cosmetics", "%d of %d unlocked" % [counts["cosmetics"], counts["wearables"]], counts["cosmetics"], counts["wearables"], "epic"],
+		[Text.t("gifts.discovered"), Text.t("gifts.discovered_note", {"have": counts["found"], "total": counts["gifts"]}), counts["found"], counts["gifts"], "common"],
+		[Text.t("gifts.pet_tables"), Text.t("gifts.pet_tables_note", {"have": counts["tables"], "total": counts["animals"]}), counts["tables"], counts["animals"], "rare"],
+		[Text.t("gifts.cosmetics"), Text.t("gifts.cosmetics_note", {"have": counts["cosmetics"], "total": counts["wearables"]}), counts["cosmetics"], counts["wearables"], "epic"],
 	]
 	for s in stats:
 		_stats.add(ProgressRing.new(Collection.fraction(s[2], s[3]), Content.rarity_colour(s[4]), diameter), s[0], s[1])

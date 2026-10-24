@@ -11,7 +11,7 @@ extends RefCounted
 ## Everyone on the leaderboard this week, most focus first: you
 ## (`mine` seconds, marked "me") and every friend.
 static func ranked(friends: Array, mine: int, walking: bool) -> Array:
-	var rows: Array = [{"name": "You", "weekly_seconds": mine, "walking": walking, "look": {}, "me": true}]
+	var rows: Array = [{"name": Text.t("friends.you"), "weekly_seconds": mine, "walking": walking, "look": {}, "me": true}]
 	rows.append_array(friends)
 	rows.sort_custom(func(a, b): return int(a["weekly_seconds"]) > int(b["weekly_seconds"]))
 	return rows

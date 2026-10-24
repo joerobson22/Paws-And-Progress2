@@ -14,9 +14,6 @@ var weathers: Dictionary = {}
 var grade_scales: Array = []
 ## What the profile's achievements are (see Achievements.list()).
 var achievements: Dictionary = {}
-var quotes: Array = []
-## Home screen lines: {morning, afternoon, evening, night, anytime}.
-var greetings: Dictionary = {}
 ## XP rules and level rewards (data/levels.json).
 var levels: Dictionary = {}
 ## [{id, name}] in the order the customise popup lists them.
@@ -47,8 +44,6 @@ func _init() -> void:
 	keys.sort_custom(func(x, y): return float(x["hour"]) < float(y["hour"]))
 	grade_scales = _load("res://data/grades.json").get("scales", [])
 	achievements = _load("res://data/achievements.json")
-	quotes = _load("res://data/quotes.json").get("quotes", [])
-	greetings = _load("res://data/greetings.json")
 	levels = _load("res://data/levels.json")
 	var c := _load("res://data/cosmetics.json")
 	cosmetic_slots = c.get("slots", [])
@@ -76,13 +71,14 @@ func animal(id: String) -> Dictionary:
 func pet_called(p: ProjectData, start_of_sentence: bool = false) -> String:
 	if p.pet_name != "":
 		return p.pet_name
-	return ("Your " if start_of_sentence else "your ") + str(animal(p.animal_id).get("name", "pet")).to_lower()
+	return Text.t("pet.your_kind_start" if start_of_sentence else "pet.your_kind",
+		{"kind": str(animal(p.animal_id).get("name", "pet")).to_lower()})
 
 
 ## "Biscuit · Staffy", or just "Staffy" for a pet without a name.
 func pet_label(p: ProjectData) -> String:
 	var kind := str(animal(p.animal_id).get("name", ""))
-	return kind if p.pet_name == "" else "%s · %s" % [p.pet_name, kind]
+	return kind if p.pet_name == "" else Text.t("pet.name_and_kind", {"name": p.pet_name, "kind": kind})
 
 
 func animal_default_colours(id: String) -> Array[Color]:
@@ -180,6 +176,7 @@ func grade_rank(ref: String) -> Array:
 
 ## The same quote for the same key, so a walk keeps its quote across restarts.
 func quote(key: int) -> String:
+	var quotes := Text.list("quotes")
 	if quotes.is_empty():
 		return ""
 	return str(quotes[posmod(key, quotes.size())])
@@ -196,11 +193,11 @@ func greeting(hour: int, username: String, rng: RandomNumberGenerator) -> String
 		part = "afternoon"
 	elif hour >= 17 and hour < 22:
 		part = "evening"
-	var pool: Array = greetings.get(part, []) if rng.randf() < 0.5 else greetings.get("anytime", [])
+	var pool: Array = Text.list("greetings." + part) if rng.randf() < 0.5 else Text.list("greetings.anytime")
 	pool = pool.filter(func(l): return username != "" or not str(l).contains("{name}"))
 	if pool.is_empty():
-		return "Ready when you are"
-	return str(pool[rng.randi_range(0, pool.size() - 1)]).replace("{name}", username)
+		return Text.t("greetings.fallback")
+	return Text.fill(str(pool[rng.randi_range(0, pool.size() - 1)]), {"name": username})
 
 
 # --- Cosmetics ---------------------------------------------------------------

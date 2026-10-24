@@ -48,13 +48,13 @@ static func open(max_width: float = 440.0, can_dismiss: bool = true, padding: in
 
 ## A yes/no question. Closes with true or false. `tone` styles the yes
 ## button: "danger" (red), "success" (green) or "primary".
-static func confirm(title: String, text: String, yes: String, tone: String = "danger", no: String = "Cancel") -> Modal:
+static func confirm(title: String, text: String, yes: String, tone: String = "danger", no: String = "") -> Modal:
 	var m := open(400)
 	m.body.add_child(m.heading(title))
 	var p := UI.para(text, 16)
 	m.body.add_child(p)
 	var row := UI.hbox(10)
-	var cancel := UI.button(no, m.close.bind(false), "quiet")
+	var cancel := UI.button(no if no != "" else Text.t("common.cancel"), m.close.bind(false), "quiet")
 	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(cancel)
 	var ok := UI.button(yes, m.close.bind(true), tone)
@@ -76,10 +76,10 @@ static func prompt(title: String, value: String, placeholder: String = "", max_l
 	edit.select_all_on_focus = true
 	m.body.add_child(edit)
 	var row := UI.hbox(10)
-	var cancel := UI.button("Cancel", m.close.bind(null), "quiet")
+	var cancel := UI.button(Text.t("common.cancel"), m.close.bind(null), "quiet")
 	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(cancel)
-	var save := UI.button("Save", func(): m.close(edit.text.strip_edges()), "accent")
+	var save := UI.button(Text.t("common.save"), func(): m.close(edit.text.strip_edges()), "accent")
 	save.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(save)
 	m.body.add_child(row)
@@ -122,7 +122,7 @@ static func colour(title: String, start: Color, on_change: Callable, swatches: A
 				on_change.call(c))
 			flow.add_child(dot)
 		m.body.add_child(flow)
-	m.body.add_child(UI.button("Done", func(): m.close(picker.color), "accent"))
+	m.body.add_child(UI.button(Text.t("common.done"), func(): m.close(picker.color), "accent"))
 	return m
 
 
@@ -139,7 +139,7 @@ func heading_row(text: String) -> HBoxContainer:
 	var h := heading(text)
 	h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(h)
-	var x := UI.round_button("close", "Close", close.bind(null), UI.SURFACE_SOFT, UI.INK, 36, false)
+	var x := UI.round_button("close", Text.t("common.close"), close.bind(null), UI.SURFACE_SOFT, UI.INK, 36, false)
 	x.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(x)
 	return row

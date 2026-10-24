@@ -80,12 +80,12 @@ func _fit() -> void:
 ## you are. The title stays at the top while the list scrolls.
 static func open_list(list: Array) -> void:
 	var m := Modal.open(480)
-	m.header.add_child(m.heading_row("Achievements"))
-	m.header.add_child(UI.para("%d of %d earned" % [list.filter(func(r): return r["earned"]).size(), list.size()], 14, UI.INK_SOFT, 700))
+	m.header.add_child(m.heading_row(Text.t("achievements.title")))
+	m.header.add_child(UI.para(Text.t("achievements.earned", {"have": list.filter(func(r): return r["earned"]).size(), "total": list.size()}), 14, UI.INK_SOFT, 700))
 	var column := UI.vbox(12)
 	var group := ""
 	for r in list:
-		var kind := "Focus" if r["kind"] == "hours" else "Gifts"
+		var kind := Text.t("achievements.group_focus" if r["kind"] == "hours" else "achievements.group_gifts")
 		if kind != group:
 			group = kind
 			if column.get_child_count() > 0:
@@ -118,8 +118,8 @@ static func _row(r: Dictionary) -> Control:
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	progress.add_child(bar)
-	var unit := "hours" if r["kind"] == "hours" else "gifts"
-	progress.add_child(UI.label("%s of %s %s" % [Achievements.grouped(r["have"]), Achievements.grouped(r["goal"]), unit], 12, UI.INK_FAINT, false, 800))
+	var line := "achievements.progress_hours" if r["kind"] == "hours" else "achievements.progress_gifts"
+	progress.add_child(UI.label(Text.t(line, {"have": Achievements.grouped(r["have"]), "goal": Achievements.grouped(r["goal"])}), 12, UI.INK_FAINT, false, 800))
 	words.add_child(progress)
 	row.add_child(words)
 	return row
@@ -204,7 +204,7 @@ class More extends VBoxContainer:
 		size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		mouse_default_cursor_shape = Cursor.HOVER
-		accessibility_name = "See every achievement"
+		accessibility_name = Text.t("achievements.see_every")
 		_disc.custom_minimum_size = Vector2(52, 52)
 		_disc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		_disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -212,14 +212,14 @@ class More extends VBoxContainer:
 			var fill := UI.SURFACE_SOFT
 			fill = fill.lightened(0.12 * _shade) if UI.dark else fill.darkened(0.1 * _shade)
 			_disc.draw_circle(_disc.size * 0.5, 26.0, fill, true, -1.0, true))
-		var plus := UI.label("+%d" % more if more > 0 else "All", 17, UI.INK_SOFT, true, 600)
+		var plus := UI.label(Text.t("achievements.more", {"n": more}) if more > 0 else Text.t("achievements.all"), 17, UI.INK_SOFT, true, 600)
 		plus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		plus.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		plus.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		plus.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_disc.add_child(plus)
 		add_child(_disc)
-		_words = UI.trimmed("See all", 11, UI.INK_SOFT, false, 800)
+		_words = UI.trimmed(Text.t("achievements.see_all"), 11, UI.INK_SOFT, false, 800)
 		_words.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_words.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_words)

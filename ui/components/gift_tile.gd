@@ -69,7 +69,7 @@ func _init(id: String, count: int = -1, glowing: bool = false, side: float = 78.
 	var corner := Control.new()
 	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(corner)
-	var badge := UI.tag("×%d" % count, colour if count > 0 else UI.SURFACE_SOFT, UI.ON_COLOUR if count > 0 else UI.INK_SOFT, 12)
+	var badge := UI.tag(Text.t("gift.count", {"n": count}), colour if count > 0 else UI.SURFACE_SOFT, UI.ON_COLOUR if count > 0 else UI.INK_SOFT, 12)
 	corner.add_child(badge)
 	corner.resized.connect(func():
 		badge.size = badge.get_combined_minimum_size()
@@ -83,7 +83,7 @@ func set_on_shelf() -> void:
 	modulate = Color(1, 1, 1, 0.55)
 	tappable = false
 	draggable = false
-	accessibility_name = "%s (on your shelf)" % accessibility_name
+	accessibility_name = Text.t("gift.on_shelf", {"gift": accessibility_name})
 
 
 ## Where the finger went down, in viewport coordinates.

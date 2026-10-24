@@ -28,31 +28,31 @@ static func open(id: String, fresh: bool = false, yours: bool = true) -> void:
 	var meta := UI.hbox(8)
 	meta.add_child(UI.tag(Content.rarity_name(rarity).to_upper(), Content.rarity_colour(rarity), UI.ON_COLOUR))
 	var animal_name: String = Content.animal(g["animal"]).get("name", "")
-	meta.add_child(UI.label("from the %s" % animal_name.to_lower(), 14, UI.INK_SOFT, false, 700))
+	meta.add_child(UI.label(Text.t("gift.from", {"animal": animal_name.to_lower()}), 14, UI.INK_SOFT, false, 700))
 	if fresh:
 		meta.add_child(UI.spacer())
-		meta.add_child(UI.tag("NEW", UI.INK, UI.BG))
+		meta.add_child(UI.tag(Text.t("gift.new"), UI.INK, UI.BG))
 	m.body.add_child(meta)
 	m.body.add_child(UI.para(g.get("description", ""), 16, UI.INK))
 	if not yours:
 		return
 	if g.has("slot"):
-		m.body.add_child(UI.para("Wearable (%s). Dress your character on your profile, above the focus screen." % Content.slot_name(g["slot"]).to_lower(), 14))
-	m.body.add_child(UI.label("You have %d" % count, 15, UI.INK_SOFT, false, 800))
+		m.body.add_child(UI.para(Text.t("gift.wearable", {"slot": Content.slot_name(g["slot"]).to_lower()}), 14))
+	m.body.add_child(UI.label(Text.t("gift.you_have", {"n": count}), 15, UI.INK_SOFT, false, 800))
 
 	var cost := Content.trade_cost(rarity)
 	var next := Content.next_rarity(rarity)
 	if cost > 0 and next != "":
 		var next_name := Content.rarity_name(next).to_lower()
 		if count >= cost:
-			var trade := UI.button("Trade in %d for %s" % [cost, UI.a(next_name)], func(): trade(m, id), "accent")
+			var trade := UI.button(Text.t("gift.trade", {"cost": cost, "a_rarity": UI.a(next_name)}), func(): trade(m, id), "accent")
 			trade.icon = Icons.texture("trade", 18, Color.WHITE)
 			trade.add_theme_constant_override("h_separation", 10)
 			m.body.add_child(trade)
 		else:
-			m.body.add_child(UI.para("Trade in %d for %s gift: %d more to go." % [cost, UI.a(next_name), cost - count], 14, UI.INK_FAINT))
+			m.body.add_child(UI.para(Text.t("gift.trade_short", {"cost": cost, "a_rarity": UI.a(next_name), "left": cost - count}), 14, UI.INK_FAINT))
 	else:
-		m.body.add_child(UI.para("Legendary gifts can't be traded in.", 14, UI.INK_FAINT))
+		m.body.add_child(UI.para(Text.t("gift.no_trade"), 14, UI.INK_FAINT))
 
 
 ## Trades the gift in from its popup `m`, then shows what it brought.

@@ -11,8 +11,8 @@ extends Pane
 
 func build() -> void:
 	var col := frame(720, 14)
-	var head := title_row("Profile")
-	head.add_child(UI.round_button("gear", "Settings", open_settings, UI.SURFACE, UI.INK, 44))
+	var head := title_row(Text.t("profile.title"))
+	head.add_child(UI.round_button("gear", Text.t("settings.title"), open_settings, UI.SURFACE, UI.INK, 44))
 	col.add_child(head)
 
 	var me := UI.card(UI.SURFACE, 14)
@@ -39,7 +39,7 @@ func build() -> void:
 ## reward levelling up brings. It's as tall as the card.
 func _figure() -> Control:
 	var figure := UI.character_portrait({}, Vector2(220 if wide else 128, 0), false, UI.ACCENT_SOFT, 48.0)
-	var pencil := UI.round_button("edit", "Customise your character", Customise.open, UI.SURFACE, UI.INK, 34)
+	var pencil := UI.round_button("edit", Text.t("profile.customise"), Customise.open, UI.SURFACE, UI.INK, 34)
 	figure.add_child(pencil)
 
 	var level := LevelBar.new(App.xp(), false, false)
@@ -47,7 +47,7 @@ func _figure() -> Control:
 	var badge := level.badge()
 	badge.mouse_filter = Control.MOUSE_FILTER_STOP
 	badge.mouse_default_cursor_shape = Cursor.HOVER
-	badge.accessibility_name = "Levels and rewards"
+	badge.accessibility_name = Text.t("profile.levels")
 	Press.attach(badge).tapped.connect(open_rewards)
 	var shine := Glint.new(0.5)
 	badge.add_child(shine)
@@ -67,11 +67,11 @@ func _details() -> Control:
 	var school := str(p.get("institution", ""))
 	var joined := int(p.get("created_unix", 0))
 	return ProfileCard.details([
-		ProfileCard.field("Username", username if username != "" else "Add your name", username == "",
-			_edit.bind("username", "Your name", "What should we call you?", 24)),
-		ProfileCard.field("School, college or university", school if school != "" else "Add where you study", school == "",
-			_edit.bind("institution", "Where do you study?", "e.g. University of Leeds", 60)),
-		ProfileCard.field("Joined", Stats.format_date(joined, App.tz_bias()) if joined > 0 else "Today"),
+		ProfileCard.field(Text.t("profile.username"), username if username != "" else Text.t("profile.username_empty"), username == "",
+			_edit.bind("username", Text.t("profile.username_prompt"), Text.t("profile.username_placeholder"), 24)),
+		ProfileCard.field(Text.t("profile.school"), school if school != "" else Text.t("profile.school_empty"), school == "",
+			_edit.bind("institution", Text.t("profile.school_prompt"), Text.t("profile.school_placeholder"), 60)),
+		ProfileCard.field(Text.t("profile.joined"), Stats.format_date(joined, App.tz_bias()) if joined > 0 else Text.t("profile.joined_today")),
 	])
 
 
@@ -113,22 +113,22 @@ func _achievements() -> Control:
 
 func open_settings() -> void:
 	var m := Modal.open(480)
-	m.body.add_child(m.heading_row("Settings"))
+	m.body.add_child(m.heading_row(Text.t("settings.title")))
 	var s := UI.vbox(10)
-	s.add_child(_toggle("Sound effects", "Taps, pops, barks and the bong.", "sound"))
+	s.add_child(_toggle(Text.t("settings.sound"), Text.t("settings.sound_note"), "sound"))
 	s.add_child(UI.divider())
-	s.add_child(_toggle("Ambience", "Water, birdsong and wind while you walk.", "ambience"))
+	s.add_child(_toggle(Text.t("settings.ambience"), Text.t("settings.ambience_note"), "ambience"))
 	s.add_child(UI.divider())
-	s.add_child(_toggle("Reduce motion", "Gentler scenery and quicker, simpler animations.", "reduce_motion"))
+	s.add_child(_toggle(Text.t("settings.reduce_motion"), Text.t("settings.reduce_motion_note"), "reduce_motion"))
 	s.add_child(UI.divider())
-	s.add_child(_toggle("Keep the screen on", "Stops your phone or laptop sleeping during a walk.", "keep_screen_on"))
+	s.add_child(_toggle(Text.t("settings.keep_screen_on"), Text.t("settings.keep_screen_on_note"), "keep_screen_on"))
 	s.add_child(UI.divider())
 	s.add_child(_location_toggle())
 	for row in Display.settings_rows(get_window()):
 		s.add_child(UI.divider())
 		s.add_child(row)
 	m.body.add_child(s)
-	var about := UI.para("Paws & Progress %s  ·  Fonts: Fredoka and Nunito (SIL Open Font License)" % ProjectSettings.get_setting("application/config/version", ""), 13, UI.INK_FAINT)
+	var about := UI.para(Text.t("settings.about", {"version": ProjectSettings.get_setting("application/config/version", "")}), 13, UI.INK_FAINT)
 	about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	m.body.add_child(about)
 
@@ -156,14 +156,14 @@ func _location_toggle() -> Control:
 	var row := UI.hbox(16)
 	var text := UI.vbox(2)
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_child(UI.label("Local sunrise and weather", 16, UI.INK, false, 800))
-	var detail := "Walks follow the real sky where you are, from your rough location (worked out from your internet connection)."
+	text.add_child(UI.label(Text.t("settings.weather"), 16, UI.INK, false, 800))
+	var detail := Text.t("settings.weather_note")
 	if Outdoors.place_name() != "":
-		detail += " Now: %s, %s." % [Outdoors.place_name(), Weather.look(Outdoors.weather(), Content.weathers)["name"].to_lower()]
+		detail += " " + Text.t("settings.weather_now", {"place": Outdoors.place_name(), "weather": Weather.look(Outdoors.weather(), Content.weathers)["name"].to_lower()})
 	text.add_child(UI.para(detail, 13))
 	row.add_child(text)
 	var sw := Switch.new(Outdoors.enabled())
-	sw.accessibility_name = "Local sunrise and weather"
+	sw.accessibility_name = Text.t("settings.weather")
 	sw.toggled.connect(Outdoors.set_enabled)
 	row.add_child(sw)
 	return row
@@ -182,13 +182,13 @@ func open_rewards() -> void:
 	var at := float(p["level"]) + float(p["into"]) / maxf(1.0, float(p["needed"]))
 	var m := Modal.open(460)
 	# The title and where you are stay put; only the rewards scroll.
-	m.header.add_child(m.heading_row("Rewards"))
+	m.header.add_child(m.heading_row(Text.t("rewards.title")))
 	var head := UI.hbox(12)
 	head.add_child(UI.level_badge(p["level"], 44))
 	var words := UI.vbox(0)
-	words.add_child(UI.label("Level %d" % p["level"], 18, UI.INK, true, 600))
+	words.add_child(UI.label(Text.t("rewards.level", {"level": p["level"]}), 18, UI.INK, true, 600))
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_child(UI.para("%d XP to level %d. You get 1 XP for each minute focused, and more for gifts." % [int(p["needed"]) - int(p["into"]), int(p["level"]) + 1], 13, UI.INK_SOFT, 700))
+	words.add_child(UI.para(Text.t("rewards.to_next", {"xp": int(p["needed"]) - int(p["into"]), "level": int(p["level"]) + 1}), 13, UI.INK_SOFT, 700))
 	head.add_child(words)
 	m.header.add_child(head)
 
@@ -253,8 +253,7 @@ func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.alignment = BoxContainer.ALIGNMENT_CENTER
 	words.add_child(UI.trimmed(title, 17, UI.INK if open else UI.INK_SOFT, false, 800))
-	var kind := "place" if r["type"] == "place" else "animal"
-	var when := ("From the start" if level == 1 else "Level %d" % level) + "  ·  new " + kind
+	var when := Text.t("rewards.new_place" if r["type"] == "place" else "rewards.new_animal", {"when": Text.t("rewards.from_start") if level == 1 else Text.t("rewards.level", {"level": level})})
 	words.add_child(UI.label(when, 13, UI.INK_FAINT, false, 700))
 	row.add_child(words)
 	if not open:

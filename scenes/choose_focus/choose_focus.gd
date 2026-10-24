@@ -14,7 +14,6 @@ extends Control
 ## + turns into a tick that adopts it.
 ## params: {"from": where the opening circle grew from}
 
-const COLOUR_ROLES := ["Primary", "Secondary", "Tertiary"]
 ## Quick picks in the colour popup: coat colours first, then a few brighter ones.
 const SWATCHES := [
 	Color("#2b2523"), Color("#4a3528"), Color("#6e5a4e"), Color("#8a6248"), Color("#a8683f"),
@@ -81,11 +80,11 @@ func _ready() -> void:
 	var row := UI.hbox()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top.add_child(row)
-	_close = UI.round_button("close", "Back", _on_close, Color.TRANSPARENT, UI.ON_DARK, 48, false)
+	_close = UI.round_button("close", Text.t("common.back"), _on_close, Color.TRANSPARENT, UI.ON_DARK, 48, false)
 	row.add_child(_close)
 	row.add_child(UI.spacer())
 	_new = KnockoutButton.new(48)
-	_new.accessibility_name = "New pet"
+	_new.accessibility_name = Text.t("choose_focus.new_pet")
 	_new.pressed.connect(_on_new)
 	row.add_child(_new)
 
@@ -101,8 +100,8 @@ func _ready() -> void:
 	var buttons := UI.hbox()
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom.add_child(buttons)
-	_left = UI.round_button("bin", "Delete pet", _on_left, UI.DANGER, Color.WHITE, 56)
-	_right = UI.round_button("check", "Complete project", _on_right, UI.SUCCESS, Color.WHITE, 56)
+	_left = UI.round_button("bin", Text.t("choose_focus.delete_pet"), _on_left, UI.DANGER, Color.WHITE, 56)
+	_right = UI.round_button("check", Text.t("choose_focus.complete_project"), _on_right, UI.SUCCESS, Color.WHITE, 56)
 	buttons.add_child(_left)
 	buttons.add_child(UI.spacer())
 	buttons.add_child(_right)
@@ -176,7 +175,7 @@ func _pick_place(id: String) -> void:
 	var level := Levels.unlock_level("place", id, Content.levels)
 	if not App.is_unlocked("place", id):
 		Motion.shake(_places[id], 6.0)
-		Toast.show_text("%s unlocks at level %d" % [Content.biome(id).get("name", ""), level], "lock")
+		Toast.show_text(Text.t("choose_focus.place_locked", {"place": Content.biome(id).get("name", ""), "level": level}), "lock")
 		return
 	if id == _place_id():
 		return
@@ -205,9 +204,9 @@ func _place_buttons() -> Control:
 			lock.position = Vector2(27, 1)
 			lock.size = Vector2(14, 14)
 			button.add_child(lock)
-			var lv := UI.label("Lv %d" % Levels.unlock_level("place", id, Content.levels), 10, UI.ON_DARK_SOFT, false, 800)
+			var lv := UI.label(Text.t("choose_focus.level_short", {"level": Levels.unlock_level("place", id, Content.levels)}), 10, UI.ON_DARK_SOFT, false, 800)
 			lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			button.accessibility_name = "%s · unlocks at level %d" % [b["name"], Levels.unlock_level("place", id, Content.levels)]
+			button.accessibility_name = Text.t("choose_focus.place_locked_name", {"place": b["name"], "level": Levels.unlock_level("place", id, Content.levels)})
 			cell.add_child(lv)
 		row.add_child(cell)
 	_refresh_places()
@@ -266,11 +265,11 @@ func _build_pick(select_id: String = "") -> void:
 	_pick.add_child(_words)
 	_left.disabled = _projects.is_empty()
 	_right.disabled = _projects.is_empty()
-	_set_icon(_left, "bin", "Delete pet")
-	_set_icon(_right, "check", "Complete project")
+	_set_icon(_left, "bin", Text.t("choose_focus.delete_pet"))
+	_set_icon(_right, "check", Text.t("choose_focus.complete_project"))
 	if _projects.is_empty():
-		_words.add_child(_shadowed(UI.label("No pets yet", 30, UI.ON_DARK, true, 600)))
-		var p := _shadowed(UI.label("Tap the + to adopt one for something you're working on.", 15, UI.ON_DARK_SOFT, false, 700))
+		_words.add_child(_shadowed(UI.label(Text.t("choose_focus.no_pets_title"), 30, UI.ON_DARK, true, 600)))
+		var p := _shadowed(UI.label(Text.t("choose_focus.no_pets_body"), 15, UI.ON_DARK_SOFT, false, 700))
 		p.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_words.add_child(p)
 		_pets = null
@@ -282,7 +281,7 @@ func _build_pick(select_id: String = "") -> void:
 	_words.add_child(_title)
 	_pet_line = _shadowed(UI.label("", 22, UI.ON_DARK, true, 500))
 	_words.add_child(_pet_line)
-	_words.add_child(_shadowed(UI.label("Tap your pet to start walking", 13, UI.ON_DARK_SOFT, false, 700)))
+	_words.add_child(_shadowed(UI.label(Text.t("choose_focus.tap_to_walk"), 13, UI.ON_DARK_SOFT, false, 700)))
 	_under = _shadowed(UI.label("", 14, UI.ON_DARK, false, 800))
 	_under.name = "Under"
 	_pick.add_child(_under)
@@ -341,7 +340,7 @@ func _on_pet_changed(i: int) -> void:
 	_remembered = p.id
 	_title.text = p.name
 	_pet_line.text = Content.pet_called(p, true)
-	_under.text = "%s · %s focused" % [Content.animal(p.animal_id).get("name", ""), Stats.format_duration(App.state.project_seconds(p.id))]
+	_under.text = Text.t("choose_focus.pet_under", {"kind": Content.animal(p.animal_id).get("name", ""), "time": Stats.format_duration(App.state.project_seconds(p.id))})
 	Motion.pop(_title, 0.04, 0.25)
 	_layout()
 
@@ -355,26 +354,26 @@ func _start_walk(i: int) -> void:
 
 func _on_left() -> void:
 	var p := _projects[_pets.index]
-	Modal.confirm("Delete %s?" % p.name,
-		"%s will go for good. Time you've already spent stays in your stats." % Content.pet_called(p, true),
-		"Delete", "danger").closed.connect(func(ok):
+	Modal.confirm(Text.t("choose_focus.delete_title", {"project": p.name}),
+		Text.t("choose_focus.delete_body", {"pet": Content.pet_called(p, true)}),
+		Text.t("common.delete"), "danger").closed.connect(func(ok):
 			if ok:
 				var next := _neighbour_id(p.id)
 				App.delete_project(p.id)
-				Toast.show_text("%s deleted" % p.name, "bin")
+				Toast.show_text(Text.t("choose_focus.deleted", {"project": p.name}), "bin")
 				_build_pick(next))
 
 
 func _on_right() -> void:
 	var p := _projects[_pets.index]
-	Modal.confirm("Complete %s?" % p.name,
-		"It moves to Completed with everything %s found along the way. You can't undo this." % Content.pet_called(p),
-		"Complete", "success").closed.connect(func(ok):
+	Modal.confirm(Text.t("choose_focus.complete_title", {"project": p.name}),
+		Text.t("choose_focus.complete_body", {"pet": Content.pet_called(p)}),
+		Text.t("common.complete"), "success").closed.connect(func(ok):
 			if ok:
 				var next := _neighbour_id(p.id)
 				App.complete_project(p.id)
 				Audio.play("project_complete")
-				Toast.show_text("%s moved to Completed" % p.name)
+				Toast.show_text(Text.t("choose_focus.completed", {"project": p.name}))
 				_build_pick(next))
 
 
@@ -405,8 +404,8 @@ func _show_mode(adopting: bool, select_id: String = "") -> void:
 	var hide_layer := _pick if adopting else _adopt_layer
 	var show_layer := _adopt_layer if adopting else _pick
 	_new.set_tick(adopting)
-	_new.accessibility_name = "Adopt" if adopting else "New pet"
-	_close.accessibility_name = "Cancel" if adopting else "Back"
+	_new.accessibility_name = Text.t("choose_focus.adopt" if adopting else "choose_focus.new_pet")
+	_close.accessibility_name = Text.t("common.cancel" if adopting else "common.back")
 	if not adopting:
 		_new.set_disabled_look(false)
 		_build_pick(select_id)
@@ -444,7 +443,7 @@ func _build_adopt() -> void:
 	var v := UI.vbox(8)
 	margin.add_child(v)
 
-	_name_edit = _field("What are you focusing on?", 40, 18)
+	_name_edit = _field(Text.t("choose_focus.project_placeholder"), 40, 18)
 	v.add_child(_name_edit)
 	# Optional: a pet without a name goes by its kind ("your staffy").
 	_pet_edit = _field("", 24, 16)
@@ -473,15 +472,15 @@ func _build_adopt() -> void:
 	var row := UI.hbox(18)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_swatches.clear()
-	for k in COLOUR_ROLES.size():
+	for k in Text.list("choose_focus.colour_roles").size():
 		var cell := UI.vbox(4)
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(52, 52)
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		b.accessibility_name = "%s colour" % COLOUR_ROLES[k]
+		b.accessibility_name = Text.t("choose_focus.colour_name", {"role": Text.list("choose_focus.colour_roles")[k]})
 		b.pressed.connect(_pick_colour.bind(k))
 		cell.add_child(b)
-		var l := UI.caption(COLOUR_ROLES[k])
+		var l := UI.caption(Text.list("choose_focus.colour_roles")[k])
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cell.add_child(l)
 		row.add_child(cell)
@@ -519,11 +518,11 @@ func _on_animal_changed(i: int) -> void:
 			view.colours = Content.animal_default_colours(Content.animals[j]["id"])
 	_animal_title.text = a["name"]
 	if open:
-		_animal_hint.text = "Scroll for more animals"
+		_animal_hint.text = Text.t("choose_focus.scroll_animals")
 		_animal_hint.add_theme_color_override("font_color", UI.INK_FAINT)
-		_pet_edit.placeholder_text = "Name your %s" % str(a["name"]).to_lower()
+		_pet_edit.placeholder_text = Text.t("choose_focus.name_pet", {"kind": str(a["name"]).to_lower()})
 	else:
-		_animal_hint.text = "Unlocks at level %d" % Levels.unlock_level("animal", a["id"], Content.levels)
+		_animal_hint.text = Text.t("choose_focus.animal_locked", {"level": Levels.unlock_level("animal", a["id"], Content.levels)})
 		_animal_hint.add_theme_color_override("font_color", UI.INK_SOFT)
 	_new.set_disabled_look(not open)
 	# A locked animal can't be coloured in: the colour buttons fade away, but
@@ -550,7 +549,7 @@ func _refresh_swatches() -> void:
 
 func _pick_colour(k: int) -> void:
 	var start := _draft.colours[k]
-	Modal.colour("%s colour" % COLOUR_ROLES[k], start, _set_colour.bind(k), SWATCHES)
+	Modal.colour(Text.t("choose_focus.colour_name", {"role": Text.list("choose_focus.colour_roles")[k]}), start, _set_colour.bind(k), SWATCHES)
 
 
 func _set_colour(c: Color, k: int) -> void:
@@ -563,7 +562,7 @@ func _set_colour(c: Color, k: int) -> void:
 func _adopt() -> void:
 	var project_name := _name_edit.text.strip_edges()
 	if project_name == "":
-		_name_edit.placeholder_text = "Give it a name first"
+		_name_edit.placeholder_text = Text.t("choose_focus.name_first")
 		Motion.shake(_name_edit)
 		_name_edit.grab_focus()
 		return
@@ -571,7 +570,7 @@ func _adopt() -> void:
 	_draft.pet_name = _pet_edit.text.strip_edges()
 	App.add_project(_draft)
 	Audio.play(str(Content.animal(_draft.animal_id).get("sound", "")), 1.0, -6.0)
-	Toast.show_text("Say hello to %s" % Content.pet_called(_draft), "paw")
+	Toast.show_text(Text.t("choose_focus.say_hello", {"pet": Content.pet_called(_draft)}), "paw")
 	_show_mode(false, _draft.id)
 
 
@@ -644,7 +643,7 @@ func _pet(animal_id: String, colours: Array[Color], height: float, locked_at: in
 		var badge := UI.panel(UI.SURFACE_SOFT, 999, 6)
 		var row := UI.hbox(4)
 		row.add_child(UI.icon_rect("lock", 14, UI.INK_SOFT))
-		row.add_child(UI.label("Lv %d" % locked_at, 13, UI.INK_SOFT, false, 900))
+		row.add_child(UI.label(Text.t("choose_focus.level_short", {"level": locked_at}), 13, UI.INK_SOFT, false, 900))
 		badge.add_child(row)
 		stage.add_child(badge)
 		badge.position = Vector2(stage.custom_minimum_size.x * 0.5 - 34.0, height * 0.12)
