@@ -206,6 +206,16 @@ func _run() -> void:
 		check(root.content_scale_size == Vector2i(390, 390) and app.phone_layout() and not map.hover_grow,
 			"the phone size switch lays the app out at a phone's width")
 		check(arrows.values().all(func(a): return not a.visible), "with no edge arrows")
+		var map_box: Rect2 = map.get_global_rect()
+		check(absf(map_box.get_center().x - main.size.x * 0.5) < 1.0 and is_equal_approx(map_box.end.y, main.size.y - main.MAP_INSET),
+			"and the map in the middle at the bottom (%s)" % map_box)
+		await _drag(map_box.get_center(), map_box.get_center(), 1)
+		await _wait(30)
+		check(map.open and absf(map.get_global_rect().get_center().x - main.size.x * 0.5) < 1.0 and is_equal_approx(map.get_global_rect().end.y, main.size.y - main.MAP_INSET),
+			"growing up from there")
+		await _shot("debug_phone_map")
+		await _key(KEY_ESCAPE)
+		await _wait(30)
 		if _class("res://core/display.gd").managed():
 			check(absf(main.size.x - 390.0) < 1.0 and main.size.y > 780.0, "in a phone-shaped window (%s)" % main.size)
 		await _shot("debug_phone")
@@ -214,6 +224,7 @@ func _run() -> void:
 		_all(debug, func(n): return _is(n, "switch.gd"))[1].button_pressed = false
 		await _wait(30)
 		check(not app.phone_layout() and map.hover_grow and root.content_scale_size != Vector2i(390, 390), "and back to the computer layout")
+		check(map.get_global_rect().position.x == main.MAP_INSET, "with the map back in the corner")
 		check(showing.call().size() == 4, "with its arrows")
 
 	# The location question: asked once, a moment after the focus screen shows.
@@ -444,6 +455,20 @@ func _run() -> void:
 		rewards._scroll.scroll_vertical = 0
 		await _wait(5)
 		check(is_equal_approx(rewards.header.get_global_rect().position.y, title_y), "the title doesn't scroll")
+		# The wheel glides the list rather than jumping, and turns add up.
+		var list_mid: Vector2 = rewards._scroll.get_global_rect().get_center()
+		await _wheel(list_mid, MOUSE_BUTTON_WHEEL_DOWN)
+		await _wheel(list_mid, MOUSE_BUTTON_WHEEL_DOWN)
+		var notch: float = rewards._scroll.get_v_scroll_bar().page * _class("res://ui/smooth_scroll.gd").NOTCH
+		var early: int = rewards._scroll.scroll_vertical
+		check(early > 0 and early < notch * 2.0 - 2.0, "the wheel glides the list (%d of %d after a frame)" % [early, int(notch * 2.0)])
+		await _wait(30)
+		check(absf(rewards._scroll.scroll_vertical - notch * 2.0) <= 1.0, "two turns go two notches (%d)" % rewards._scroll.scroll_vertical)
+		await _wheel(list_mid, MOUSE_BUTTON_WHEEL_UP)
+		await _wheel(list_mid, MOUSE_BUTTON_WHEEL_UP)
+		await _wheel(list_mid, MOUSE_BUTTON_WHEEL_UP)
+		await _wait(30)
+		check(rewards._scroll.scroll_vertical == 0, "and stops at the top (%d)" % rewards._scroll.scroll_vertical)
 		_close_modal()
 		await _wait(15)
 		await _drag(pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), pic.position + Vector2(pic.size.x * 0.5, pic.size.y * 0.4), 1)
@@ -1364,8 +1389,7 @@ func _find(node: Node, match: Callable) -> Node:
 func _clear_of_shell(rect: Rect2) -> bool:
 	var main := _main()
 	var map: Control = main._minimap
-	var map_rect := Rect2(Vector2(main.MAP_INSET, main.size.y - main.MAP_INSET - map.CELL.x * 3.0 - map.GAP.x * 2.0 - map.PAD.x * 2.0),
-		Vector2.ONE * (map.CELL.x * 3.0 + map.GAP.x * 2.0 + map.PAD.x * 2.0))
+	var map_rect: Rect2 = map.rest_rect()
 	if rect.intersects(map_rect):
 		return false
 	for dir in main._ways_from(main._at):
@@ -1380,6 +1404,19 @@ func _point(at: Vector2) -> void:
 	m.position = at
 	m.global_position = at
 	root.push_input(m, true)
+	await process_frame
+
+
+## One notch of the mouse wheel at `at`.
+func _wheel(at: Vector2, button: MouseButton) -> void:
+	for down in [true, false]:
+		var e := InputEventMouseButton.new()
+		e.button_index = button
+		e.pressed = down
+		e.factor = 1.0
+		e.position = at
+		e.global_position = at
+		root.push_input(e, true)
 	await process_frame
 
 

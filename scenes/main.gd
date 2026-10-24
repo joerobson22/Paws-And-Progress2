@@ -3,8 +3,9 @@ extends Control
 ## in the middle: gifts to the left, completed projects to the right, your
 ## profile above and stats below. Swipe between them, use the arrow keys
 ## (Esc comes back to the middle), click the big faint arrows at the edges
-## (computers), or open the minimap in the bottom left corner and pick one. Every pane is built once and kept, so each one is as you left it when
-## you come back. Full-screen flows (choosing a focus, the walk, the end of a
+## (computers), or open the minimap (bottom left on computers, bottom middle
+## on phones) and pick one. Every pane is built once and kept, so each one
+## is as you left it when you come back. Full-screen flows (choosing a focus, the walk, the end of a
 ## walk) open over everything through a growing circle.
 ## Screens ask to move with App.go(). A new save slot stays on the profile
 ## screen, with no map or arrows, until its profile is filled in.
@@ -29,7 +30,7 @@ const PHONE_MIN_SHORT_SIDE := 360.0
 ## Computers: the window's short side in design units, whatever its size.
 const DESKTOP_SHORT_SIDE := 600.0
 const MIN_DESKTOP_SCALE := 0.75
-## The minimap's gap from the bottom left corner.
+## The minimap's gap from the bottom (and the left, on computers).
 const MAP_INSET := 18.0
 ## A drag becomes a swipe once it moves this far...
 const SWIPE_START := 16.0
@@ -96,6 +97,7 @@ func _ready() -> void:
 		_names[cell] = pane_name
 
 	add_child(Cursor.new())
+	add_child(SmoothScroll.new())
 	for dir in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 		var arrow := NavArrow.new(dir)
 		arrow.pressed.connect(func(d: Vector2i): _go_cell(_at + d))
@@ -166,6 +168,7 @@ func _apply_window() -> void:
 	Display.apply(get_window())
 	if _minimap:
 		_minimap.hover_grow = not App.phone_layout()
+		_layout()
 
 
 func _layout() -> void:
@@ -176,7 +179,12 @@ func _layout() -> void:
 	if not _moving and not _swiping:
 		_world.position = -Vector2(_at) * size
 	var insets := UI.safe_insets(self)
-	_minimap.dock(Vector2(MAP_INSET + insets["left"], size.y - MAP_INSET - insets["bottom"]))
+	var floor_y: float = size.y - MAP_INSET - insets["bottom"]
+	if App.phone_layout():
+		# Phones: in the middle (of the part clear of the notch), for either thumb.
+		_minimap.dock(Vector2((insets["left"] + size.x - insets["right"]) * 0.5, floor_y), true)
+	else:
+		_minimap.dock(Vector2(MAP_INSET + insets["left"], floor_y))
 	for dir in _arrows:
 		_arrows[dir].dock(size, insets)
 
