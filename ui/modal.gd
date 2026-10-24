@@ -226,9 +226,17 @@ func _fit() -> void:
 	body.custom_minimum_size.x = w
 	header.custom_minimum_size.x = w
 	footer.custom_minimum_size.x = w
+	_scroll.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, room())
+
+
+## The most height the body gets before it scrolls: the screen less the
+## card's padding, the header and the footer. Something no taller than this
+## never makes the body scroll, so it can scroll inside itself instead.
+func room() -> float:
+	var pad := card.get_theme_stylebox("panel").get_minimum_size()
 	var above := header.get_combined_minimum_size().y + 16.0 if header.visible else 0.0
 	var below := footer.get_combined_minimum_size().y + 16.0 if footer.visible else 0.0
-	_scroll.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, maxf(80.0, view.y - 48.0 - pad.y - above - below))
+	return maxf(80.0, get_viewport_rect().size.y - 48.0 - pad.y - above - below)
 
 
 ## Scrolls the body so `target` (somewhere inside it) sits in the middle,

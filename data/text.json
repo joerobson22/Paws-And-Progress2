@@ -294,7 +294,8 @@
 	},
 	"friend": {
 		"school_empty": "Not added yet",
-		"joined_unknown": "Recently"
+		"joined_unknown": "Recently",
+		"no_achievements": "No achievements yet"
 	},
 	"shelf": {
 		"heading": "Gift shelf",
@@ -385,8 +386,7 @@
 		"deleted_project": "Deleted project",
 		"chip": "{project}  {time}",
 		"time_this_week": "{time} this week",
-		"time_on_day": "{time} on {day}",
-		"in_progress": "Still in progress. Its panel moves to Completed when you finish it."
+		"time_on_day": "{time} on {day}"
 	},
 	"leaderboard": {
 		"title": "Friends leaderboard",
