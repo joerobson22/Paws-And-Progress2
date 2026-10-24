@@ -2,10 +2,12 @@ class_name Minimap
 extends Control
 ## The little map of the app: five dots laid out like the screens (focus in
 ## the middle, one each side), with the one you're on filled in, sitting in
-## the bottom left corner. The highlight glides with you as you swipe. It
+## the bottom left corner (computers). The highlight glides with you as you swipe. It
 ## grows up and to the right into big tiles, each with an icon fading in for
 ## its screen (a home for focus, a present for gifts, a tick for completed, a
 ## person for your profile and a bar chart for stats); pick one to go there.
+## On phones it sits in the middle at the bottom instead, and grows up from
+## there, so it's under either thumb.
 ## With a mouse it grows while the pointer is over it, and shrinks a moment
 ## after the pointer leaves. On phones a tap grows it, and tapping it again
 ## (or anywhere else, or Esc) shrinks it back.
@@ -29,8 +31,10 @@ var _at := Vector2.ZERO  # highlight position in cell units (animates)
 ## 0 small to 1 big (animates).
 var _grow := 0.0
 var _hover: Variant = null
-## Where its bottom left corner sits, in its parent.
+## Where it's pinned, in its parent: its bottom left corner, or the middle
+## of its bottom edge when `_centred`.
 var _dock := Vector2.ZERO
+var _centred := false
 ## Bumped each time the pointer comes or goes, so a stale shrink is dropped.
 var _visit := 0
 ## True while the pointer is over it.
@@ -45,10 +49,20 @@ func _init() -> void:
 	_apply()
 
 
-## Pins its bottom left corner to `point`, so it grows up and to the right.
-func dock(point: Vector2) -> void:
+## Pins its bottom left corner to `point`, so it grows up and to the right;
+## or with `centred`, the middle of its bottom edge, so it grows up and out
+## to both sides.
+func dock(point: Vector2, centred: bool = false) -> void:
 	_dock = point
+	_centred = centred
 	_apply()
+
+
+## Where it sits while small, in its parent.
+func rest_rect() -> Rect2:
+	var side := PAD.x * 2.0 + CELL.x * 3.0 + GAP.x * 2.0
+	var left := _dock.x - side * 0.5 if _centred else _dock.x
+	return Rect2(left, _dock.y - side, side, side)
 
 
 ## Moves the highlight to `cell`, gliding unless `instant`. Going somewhere
@@ -132,7 +146,7 @@ func _gap() -> float:
 func _apply() -> void:
 	var side := lerpf(PAD.x, PAD.y, _grow) * 2.0 + _cell() * 3.0 + _gap() * 2.0
 	size = Vector2(side, side)
-	position = Vector2(_dock.x, _dock.y - side)
+	position = Vector2(_dock.x - side * 0.5 if _centred else _dock.x, _dock.y - side)
 	queue_redraw()
 
 
