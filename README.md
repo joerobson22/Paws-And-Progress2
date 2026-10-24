@@ -161,6 +161,48 @@ it, then flick it. Your pet will fetch it, wading in if it lands in the water.
 On first launch on desktop, a save from the original app
 (`…/app_userdata/Paws-And-Progress/gamedata.save`) is imported automatically.
 
+## Running it on an iPhone
+
+The iOS export preset is already in `export_presets.cfg`: iPhone only,
+portrait, iOS 14 and up, with the paw icon (and a dark mode version) and a
+paw launch screen. These steps need your Mac, Apple ID and phone, so they
+can't be done for you. Do steps 1 to 4 once.
+
+1. **Xcode.** Install it from the Mac App Store, open it once, and let it
+   install the iOS platform. In **Xcode → Settings → Accounts**, add your
+   Apple ID. A free account works: the app runs for 7 days, then you run it
+   from Xcode again. The paid Developer Program (about £79 a year) removes that
+   limit and is needed for TestFlight and the App Store.
+2. **Export templates.** In Godot: **Editor → Manage Export Templates →
+   Download and Install**. They must match your Godot version exactly.
+3. **Your Team ID.** In Godot: **Project → Export → iOS**, and paste it into
+   **App Store Team ID**. It's 10 letters and digits:
+   - Paid account: [Membership details](https://developer.apple.com/account#MembershipDetailsCard).
+   - Free account: in **Keychain Access**, open the "Apple Development: …"
+     certificate (Xcode makes it on first run); it's the
+     **Organizational Unit**.
+
+   It isn't a secret, so the change to `export_presets.cfg` is fine to commit.
+4. **Your phone.** Plug it in, tap **Trust**, then turn on **Settings →
+   Privacy & Security → Developer Mode** and let it restart.
+5. **Export.** In **Project → Export**, pick **iOS**, then **Export
+   Project…**, and keep the path it offers, `build/ios/PawsAndProgress.ipa`
+   (`build/` isn't committed). The preset only makes the Xcode project
+   there, so Xcode does the signing in the next step.
+6. **Run.** Open `build/ios/PawsAndProgress.xcodeproj`, choose your iPhone
+   at the top of the window, and press **⌘R**. With a free account, the
+   first launch is blocked until you go to **Settings → General → VPN &
+   Device Management** and trust your Apple ID.
+
+The bundle ID is `com.joerobson22.pawsandprogress` (**Bundle Identifier**
+in the preset). Change it now if you want a different one; it can't change
+once the app is on the App Store. If Xcode says it's taken, add something
+to the end.
+
+Before the App Store, fill in the privacy details: the weather looks up a
+rough location from your IP address (`core/outdoors.gd`), which counts as
+"coarse location" data.
+
 ## Tests
 
 ```sh
