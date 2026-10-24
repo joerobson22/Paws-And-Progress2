@@ -7,16 +7,17 @@ extends PanelContainer
 ## With `gradeable`, the top right is a button: a circled "?" until the
 ## project has a grade, then its grade badge; either asks for a grade
 ## (`grade_pressed`). Nothing else on the panel can be tapped. `flat` drops
-## the shadow, for a panel sitting inside a popup.
+## its own box, for a panel that is the whole of a popup; `on_close` puts a
+## close button in its top right corner, after the grade.
 
 signal grade_pressed(project_id: String)
 
 var project_id := ""
 
 
-func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bool = false) -> void:
+func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bool = false, on_close: Callable = Callable()) -> void:
 	project_id = p.id
-	var sb := UI.box(UI.SURFACE, Color.TRANSPARENT, 24)
+	var sb := UI.box(Color.TRANSPARENT if flat else UI.SURFACE, Color.TRANSPARENT, 24)
 	if not flat:
 		UI.with_shadow(sb, 0.8)
 	sb.set_content_margin_all(16)
@@ -53,6 +54,11 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 		var badge := UI.grade_badge(p.grade, 42)
 		badge.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		top.add_child(badge)
+	var close_button: Button = null
+	if on_close.is_valid():
+		close_button = UI.round_button("close", Text.t("common.close"), on_close, UI.SURFACE_SOFT, UI.INK, 36, false)
+		close_button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		top.add_child(close_button)
 	right.add_child(top)
 
 	var gifts := App.state.project_gifts(p.id)
@@ -78,8 +84,9 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 	dates.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(dates)
 	UI.ignore_mouse(self)
-	if grade_button:
-		grade_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	for b in [grade_button, close_button]:
+		if b:
+			b.mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 static func _gift_chip(gift_id: String, count: int) -> Control:

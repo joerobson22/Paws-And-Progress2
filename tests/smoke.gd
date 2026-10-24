@@ -392,6 +392,24 @@ func _run() -> void:
 		await _wait(25)
 		check(modal_class.is_open(), "the pencil opens the customise popup")
 		await _shot("customise")
+		var editor: Node = modal_class.top()
+		check(_find(editor.header, func(n): return n is Label and n.text == "Customise") != null, "its title is above the list, not in it")
+		var parts: ScrollContainer = _find(editor.body, func(n): return n is ScrollContainer)
+		var preview: Control = _find(editor.body, func(n): return _is(n, "round_frame.gd"))
+		check(parts != null and preview != null and not preview.is_ancestor_of(parts) and not parts.is_ancestor_of(preview), "the preview sits beside the list of parts")
+		check(not editor._scroll.get_v_scroll_bar().visible, "the popup itself doesn't scroll")
+		var minis := _all(editor.body, func(n): return n is Control and n.get("_slot") != null)
+		check(minis.size() == _content().cosmetic_slots.size() + 2 and minis.all(func(n): return n.accessibility_name != ""), "every part shows a picture of what's chosen")
+		check(_find(editor.body, func(n): return n is Label and n.text == "Jeans") == null, "not its name")
+		if parts and preview and main.size.y >= 590:
+			var preview_at := preview.get_global_rect()
+			parts.scroll_vertical = 10000
+			await _wait(10)
+			# A tall phone fits every part; otherwise they scroll.
+			check(parts.scroll_vertical > 0 or not parts.get_v_scroll_bar().visible, "the parts scroll when they don't fit")
+			check(preview.get_global_rect().is_equal_approx(preview_at), "the preview stays put while they scroll")
+			check(parts.get_global_rect().encloses(minis.back().get_global_rect()), "the last part scrolls into view")
+			await _shot("customise_scrolled")
 		_close_modal()
 		await _wait(15)
 	var badge: Control = _find(profile_pane, func(n): return n is Control and n.accessibility_name == "Levels and rewards")
@@ -401,6 +419,14 @@ func _run() -> void:
 		var b: Rect2 = badge.get_global_rect()
 		var pic: Rect2 = picture.get_global_rect()
 		check(b.get_center().x < pic.get_center().x and b.get_center().y > pic.get_center().y, "the badge sits bottom left")
+		badge.mouse_entered.emit()
+		await _wait(20)
+		check(badge.scale.x > 1.05 and badge.self_modulate.r > 1.05, "the badge grows and lightens under the pointer")
+		check(badge.get_global_rect().get_center().is_equal_approx(b.get_center()), "it grows from its centre")
+		await _shot("badge_hover")
+		badge.mouse_exited.emit()
+		await _wait(20)
+		check(badge.scale.is_equal_approx(Vector2.ONE) and badge.self_modulate.is_equal_approx(Color.WHITE), "and settles back after")
 		# Its right side: on a small window its left can be under the minimap.
 		var on_badge := Vector2(b.end.x - 8.0, b.get_center().y)
 		await _drag(on_badge, on_badge, 1)
@@ -521,7 +547,21 @@ func _run() -> void:
 	main._panes[Vector2i(0, 1)]._show_project(app.state.projects[0].id, 0)
 	await _wait(25)
 	await _shot("stats_popup")
-	_close_modal()
+	var project_popup: Node = modal_class.top()
+	var project_panel: Control = _find(project_popup.body, func(n): return _is(n, "project_panel.gd"))
+	check(project_popup.body.get_child_count() == 1 and project_panel != null, "the project popup is just its panel")
+	check(_find(project_popup, func(n): return n is Label and n.text.begins_with("Still in progress")) == null, "with no note under it")
+	var project_close: Button = _find(project_panel, func(n): return n is Button and n.accessibility_name == "Close") if project_panel else null
+	check(project_close != null and project_close.mouse_filter == Control.MOUSE_FILTER_STOP, "a close button in its corner")
+	if project_close:
+		var panel_rect := project_panel.get_global_rect()
+		var x_at := project_close.get_global_rect()
+		check(x_at.end.x > panel_rect.end.x - 40.0 and x_at.position.y < panel_rect.position.y + 40.0, "top right")
+		await _tap_control(project_close, main)
+		await _wait(20)
+	check(not modal_class.is_open(), "which closes it")
+	if modal_class.is_open():
+		_close_modal()
 	await _stats_and_friends(main)
 	main._panes[Vector2i(0, 1)]._select_week(main._panes[Vector2i(0, 1)]._week - 7)
 	await _wait(10)
@@ -968,7 +1008,13 @@ func _stats_and_friends(main: Node) -> void:
 	check(popup != null and _find(popup, func(n): return n is Label and n.text == "Mei") != null, "it opens their profile")
 	if popup:
 		check(_find(popup, func(n): return n is Label and n.text == "University of York") != null, "with where they study")
-		check(_find(popup, func(n): return _is(n, "medal_card.gd")) != null, "and their achievements")
+		var medal := func(n): return n is VBoxContainer and n.get("info") is Dictionary
+		var shown := _all(popup, medal)
+		var mei: Dictionary = app.friends.filter(func(f): return f["name"] == "Mei")[0]
+		var ach := _class("res://core/achievements.gd")
+		var mei_rows: Array = ach.progress(ach.list(_content().achievements, _content().animals, _content().gifts), int(mei["focused_seconds"]), mei["gifts"], _content().gifts)
+		check(shown.size() == mei_rows.filter(func(r): return r["earned"]).size() and shown.all(func(n): return n.info["earned"]), "and only the achievements they've earned")
+		check(_find(popup, func(n): return n is Label and n.text == "See all") == null, "with no See all")
 		await _shot("friend_profile")
 		var tile: Control = _find(popup, func(n): return _is(n, "gift_tile.gd"))
 		check(tile != null and tile.tappable, "their shelf gifts can be tapped")
@@ -982,6 +1028,27 @@ func _stats_and_friends(main: Node) -> void:
 			await _wait(20)
 		_close_modal()
 		await _wait(20)
+
+	# Someone who's earned every achievement: more than fit, so they scroll
+	# sideways inside their card.
+	var champion: Dictionary = app.friends[0].duplicate()
+	champion["name"] = "Champion"
+	champion["focused_seconds"] = 100000 * 3600
+	champion["gifts"] = _content().gifts.map(func(g): return g["id"])
+	_class("res://ui/components/friend_profile.gd").open(champion)
+	await _wait(25)
+	var strip: ScrollContainer = _find(modal_class.top().body, func(n): return n is ScrollContainer)
+	check(strip != null and strip.get_h_scroll_bar().visible, "lots of achievements scroll sideways")
+	if strip:
+		var first: Control = _find(strip, func(n): return n is VBoxContainer and n.get("info") is Dictionary)
+		check(first != null and strip.get_global_rect().encloses(first.get_global_rect()), "the first medal shows whole")
+		await _shot("friend_profile_many")
+		strip.scroll_horizontal = 10000
+		await _wait(10)
+		check(strip.scroll_horizontal > 0, "and scroll to the rest")
+		await _shot("friend_profile_many_scrolled")
+	_close_modal()
+	await _wait(20)
 
 	# Tapping yourself goes to your profile.
 	var me_row: Control = _find(board, func(n): return n.has_meta("press") and n.accessibility_name == "Your profile")

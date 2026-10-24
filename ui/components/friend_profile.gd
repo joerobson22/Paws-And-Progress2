@@ -3,9 +3,10 @@ extends RefCounted
 ## A friend's profile in a popup, laid out like your profile screen but
 ## fitting one popup: their character head to toe on the left; where they
 ## study, when they joined and their week on the right, with their gift
-## shelf along the bottom (tap a gift for a closer look); then their best
-## achievements, ending in "See all". Opened by tapping a friend's face or
-## name anywhere. Tapping your own goes to your profile screen instead.
+## shelf along the bottom (tap a gift for a closer look); then the
+## achievements they've earned, in a row that scrolls sideways when there
+## are more than fit. Opened by tapping a friend's face or name anywhere.
+## Tapping your own goes to your profile screen instead.
 
 
 ## `f` is a friend (see Friends), or the leaderboard's row for you.
@@ -43,13 +44,44 @@ static func open(f: Dictionary) -> void:
 		int(f.get("focused_seconds", 0)), f.get("gifts", []), Content.gifts)
 	var section := UI.vbox(8)
 	section.add_child(ProfileCard.achievements_head(rows))
-	var medals := MedalCard.new(rows, 1)
+	section.add_child(_earned(rows))
+	m.body.add_child(section)
+
+
+## The medals for every achievement they've earned, hardest won first, in
+## a card one medal tall. More than fit scroll sideways.
+static func _earned(rows: Array) -> Control:
 	# On the popup's white a thin outline sets the medals apart, rather than
 	# a shadow the popup's edges would cut off.
-	var outline: StyleBoxFlat = medals.get_theme_stylebox("panel").duplicate()
-	outline.shadow_size = 0
-	outline.border_color = UI.LINE
+	var card := PanelContainer.new()
+	var outline := UI.box(UI.SURFACE, UI.LINE, 24)
 	outline.set_border_width_all(2)
-	medals.add_theme_stylebox_override("panel", outline)
-	section.add_child(medals)
-	m.body.add_child(section)
+	# The medals scroll almost up to the outline, but start and end 14 in.
+	outline.content_margin_left = 8
+	outline.content_margin_right = 8
+	outline.content_margin_top = 14
+	outline.content_margin_bottom = 12
+	card.add_theme_stylebox_override("panel", outline)
+	card.custom_minimum_size.y = MedalCard.Medal.HEIGHT + outline.get_minimum_size().y
+	var earned := Achievements.showcase(rows).filter(func(r): return r["earned"])
+	if earned.is_empty():
+		outline.content_margin_left = 14
+		outline.content_margin_right = 14
+		var none := UI.label(Text.t("friend.no_achievements"), 15, UI.INK_FAINT, false, 800)
+		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		none.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		card.add_child(none)
+		return card
+	var strip := UI.scroll_area(true)
+	strip.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var room := MarginContainer.new()
+	room.add_theme_constant_override("margin_left", 6)
+	room.add_theme_constant_override("margin_right", 6)
+	var medals := UI.hbox(12)
+	for r in earned:
+		medals.add_child(MedalCard.Medal.new(r))
+	room.add_child(medals)
+	strip.add_child(room)
+	UI.clear_of_bar(strip, room, 8)
+	card.add_child(strip)
+	return card
