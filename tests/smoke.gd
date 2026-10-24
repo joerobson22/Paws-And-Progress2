@@ -514,6 +514,7 @@ func _run() -> void:
 		app.state.settings.erase("resolution")
 	_close_modal()
 	await _wait(20)
+	await _accounts(main)
 
 	app.go("stats")
 	await _wait(50)
@@ -990,6 +991,118 @@ func _stats_and_friends(main: Node) -> void:
 	check(main._at == main.PANES["profile"][0] and not modal_class.is_open(), "tapping yourself goes to your profile")
 	app.go("stats")
 	await _wait(50)
+
+
+## Settings has "Switch account", which lists every save slot under a
+## title that stays put, with a + below the list. The + makes a new slot and
+## goes to its profile, which can't be left till it's filled in; it has no
+## friends, so its leaderboard is empty. Then back to the first slot, and
+## the new one is deleted.
+func _accounts(main: Node) -> void:
+	var app := _app()
+	var modal_class := _class("res://ui/modal.gd")
+	var profile_cell: Vector2i = main.PANES["profile"][0]
+	var profile_pane: Control = main._panes[profile_cell]
+	var home_slot: String = app.slot
+	var before: int = app.slots().size()
+	profile_pane.open_settings()
+	await _wait(25)
+	var switch: Button = _find(modal_class.top().body, func(n): return n is Button and n.text == "Switch account")
+	check(switch != null, "settings has a Switch account button")
+	if switch == null:
+		_close_modal()
+		return
+	await _tap_control(switch, main)
+	await _wait(25)
+	var picker: Node = modal_class.top()
+	check(_find(picker.header, func(n): return n is Label and n.text == "Switch account") != null, "its title stays above the list")
+	var cards: Array = _all(picker.body, func(n): return n.has_meta("press"))
+	check(cards.size() == before, "a card for every save slot (%d)" % cards.size())
+	var add: Button = _find(picker.footer, func(n): return n is Button and n.accessibility_name == "New account")
+	check(add != null, "a + under the list, outside it")
+	check(_find(picker.body, func(n): return n is Button and n.accessibility_name.begins_with("Delete")) == null,
+		"the account you're using can't be deleted")
+	await _shot("accounts")
+	if add == null:
+		modal_class.close_all()
+		return
+	await _tap_control(add, main)
+	await _wait(60)
+	var new_slot: String = app.slot
+	check(new_slot != home_slot and not modal_class.is_open(), "the + makes a new account and closes the popups")
+	check(main._at == profile_cell and app.setup_pending(), "it opens on the new account's profile")
+	check(app.friends.is_empty(), "a new account has no friends")
+	check(app.state.projects.is_empty() and app.state.sessions.is_empty() and app.state.inventory.is_empty(), "and nothing else either")
+	check(app.state.settings.get("location") == "off", "it keeps your settings")
+	await _shot("account_new")
+	check(main._minimap.modulate.a < 0.01 and main._arrows.values().all(func(a): return not a.visible), "no map or arrows till it's filled in")
+	await _key(KEY_DOWN)
+	await _wait(40)
+	check(main._at == profile_cell, "the arrow keys can't leave")
+	app.go("stats")
+	await _wait(40)
+	check(main._at == profile_cell, "nor can anything else")
+	var go: Button = _find(profile_pane, func(n): return n is Button and n.text == "Start walking")
+	check(go != null and go.disabled, "Start walking waits for the profile")
+	app.set_profile("username", "Sam")
+	await _wait(10)
+	go = _find(profile_pane, func(n): return n is Button and n.text == "Start walking")
+	check(go != null and go.disabled, "all of it")
+	app.set_profile("institution", "University of York")
+	await _wait(10)
+	go = _find(profile_pane, func(n): return n is Button and n.text == "Start walking")
+	check(go != null and not go.disabled, "then it's ready")
+	await _shot("account_ready")
+	if go:
+		await _tap_control(go, main)
+		await _wait(60)
+	check(not app.setup_pending() and main._at == Vector2i.ZERO, "Start walking goes to the focus screen")
+	await _wait(20)
+	check(main._minimap.modulate.a > 0.99, "and the map is back")
+
+	app.go("stats")
+	await _wait(50)
+	var board: Control = _find(main._panes[Vector2i(0, 1)], func(n): return _is(n, "leaderboard.gd"))
+	check(board != null and board.rows.is_empty(), "with no friends the leaderboard is empty")
+	if board:
+		check(_find(board, func(n): return n is Label and n.text == "No friends yet!" and n.is_visible_in_tree()) != null, "and says so")
+		check(_find(board, func(n): return n.has_meta("press")) == null and _find(board, func(n): return n is Button) == null, "not even your own row")
+	await _shot("leaderboard_empty")
+
+	# Back to the first account, then delete the new one.
+	app.go("profile")
+	await _wait(50)
+	profile_pane.open_settings()
+	await _wait(20)
+	picker = _class("res://ui/components/account_switcher.gd").open()
+	await _wait(25)
+	var home_card: Control = _find(picker.body, func(n): return n.has_meta("press") and n.accessibility_name == "Switch to Joe")
+	check(home_card != null, "the first account is listed by name")
+	if home_card:
+		await _tap_control(home_card, main)
+		await _wait(40)
+	check(app.slot == home_slot and app.state.profile["username"] == "Joe" and not modal_class.is_open(), "tapping its card switches back")
+	check(main._at == profile_cell and not app.state.projects.is_empty(), "to its profile, as it was left")
+	picker = _class("res://ui/components/account_switcher.gd").open()
+	await _wait(25)
+	var bin: Button = _find(picker.body, func(n): return n is Button and n.accessibility_name == "Delete Sam")
+	check(bin != null, "other accounts have a bin")
+	await _shot("accounts_two")
+	if bin:
+		await _tap_control(bin, main)
+		await _wait(25)
+		check(modal_class.top() != picker, "it asks first")
+		await _shot("account_delete")
+		_close_modal(true)
+		await _wait(30)
+	check(app.slots().size() == before and not FileAccess.file_exists(SaveSlots.file(new_slot)), "and deletes it")
+	check(_all(picker.body, func(n): return n.has_meta("press")).size() == before, "the list updates")
+	modal_class.close_all()
+	await _wait(20)
+	# Debug builds only give the first slot sample friends; the rest of the
+	# run wants them whichever slot it's in.
+	app.friends = _class("res://core/friends.gd").sample()
+	app.state_changed.emit()
 
 
 ## Taps `c`, scrolling it into view first. In the CI's tiny window it may

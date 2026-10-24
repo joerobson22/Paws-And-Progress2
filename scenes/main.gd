@@ -6,7 +6,8 @@ extends Control
 ## (computers), or open the minimap in the bottom left corner and pick one. Every pane is built once and kept, so each one is as you left it when
 ## you come back. Full-screen flows (choosing a focus, the walk, the end of a
 ## walk) open over everything through a growing circle.
-## Screens ask to move with App.go().
+## Screens ask to move with App.go(). A new save slot stays on the profile
+## screen, with no map or arrows, until its profile is filled in.
 
 const PANES := {
 	"focus": [Vector2i(0, 0), "res://scenes/panes/focus.gd"],
@@ -54,6 +55,8 @@ var _arrows := {}  # Vector2i direction -> NavArrow
 var _bg := ColorRect.new()
 ## The window settings last put in place, so only a change to them moves it.
 var _window_applied := ""
+## True while a new save slot keeps you on the profile screen.
+var _locked := false
 
 var _press := false
 var _press_pos := Vector2.ZERO
@@ -80,6 +83,8 @@ func _ready() -> void:
 
 	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_world)
+	if App.setup_pending():
+		_at = PANES["profile"][0]
 	for pane_name in PANES:
 		var cell: Vector2i = PANES[pane_name][0]
 		var pane: Pane = load(PANES[pane_name][1]).new()
@@ -118,6 +123,7 @@ func _ready() -> void:
 	_layout()
 	_panes[_at].show_pane()
 	_minimap.show_cell(_at, true)
+	_sync_lock(true)
 
 	# Closing the app ends a walk; say so the next time it opens.
 	if not App.ended_walk.is_empty():
@@ -189,7 +195,7 @@ func _ways_from(cell: Vector2i) -> Array[Vector2i]:
 ## and hide while moving, during walks and while a popup is up.
 func _process(_delta: float) -> void:
 	var show := not App.phone_layout() and not _moving and not _swiping \
-		and _flows.is_empty() and not Modal.is_open()
+		and _flows.is_empty() and not Modal.is_open() and not _locked
 	var ways: Array[Vector2i] = _ways_from(_at) if show else ([] as Array[Vector2i])
 	for dir in _arrows:
 		_arrows[dir].appear(ways.has(dir))
@@ -200,6 +206,7 @@ func _process(_delta: float) -> void:
 func _on_state_changed() -> void:
 	_apply_window()
 	_fit_design_size()
+	_sync_lock()
 	var want := UI.wants_dark(str(App.state.settings.get("theme", "auto")))
 	if want != UI.dark:
 		_switch_palette(want)
@@ -262,6 +269,26 @@ func _settle() -> void:
 
 # --- Navigation --------------------------------------------------------------
 
+## Hides the map while a new save slot keeps you on the profile screen
+## (the arrows hide in _process), and brings it back after.
+func _sync_lock(instant: bool = false) -> void:
+	var locked := App.setup_pending()
+	if locked == _locked:
+		return
+	_locked = locked
+	_minimap.shrink(true)
+	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE if locked else Control.MOUSE_FILTER_STOP
+	if instant:
+		_minimap.modulate.a = 0.0 if locked else 1.0
+	else:
+		Motion.fade(_minimap, 0.0 if locked else 1.0, Motion.FAST)
+
+
+## True if you can go to `cell`: anywhere, unless a new save slot is
+## keeping you on the profile screen.
+func _can_go(cell: Vector2i) -> bool:
+	return _panes.has(cell) and (not _locked or cell == PANES["profile"][0])
+
 func _open(screen: String, params: Dictionary) -> void:
 	if PANES.has(screen):
 		_close_flows()
@@ -277,7 +304,7 @@ func _open(screen: String, params: Dictionary) -> void:
 ## Slides to a pane. Panes off to the side only connect to the middle, so
 ## going from one side to another passes through the focus screen.
 func _go_cell(cell: Vector2i) -> void:
-	if not _panes.has(cell) or _moving or cell == _at:
+	if not _can_go(cell) or _moving or cell == _at:
 		return
 	if _at != Vector2i.ZERO and cell != Vector2i.ZERO:
 		await _slide_to(Vector2i.ZERO, Motion.NORMAL * 0.75)
@@ -430,7 +457,7 @@ func _input(e: InputEvent) -> void:
 				step = Vector2i.UP
 			KEY_DOWN:
 				step = Vector2i.DOWN
-		if step != Vector2i.ZERO and _panes.has(_at + step):
+		if step != Vector2i.ZERO and _can_go(_at + step):
 			get_viewport().set_input_as_handled()
 			_go_cell(_at + step)
 
@@ -447,7 +474,7 @@ func _try_swipe(pos: Vector2) -> void:
 	# The finger drags the screen: moving right brings in the pane on the left.
 	var step := Vector2i(-signi(roundi(along)), 0) if horizontal else Vector2i(0, -signi(roundi(along)))
 	var target := _at + step
-	if not _panes.has(target) or _scroll_blocks(pos, horizontal, along):
+	if not _can_go(target) or _scroll_blocks(pos, horizontal, along):
 		# Not a swipe: leave this drag to whatever's under the finger.
 		_press = false
 		return
