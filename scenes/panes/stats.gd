@@ -226,16 +226,11 @@ func _show_project(project_id: String, day: int) -> void:
 	if day >= 0:
 		var days := Stats.daily_project_totals(App.state.sessions, _week, App.tz_bias())
 		extra = "%s on %s" % [Stats.format_duration(int(days[day].get(project_id, 0))), DAY_WORDS[day]]
-	var m := Modal.open(560, true, 18)
-	var top := UI.hbox(8)
-	top.add_child(UI.spacer())
-	top.add_child(UI.round_button("close", "Close", m.close.bind(null), UI.SURFACE_SOFT, UI.INK, 36, false))
-	m.body.add_child(top)
-	var panel := ProjectPanel.new(p, extra, false, true)
+	# The popup is the project's panel itself, with a close button in its corner.
+	var m := Modal.open(560, true, 0)
+	var panel := ProjectPanel.new(p, extra, false, true, m.close.bind(null))
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	m.body.add_child(panel)
-	if not p.is_complete():
-		m.body.add_child(UI.para("Still in progress. Its panel moves to Completed when you finish it.", 13, UI.INK_FAINT))
 
 
 ## The week's bars: one per day, stacked by project, tappable piece by piece.

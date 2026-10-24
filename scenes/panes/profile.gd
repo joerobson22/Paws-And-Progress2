@@ -35,8 +35,9 @@ func build() -> void:
 
 ## The character, with a pencil in the corner to change how they look. Your
 ## level badge sits in the bottom left with your XP filling a bar along the
-## bottom; the badge shines under the pointer, and tapping it shows every
-## reward levelling up brings. It's as tall as the card.
+## bottom; under the pointer the badge grows from its centre, turns a shade
+## lighter and shines, and tapping it shows every reward levelling up
+## brings. It's as tall as the card.
 func _figure() -> Control:
 	var figure := UI.character_portrait({}, Vector2(220 if wide else 128, 0), false, UI.ACCENT_SOFT, 48.0)
 	var pencil := UI.round_button("edit", "Customise your character", Customise.open, UI.SURFACE, UI.INK, 34)
@@ -51,13 +52,26 @@ func _figure() -> Control:
 	Press.attach(badge).tapped.connect(open_rewards)
 	var shine := Glint.new(0.5)
 	badge.add_child(shine)
-	badge.mouse_entered.connect(shine.shine)
+	badge.mouse_entered.connect(func():
+		shine.shine()
+		_hover_badge(badge, true))
+	badge.mouse_exited.connect(_hover_badge.bind(badge, false))
 	figure.resized.connect(func():
 		pencil.size = pencil.get_combined_minimum_size()
 		pencil.position = Vector2(figure.size.x - pencil.size.x - 8, 8)
 		level.size = Vector2(figure.size.x - 16, level.get_combined_minimum_size().y)
 		level.position = Vector2(8, figure.size.y - level.size.y - 8))
 	return figure
+
+
+## Grows the level badge from its centre and lightens its fill, or settles
+## it back. Only the fill lightens: the number and the white rim stay put.
+static func _hover_badge(badge: Control, on: bool) -> void:
+	badge.pivot_offset = badge.size * 0.5
+	var t := Motion.tween(badge, "hover")
+	t.set_parallel(true)
+	t.tween_property(badge, "scale", Vector2.ONE * (1.12 if on else 1.0), Motion.time(Motion.FAST))
+	t.tween_property(badge, "self_modulate", Color(1.22, 1.22, 1.22) if on else Color.WHITE, Motion.time(Motion.FAST))
 
 
 ## Your name, where you study and when you joined: small, at the top.

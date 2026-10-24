@@ -4,9 +4,12 @@ extends Node2D
 ## real art exists. The origin is at the feet and it faces right.
 ## `look` is {skin_tone, hair_tone, cosmetics: {slot: item id}}; leave it
 ## empty to follow the player's own profile. `face_only` draws just the head
-## and shoulders, centred on the face, for avatars.
+## and shoulders, centred on the face, for avatars. `part` draws just one
+## slot's item on its own (see part_rect()), for the customise list.
 
 const STICK := Color("#7a5236")
+## Where the head sits, standing still.
+const HEAD := Vector2(2, -124)
 
 @export var walking: bool = false
 @export var speed: float = 1.0
@@ -18,6 +21,12 @@ var look: Dictionary = {}:
 var face_only := false:
 	set(v):
 		face_only = v
+		queue_redraw()
+## A slot id ("hat", "top"...) to draw only what's worn there, or "" for
+## the whole character.
+var part := "":
+	set(v):
+		part = v
 		queue_redraw()
 ## Reaching forward for the lead on a walk; arms down for portraits.
 var holding_lead := true
@@ -63,17 +72,57 @@ static func _style(item: Dictionary) -> String:
 	return str(item.get("style", "none"))
 
 
+## The room `part` takes when drawn on its own, in this node's space, so a
+## box can scale it to fit. The head is drawn with a hairstyle or a face.
+static func part_rect(slot: String, item: Dictionary) -> Rect2:
+	match slot:
+		"hat":
+			var tops := {"witch": 48, "bunny_ears": 44, "pot": 38, "alpine": 36, "tophat": 34, "feather_cap": 32, "ears": 28, "beanie": 26, "nest": 26}
+			var top := float(tops.get(_style(item), 22))
+			return Rect2(HEAD.x - 24, HEAD.y - top, 50, top + 2)
+		"hair", "face":
+			return Rect2(HEAD.x - 21, HEAD.y - 25, 42, 50 if _style(item) == "long" else 42)
+		"neckwear":
+			match _style(item):
+				"bowtie":
+					return Rect2(3, -111, 18, 15)
+				"necklace":
+					return Rect2(-9, -112, 24, 20)
+			return Rect2(-15, -111, 30, 28)
+		"top":
+			return Rect2(-27, -120, 54, 56)
+		"gloves":
+			return Rect2(-16, -8, 32, 16)
+		"walking_stick":
+			return Rect2(0, -78, 22, 80)
+		"trousers":
+			return Rect2(-16, -62, 32, 62) if _style(item) != "shorts" else Rect2(-16, -62, 32, 32)
+		"shoes":
+			return Rect2(-18, -17, 42, 19)
+	return Rect2(-20, -175, 40, 175)
+
+
+func _skin() -> Color:
+	return Content.skin_tones[clampi(int(_look().get("skin_tone", 0)), 0, Content.skin_tones.size() - 1)]
+
+
+func _hair() -> Color:
+	return Content.hair_tones[clampi(int(_look().get("hair_tone", 0)), 0, Content.hair_tones.size() - 1)]
+
+
 func _draw() -> void:
-	var l := _look()
-	var skin: Color = Content.skin_tones[clampi(int(l.get("skin_tone", 0)), 0, Content.skin_tones.size() - 1)]
-	var hair: Color = Content.hair_tones[clampi(int(l.get("hair_tone", 0)), 0, Content.hair_tones.size() - 1)]
+	var skin := _skin()
+	var hair := _hair()
+	if part != "":
+		_draw_part(skin, hair)
+		return
 	var top := _item("top")
 	var top_colour := Content.cosmetic_colour(top, Color("#b4533f"))
 	var bob := absf(sin(_phase)) * 2.0 if walking and not face_only else 0.0
 	# Slumped: everything above the hips sinks a little, and the head hangs.
 	if not face_only:
 		bob -= 4.0 * sad + (sin(_sigh * 1.3) * 0.5 + 0.5) * 1.5 * sad
-	var head := Vector2(2 + 5.0 * sad, -124 - bob + 7.0 * sad)
+	var head := HEAD + Vector2(5.0 * sad, -bob + 7.0 * sad)
 	if face_only:
 		draw_set_transform(-head)
 
@@ -121,9 +170,87 @@ func _draw_body(skin: Color, top: Dictionary, sleeve: Color, shoulder: Vector2, 
 			draw_line(hip, foot, trouser_colour.darkened(shade), 11, true)
 		_draw_shoe(foot, shade)
 
-	# Body.
-	var body := Rect2(-14, -108 - bob, 28, 56)
-	draw_rect(body, sleeve)
+	_draw_torso(top, sleeve, bob)
+
+	# Front arm, holding the lead (or hanging down when there isn't one).
+	hand = Vector2(22, -78 - bob) if holding_lead else shoulder + Vector2(3, 40).rotated(sin(_phase) * 0.35 if walking else 0.0)
+	_draw_arm(shoulder, hand, sleeve, skin, tee)
+	_draw_hand(hand, skin, gloves, 0.0)
+	_draw_stick(hand)
+
+
+## Only what's worn in `part`, standing still.
+func _draw_part(skin: Color, hair: Color) -> void:
+	var item := _item(part)
+	match part:
+		"hat":
+			_draw_hat(HEAD)
+		"hair", "face":
+			_draw_head(HEAD, skin, hair, false)
+		"neckwear":
+			_draw_neckwear(0.0)
+		"top":
+			_draw_top_flat(item, skin)
+		"gloves":
+			_draw_hand(Vector2(-8, 0), skin.darkened(0.1), item, 0.1)
+			_draw_hand(Vector2(8, 0), skin, item, 0.0)
+		"walking_stick":
+			_draw_stick(Vector2(3, -60))
+		"trousers":
+			_draw_trousers_flat(item)
+		"shoes":
+			_draw_shoe(Vector2(-10, 0), 0.12)
+			_draw_shoe(Vector2(8, 0), 0.0)
+
+
+## A top laid flat, facing out, so its shape reads at a glance: the body,
+## sleeves out to the sides, and its trim (a hood, a hem, a cape behind).
+func _draw_top_flat(top: Dictionary, skin: Color) -> void:
+	var colour := Content.cosmetic_colour(top, Color("#b4533f"))
+	var style := _style(top)
+	var body := colour if style != "cape" else colour.lightened(0.35)
+	if style == "cape":
+		draw_colored_polygon(PackedVector2Array([Vector2(-12, -110), Vector2(12, -110), Vector2(22, -66), Vector2(-22, -66)]), colour.darkened(0.1))
+	if style == "hoodie":
+		draw_circle(Vector2(0, -110), 9, colour.darkened(0.18), true, -1.0, true)
+	for side in [-1.0, 1.0]:
+		var shoulder := Vector2(10 * side, -106)
+		var cuff := Vector2(21 * side, -76)
+		if style == "tee":
+			var elbow := shoulder.lerp(cuff, 0.4)
+			draw_line(shoulder, elbow, body, 10, true)
+			draw_line(elbow, cuff, skin, 7, true)
+		else:
+			draw_line(shoulder, cuff, body.darkened(0.06), 9, true)
+	draw_style_box(UI.box(body, Color.TRANSPARENT, 3), Rect2(-12, -110, 24, 40))
+	match style:
+		"jumper":
+			draw_rect(Rect2(-12, -74, 24, 4), body.darkened(0.15))
+			if top.has("rarity"):
+				draw_circle(Vector2(0, -92), 4.5, body.lightened(0.35), true, -1.0, true)
+		"hoodie":
+			draw_rect(Rect2(-8, -84, 16, 8), body.darkened(0.12))
+			draw_line(Vector2(-3, -108), Vector2(-3, -98), UI.SURFACE, 1.5, true)
+			draw_line(Vector2(3, -108), Vector2(3, -98), UI.SURFACE, 1.5, true)
+		"tee":
+			draw_arc(Vector2(0, -110), 5, 0, PI, 10, body.darkened(0.15), 2.0, true)
+
+
+## Trousers laid flat: a waistband and two legs a little apart (shorts stop
+## at the knee).
+func _draw_trousers_flat(trousers: Dictionary) -> void:
+	var colour := Content.cosmetic_colour(trousers, Color("#4b5a6e"))
+	var hem := -32.0 if _style(trousers) == "shorts" else -2.0
+	for side in [-1.0, 1.0]:
+		var shade := colour.darkened(0.08) if side < 0 else colour
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(0, -54), Vector2(12 * side, -56), Vector2(14 * side, hem), Vector2(3 * side, hem)]), shade)
+	draw_rect(Rect2(-12, -60, 24, 6), colour.darkened(0.2))
+
+
+## The body of the top they wear, with its trim.
+func _draw_torso(top: Dictionary, sleeve: Color, bob: float) -> void:
+	draw_rect(Rect2(-14, -108 - bob, 28, 56), sleeve)
 	match _style(top):
 		"jumper":
 			draw_rect(Rect2(-14, -57 - bob, 28, 5), sleeve.darkened(0.15))
@@ -135,16 +262,14 @@ func _draw_body(skin: Color, top: Dictionary, sleeve: Color, shoulder: Vector2, 
 		"tee":
 			draw_rect(Rect2(-14, -108 - bob, 28, 4), sleeve.darkened(0.1))
 
-	# Front arm, holding the lead (or hanging down when there isn't one).
-	hand = Vector2(22, -78 - bob) if holding_lead else shoulder + Vector2(3, 40).rotated(sin(_phase) * 0.35 if walking else 0.0)
-	_draw_arm(shoulder, hand, sleeve, skin, tee)
-	_draw_hand(hand, skin, gloves, 0.0)
 
+## The walking stick, if they carry one, held in `hand`.
+func _draw_stick(hand_at: Vector2) -> void:
 	var stick := _item("walking_stick")
 	if _style(stick) != "none":
 		var colour := Content.cosmetic_colour(stick, STICK)
-		draw_line(hand + Vector2(4, -10), Vector2(hand.x + 14, 0), STICK, 4, true)
-		draw_circle(hand + Vector2(4, -11), 4.5, colour, true, -1.0, true)
+		draw_line(hand_at + Vector2(4, -10), Vector2(hand_at.x + 14, 0), STICK, 4, true)
+		draw_circle(hand_at + Vector2(4, -11), 4.5, colour, true, -1.0, true)
 
 
 func _draw_arm(from: Vector2, to: Vector2, sleeve: Color, skin: Color, short_sleeve: bool) -> void:
@@ -203,7 +328,7 @@ func _draw_neckwear(bob: float) -> void:
 			draw_circle(Vector2(9, y + 6), 3, colour.lightened(0.3), true, -1.0, true)
 
 
-func _draw_head(h: Vector2, skin: Color, hair_tone: Color) -> void:
+func _draw_head(h: Vector2, skin: Color, hair_tone: Color, with_hat: bool = true) -> void:
 	var hair := _item("hair")
 	var hair_colour := Content.cosmetic_colour(hair, hair_tone) if hair.has("rarity") else hair_tone
 	var style := _style(hair)
@@ -225,7 +350,8 @@ func _draw_head(h: Vector2, skin: Color, hair_tone: Color) -> void:
 		_:
 			draw_arc(h, 12, PI, TAU, 16, hair_colour, 9, true)
 			draw_circle(h + Vector2(11, -9), 4.5, hair_colour, true, -1.0, true)
-	_draw_hat(h)
+	if with_hat:
+		_draw_hat(h)
 
 
 func _draw_face(h: Vector2) -> void:
