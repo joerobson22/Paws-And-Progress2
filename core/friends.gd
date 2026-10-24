@@ -9,8 +9,11 @@ extends RefCounted
 
 
 ## Everyone on the leaderboard this week, most focus first: you
-## (`mine` seconds, marked "me") and every friend.
+## (`mine` seconds, marked "me") and every friend. Nobody, you included,
+## when you have no friends.
 static func ranked(friends: Array, mine: int, walking: bool) -> Array:
+	if friends.is_empty():
+		return []
 	var rows: Array = [{"name": "You", "weekly_seconds": mine, "walking": walking, "look": {}, "me": true}]
 	rows.append_array(friends)
 	rows.sort_custom(func(a, b): return int(a["weekly_seconds"]) > int(b["weekly_seconds"]))

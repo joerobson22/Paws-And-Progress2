@@ -72,6 +72,7 @@ static func from_dict(raw: Dictionary) -> GameState:
 	for k in ["created_unix", "skin_tone", "hair_tone", "walks_since_epic",
 			"legacy_total_seconds", "legacy_longest_seconds", "legacy_best_week_seconds"]:
 		state.profile[k] = int(state.profile[k])
+	state.profile["setup_pending"] = bool(state.profile["setup_pending"])
 	state.profile["username"] = str(state.profile["username"])
 	state.profile["institution"] = str(state.profile["institution"])
 	state.profile["shelf"] = state.shelf()

@@ -6,7 +6,8 @@ extends PanelContainer
 ## opens the whole list in a popup. When you're further down than the card
 ## shows, your row takes its last spot, so you can always see where you
 ## are. It only ever shows whole rows. Tapping a friend's face or name
-## opens their profile; tapping yours goes to your profile screen.
+## opens their profile; tapping yours goes to your profile screen. With
+## no friends it's empty under the heading but for "No friends yet!".
 
 ## A row and the line under it.
 const ROW_PITCH := 57.0
@@ -19,9 +20,8 @@ var _pinned: Control
 var _mine: Control
 
 
-## `list` is rows from Friends.ranked(). `note` shows under the rows when
-## there are no friends yet (and "See full" is left off).
-func _init(list: Array, note: String = "") -> void:
+## `list` is rows from Friends.ranked() (empty with no friends).
+func _init(list: Array) -> void:
 	rows = list
 	var b := UI.with_shadow(UI.box(UI.SURFACE, Color.TRANSPARENT, 24))
 	b.content_margin_left = 20
@@ -68,14 +68,12 @@ func _init(list: Array, note: String = "") -> void:
 	_holder.add_child(_scroll)
 	_list_box = _list(list)
 	_list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if list.size() <= 1 and note != "":
-		_list_box.add_child(UI.divider())
-		var words := UI.para(note, 13, UI.INK_FAINT)
-		var pad := MarginContainer.new()
-		pad.add_theme_constant_override("margin_top", 10)
-		pad.add_theme_constant_override("margin_bottom", 10)
-		pad.add_child(words)
-		_list_box.add_child(pad)
+	if list.is_empty():
+		var none := UI.label("No friends yet!", 16, UI.INK_FAINT, false, 700)
+		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		none.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		none.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_holder.add_child(none)
 	var room := MarginContainer.new()
 	room.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	room.add_child(_list_box)

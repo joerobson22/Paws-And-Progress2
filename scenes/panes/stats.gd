@@ -82,8 +82,7 @@ func build() -> void:
 		col.add_child(history)
 
 	var mine := Stats.week_total(App.state.sessions, Stats.week_start(today), App.tz_bias())
-	var board := Leaderboard.new(Friends.ranked(App.friends, mine, App.state.active != null),
-		"Friends join you here once accounts arrive: you'll see their weeks, and who's out walking right now.")
+	var board := Leaderboard.new(Friends.ranked(App.friends, mine, App.state.active != null))
 	# At least a row and yours: a friend above you, then your pinned row.
 	board.custom_minimum_size.y = 180 if _columns else 128
 	col.add_child(board)
