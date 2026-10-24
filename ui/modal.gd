@@ -13,10 +13,12 @@ static var _stack: Array[Modal] = []
 ## Tapping the backdrop or pressing Escape closes it (with a null result).
 var dismissible := true
 ## The card and the column inside it; fill `body` with content. Anything in
-## `header` stays put above it while a long body scrolls.
+## `header` stays put above it while a long body scrolls, and anything in
+## `footer` stays put below it.
 var card: PanelContainer
 var header: VBoxContainer
 var body: VBoxContainer
+var footer: VBoxContainer
 var _backdrop: ColorRect
 var _scroll: ScrollContainer
 var _max_width := 440.0
@@ -29,6 +31,12 @@ static func is_open() -> bool:
 
 static func top() -> Modal:
 	return _stack.back() if not _stack.is_empty() else null
+
+
+## Closes every popup, newest first.
+static func close_all() -> void:
+	while top():
+		top().close()
 
 
 ## Opens an empty popup; fill `body` and it animates in on the next frame.
@@ -199,6 +207,11 @@ func _build(padding: int) -> void:
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(body)
 	body.minimum_size_changed.connect(_fit)
+	footer = UI.vbox(16)
+	footer.visible = false
+	footer.child_entered_tree.connect(func(_child): footer.visible = true)
+	footer.minimum_size_changed.connect(_fit)
+	column.add_child(footer)
 	resized.connect(_fit)
 
 
@@ -212,8 +225,10 @@ func _fit() -> void:
 	_scroll.custom_minimum_size.x = w
 	body.custom_minimum_size.x = w
 	header.custom_minimum_size.x = w
+	footer.custom_minimum_size.x = w
 	var above := header.get_combined_minimum_size().y + 16.0 if header.visible else 0.0
-	_scroll.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, maxf(80.0, view.y - 48.0 - pad.y - above))
+	var below := footer.get_combined_minimum_size().y + 16.0 if footer.visible else 0.0
+	_scroll.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, maxf(80.0, view.y - 48.0 - pad.y - above - below))
 
 
 ## Scrolls the body so `target` (somewhere inside it) sits in the middle,

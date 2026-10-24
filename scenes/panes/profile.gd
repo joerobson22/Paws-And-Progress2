@@ -6,7 +6,8 @@ extends Pane
 ## right, your details at the top and your gift shelf at the bottom, with a
 ## pencil to arrange it. Under the card, as many of your best achievements
 ## as fit; "See all" lists every one. It all fits the screen without scrolling. The
-## gear in the top right opens the settings.
+## gear in the top right opens the settings. A new save slot shows what's
+## left to fill in instead of the achievements, and keeps you here till then.
 
 
 func build() -> void:
@@ -30,7 +31,7 @@ func build() -> void:
 	side.add_child(_shelf())
 	body.add_child(side)
 
-	col.add_child(_achievements())
+	col.add_child(_setup() if App.setup_pending() else _achievements())
 
 
 ## The character, with a pencil in the corner to change how they look. Your
@@ -90,10 +91,7 @@ func _edit(key: String, title: String, placeholder: String, max_length: int) -> 
 ## Every achievement with how far along you are, in order: the hours
 ## focused, then every gift, then each animal's set.
 static func achievement_rows() -> Array:
-	var p := App.state.profile
-	var focused := Stats.total_seconds(App.state.sessions) + int(p.get("legacy_total_seconds", 0))
-	return Achievements.progress(Achievements.list(Content.achievements, Content.animals, Content.gifts),
-		focused, App.state.inventory.keys(), Content.gifts)
+	return App.achievement_rows()
 
 
 ## The achievements under the card: a heading with how many you have, then
@@ -109,12 +107,53 @@ func _achievements() -> Control:
 	return section
 
 
+## A new save slot's first stop, under the card (it has no achievements
+## yet): a tick by each thing to fill in, and "Start walking", which only
+## works once both are done and lets you leave this screen.
+func _setup() -> Control:
+	var c := UI.card(UI.SURFACE, 20)
+	var v := UI.vbox(12)
+	c.add_child(v)
+	v.add_child(UI.label(Text.t("setup.welcome"), 20, UI.INK, true, 600))
+	var p := App.state.profile
+	var todo := UI.hbox(20)
+	todo.add_child(_todo(Text.t("setup.name"), str(p.get("username", "")).strip_edges() != ""))
+	todo.add_child(_todo(Text.t("setup.school"), str(p.get("institution", "")).strip_edges() != ""))
+	v.add_child(todo)
+	var go := UI.button(Text.t("setup.start"), func():
+		App.finish_setup()
+		App.go("focus"), "accent")
+	go.disabled = not App.profile_complete()
+	v.add_child(go)
+	return c
+
+
+## One thing a new account fills in, ticked once it's done.
+func _todo(text: String, done: bool) -> Control:
+	var row := UI.hbox(8)
+	var dot := UI.panel(UI.ACCENT if done else UI.SURFACE_SOFT, 999, 0)
+	dot.custom_minimum_size = Vector2(22, 22)
+	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if done:
+		var tick := UI.icon_rect("check", 14, UI.ON_COLOUR)
+		tick.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		tick.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		dot.add_child(tick)
+	row.add_child(dot)
+	row.add_child(UI.label(text, 15, UI.INK if done else UI.INK_SOFT, false, 700))
+	row.accessibility_name = Text.t("setup.step_done" if done else "setup.step_todo", {"step": text})
+	return row
+
+
 # --- Settings ----------------------------------------------------------------
 
 func open_settings() -> void:
 	var m := Modal.open(480)
-	m.body.add_child(m.heading_row(Text.t("settings.title")))
+	# The title stays put while the settings scroll.
+	m.header.add_child(m.heading_row(Text.t("settings.title")))
 	var s := UI.vbox(10)
+	s.add_child(_account_row())
+	s.add_child(UI.divider())
 	s.add_child(_toggle(Text.t("settings.sound"), Text.t("settings.sound_note"), "sound"))
 	s.add_child(UI.divider())
 	s.add_child(_toggle(Text.t("settings.ambience"), Text.t("settings.ambience_note"), "ambience"))
@@ -127,10 +166,36 @@ func open_settings() -> void:
 	for row in Display.settings_rows(get_window()):
 		s.add_child(UI.divider())
 		s.add_child(row)
-	m.body.add_child(s)
 	var about := UI.para(Text.t("settings.about", {"version": ProjectSettings.get_setting("application/config/version", "")}), 13, UI.INK_FAINT)
 	about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	m.body.add_child(about)
+	s.add_child(about)
+	# Clear of the scrollbar, so the switches never touch it.
+	var room := MarginContainer.new()
+	room.add_child(s)
+	m.body.add_child(room)
+	UI.clear_of_bar(m.body.get_parent() as ScrollContainer, room)
+
+
+## Whose save this is, and "Switch account" for the other saves on this
+## device (AccountSwitcher).
+func _account_row() -> Control:
+	var row := UI.hbox(14)
+	var face := UI.character_portrait({}, Vector2(44, 44), true)
+	face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(face)
+	var text := UI.vbox(2)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var username := str(App.state.profile.get("username", ""))
+	text.add_child(UI.trimmed(username if username != "" else Text.t("accounts.unnamed"), 16, UI.INK, false, 800))
+	text.add_child(UI.para(Text.t("accounts.note"), 13))
+	row.add_child(text)
+	var switch := UI.button(Text.t("accounts.title"), AccountSwitcher.open, "quiet")
+	switch.custom_minimum_size.y = 40
+	switch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	switch.add_theme_font_size_override("font_size", 14)
+	row.add_child(switch)
+	return row
 
 
 func _toggle(title: String, detail: String, key: String) -> Control:
