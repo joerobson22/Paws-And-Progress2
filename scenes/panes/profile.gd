@@ -7,7 +7,7 @@ extends Pane
 ## pencil to arrange it. Under the card, as many of your best achievements
 ## as fit; "See all" lists every one. It all fits the screen without scrolling. The
 ## gear in the top right opens the settings. A new save slot shows what's
-## left to fill in instead of the achievements, and keeps you here till then.
+## left to fill in above the achievements, and keeps you here till then.
 
 
 func build() -> void:
@@ -31,7 +31,11 @@ func build() -> void:
 	side.add_child(_shelf())
 	body.add_child(side)
 
-	col.add_child(_setup() if App.setup_pending() else _achievements())
+	if App.setup_pending():
+		col.add_child(_setup())
+		col.add_child(_spare_achievements(me))
+	else:
+		col.add_child(_achievements())
 
 
 ## The character, with a pencil in the corner to change how they look. Your
@@ -119,6 +123,34 @@ func _achievements() -> Control:
 	medals.shrank.connect(func(): section.size_flags_vertical = Control.SIZE_FILL)
 	section.add_child(medals)
 	return section
+
+
+## The achievements under a new account's setup card, when there's room
+## for a row of medals; on a short screen they're left out and the card
+## takes the room. When every medal fits with room to spare, the card takes
+## that too, as it does once setup is done.
+func _spare_achievements(card: Control) -> Control:
+	var section := _achievements()
+	# A plain Control, so the medals never squeeze the card or the setup.
+	var room := Control.new()
+	room.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	room.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	room.add_child(section)
+	card.size_flags_vertical = Control.SIZE_FILL
+	room.resized.connect(func():
+		var least := section.get_combined_minimum_size().y
+		if room.size.y < least:
+			# Hidden whole, so the column leaves no gap for it either.
+			room.hide()
+			card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		else:
+			section.size = Vector2(room.size.x, maxf(least, room.size.y))
+		, CONNECT_DEFERRED)
+	(section.get_child(1) as MedalCard).shrank.connect(func():
+		room.size_flags_vertical = Control.SIZE_FILL
+		room.custom_minimum_size.y = section.get_combined_minimum_size().y
+		card.size_flags_vertical = Control.SIZE_EXPAND_FILL, CONNECT_DEFERRED)
+	return room
 
 
 ## A new save slot's first stop, under the card (it has no achievements

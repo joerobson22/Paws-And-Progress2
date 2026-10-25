@@ -2,7 +2,7 @@ extends Pane
 ## Stats, below the focus screen. This week's focus as a bar per day, each
 ## bar split by project (tap a piece, or a project in the sideways strip
 ## under the chart, for that project's details), your past weeks beside it
-## (tap one to chart it), your streak in the top right (a shield on the
+## once there are any (tap one to chart it), your streak in the top right (a shield on the
 ## flame when you've earned a day off), and the friends leaderboard
 ## underneath. It all fits the screen; only the strips and the leaderboard
 ## scroll.
@@ -63,9 +63,16 @@ func build() -> void:
 	UI.clear_of_bar(strip, strip_room, 8)
 	c.add_child(strip)
 
-	# The chart gets the most room; the leaderboard the rest.
+	# The chart gets the most room; the leaderboard the rest. With only
+	# this week so far there's nothing to pick between, so the past weeks
+	# stay hidden and the chart has the width.
 	var history := _history(today)
-	if _columns:
+	if _weeks.size() < 2:
+		_weeks.clear()
+		history.queue_free()
+		chart_card.size_flags_stretch_ratio = 1.5
+		col.add_child(chart_card)
+	elif _columns:
 		var row := UI.hbox(16)
 		row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		row.size_flags_stretch_ratio = 1.5
@@ -115,7 +122,8 @@ func _streak() -> Control:
 
 
 ## Past weeks, newest first: a column beside the chart on computers and
-## wide screens, a sideways strip under it on phones.
+## wide screens, a sideways strip under it on phones. Only shown once
+## there's a week before this one.
 func _history(today: int) -> Control:
 	_weeks.clear()
 	var totals := Stats.weekly_totals(App.state.sessions, App.tz_bias())
