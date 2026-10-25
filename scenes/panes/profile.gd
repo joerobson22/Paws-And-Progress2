@@ -1,106 +1,103 @@
 extends Pane
-## Your profile, above the focus screen: your character head to toe (tap it,
-## or the pencil, to change how they look) with your level badge in the
-## bottom left and your XP filling a bar along the bottom (tap the badge for
-## everything levelling up unlocks), your account details and a few lifetime
-## numbers. The gear in the top left opens the settings. It's kept short
-## enough to fit a phone screen, so swiping back down works from anywhere.
+## Your profile, above the focus screen. One card at the top: your
+## character head to toe on the left (the pencil changes how they look),
+## with your level badge in the bottom left and your XP filling a bar along
+## the bottom (tap the badge for everything levelling up unlocks). On the
+## right, your details at the top and your gift shelf at the bottom, with a
+## pencil to arrange it. Under the card, as many of your best achievements
+## as fit; "See all" lists every one. It all fits the screen without scrolling. The
+## gear in the top right opens the settings. A new save slot shows what's
+## left to fill in above the achievements, and keeps you here till then.
 
 
 func build() -> void:
-	var col := page(720, 16)
-	var head := UI.title_row("Profile")
-	var gear := UI.round_button("gear", "Settings", open_settings, UI.SURFACE, UI.INK, 44)
-	head.add_child(gear)
-	head.move_child(gear, 0)
+	var col := frame(720, 14)
+	var head := title_row(Text.t("profile.title"))
+	head.add_child(UI.round_button("gear", Text.t("settings.title"), open_settings, UI.SURFACE, UI.INK, 44))
 	col.add_child(head)
-	var p := App.state.profile
 
-	var me := UI.card(UI.SURFACE, 18)
-	var body: BoxContainer
-	if wide:
-		body = UI.hbox(24)
-	else:
-		body = UI.vbox(12)
+	var me := UI.card(UI.SURFACE, 14)
+	# On a tall screen the card and the achievements share the spare room:
+	# the character grows, and more medals fit.
+	me.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var body := UI.hbox(22 if wide else 14)
 	me.add_child(body)
 	col.add_child(me)
 	body.add_child(_figure())
+	var side := UI.vbox(8)
+	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side.add_child(_details())
+	side.add_child(UI.spacer(true))
+	side.add_child(_shelf())
+	body.add_child(side)
 
-	var info := UI.vbox(2)
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.alignment = BoxContainer.ALIGNMENT_CENTER
-	var username := str(p.get("username", ""))
-	info.add_child(_field("Username", username if username != "" else "Add your name", username == "",
-		_edit.bind("username", "Your name", "What should we call you?", 24)))
-	info.add_child(UI.divider())
-	var school := str(p.get("institution", ""))
-	info.add_child(_field("School, college or university", school if school != "" else "Add where you study", school == "",
-		_edit.bind("institution", "Where do you study?", "e.g. University of Leeds", 60)))
-	info.add_child(UI.divider())
-	var joined := int(p.get("created_unix", 0))
-	info.add_child(_field("Joined", Stats.format_date(joined, App.tz_bias()) if joined > 0 else "Today", false, Callable()))
-	body.add_child(info)
-
-	var numbers := GridContainer.new()
-	numbers.columns = 3
-	numbers.add_theme_constant_override("h_separation", 12)
-	var all_time := Stats.total_seconds(App.state.sessions) + int(p.get("legacy_total_seconds", 0))
-	var gifts := 0
-	for n in App.state.inventory.values():
-		gifts += int(n)
-	numbers.add_child(_number("Focused", Stats.format_duration(all_time)))
-	numbers.add_child(_number("Gifts", str(gifts)))
-	numbers.add_child(_number("Completed", str(App.state.completed_projects().size())))
-	col.add_child(numbers)
+	if App.setup_pending():
+		col.add_child(_setup())
+		col.add_child(_spare_achievements(me))
+	else:
+		col.add_child(_achievements())
 
 
-## The character: tap it, or the pencil, to change how they look. Your
+## The character, with a pencil in the corner to change how they look. Your
 ## level badge sits in the bottom left with your XP filling a bar along the
-## bottom; the badge grows under the pointer, and tapping it shows every
-## reward levelling up brings.
+## bottom; under the pointer the badge grows from its centre, turns a shade
+## lighter and shines, and tapping it shows every reward levelling up
+## brings. It's as tall as the card.
 func _figure() -> Control:
-	var figure := UI.character_portrait({}, Vector2(230 if wide else 0, 300 if wide else 250), false, UI.ACCENT_SOFT, 48.0)
-	figure.mouse_filter = Control.MOUSE_FILTER_STOP
-	figure.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	figure.tooltip_text = "Customise your character"
-	Press.attach(figure).tapped.connect(Customise.open)
-	var pencil := UI.round_button("edit", "Customise your character", Customise.open, UI.SURFACE, UI.INK, 36)
+	var figure := UI.character_portrait({}, Vector2(220 if wide else 128, 0), false, UI.ACCENT_SOFT, 48.0)
+	var pencil := UI.round_button("edit", Text.t("profile.customise"), Customise.open, UI.SURFACE, UI.INK, 34)
 	figure.add_child(pencil)
 
 	var level := LevelBar.new(App.xp(), false, false)
 	figure.add_child(level)
 	var badge := level.badge()
 	badge.mouse_filter = Control.MOUSE_FILTER_STOP
-	badge.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	badge.tooltip_text = "Levels and rewards"
+	badge.mouse_default_cursor_shape = Cursor.HOVER
+	badge.accessibility_name = Text.t("profile.levels")
 	Press.attach(badge).tapped.connect(open_rewards)
-	badge.mouse_entered.connect(func(): Motion.to(badge, "scale", Vector2.ONE * 1.15, Motion.FAST))
-	badge.mouse_exited.connect(func(): Motion.to(badge, "scale", Vector2.ONE, Motion.FAST))
+	var shine := Glint.new(0.5)
+	badge.add_child(shine)
+	badge.mouse_entered.connect(func():
+		shine.shine()
+		_hover_badge(badge, true))
+	badge.mouse_exited.connect(_hover_badge.bind(badge, false))
 	figure.resized.connect(func():
 		pencil.size = pencil.get_combined_minimum_size()
 		pencil.position = Vector2(figure.size.x - pencil.size.x - 8, 8)
-		level.size = Vector2(figure.size.x - 20, level.get_combined_minimum_size().y)
-		level.position = Vector2(10, figure.size.y - level.size.y - 10)
-		badge.pivot_offset = badge.size * 0.5)
+		level.size = Vector2(figure.size.x - 16, level.get_combined_minimum_size().y)
+		level.position = Vector2(8, figure.size.y - level.size.y - 8))
 	return figure
 
 
-## A labelled detail; tappable to edit when `on_tap` is given.
-func _field(title: String, value: String, placeholder: bool, on_tap: Callable) -> Control:
-	var row := UI.hbox(10)
-	row.custom_minimum_size.y = 52
-	var text := UI.vbox(0)
-	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.alignment = BoxContainer.ALIGNMENT_CENTER
-	text.add_child(UI.caption(title))
-	text.add_child(UI.trimmed(value, 18, UI.INK_FAINT if placeholder else UI.INK, false, 800))
-	row.add_child(text)
-	if on_tap.is_valid():
-		var b := UI.round_button("edit", "Edit %s" % title.to_lower(), on_tap, UI.SURFACE_SOFT, UI.INK, 38, false)
-		row.add_child(b)
-		row.mouse_filter = Control.MOUSE_FILTER_STOP
-		Press.attach(row).tapped.connect(on_tap)
-	return row
+## Grows the level badge from its centre and lightens its fill, or settles
+## it back. Only the fill lightens: the number and the white rim stay put.
+static func _hover_badge(badge: Control, on: bool) -> void:
+	badge.pivot_offset = badge.size * 0.5
+	var t := Motion.tween(badge, "hover")
+	t.set_parallel(true)
+	t.tween_property(badge, "scale", Vector2.ONE * (1.12 if on else 1.0), Motion.time(Motion.FAST))
+	t.tween_property(badge, "self_modulate", Color(1.22, 1.22, 1.22) if on else Color.WHITE, Motion.time(Motion.FAST))
+
+
+## Your name, where you study and when you joined: small, at the top.
+func _details() -> Control:
+	var p := App.state.profile
+	var username := str(p.get("username", ""))
+	var school := str(p.get("institution", ""))
+	var joined := int(p.get("created_unix", 0))
+	return ProfileCard.details([
+		ProfileCard.field(Text.t("profile.username"), username if username != "" else Text.t("profile.username_empty"), username == "",
+			_edit.bind("username", Text.t("profile.username_prompt"), Text.t("profile.username_placeholder"), 24)),
+		ProfileCard.field(Text.t("profile.school"), school if school != "" else Text.t("profile.school_empty"), school == "",
+			_edit.bind("institution", Text.t("profile.school_prompt"), Text.t("profile.school_placeholder"), 60)),
+		ProfileCard.field(Text.t("profile.joined"), Stats.format_date(joined, App.tz_bias()) if joined > 0 else Text.t("profile.joined_today")),
+	])
+
+
+## Your gift shelf, along the bottom of the card, with a pencil that opens
+## the shelf editor. The gifts here are only to look at.
+func _shelf() -> Control:
+	return ProfileCard.shelf(GiftShelf.new(GiftShelf.mine(), 66.0 if wide else 60.0), ShelfEditor.open)
 
 
 func _edit(key: String, title: String, placeholder: String, max_length: int) -> void:
@@ -109,35 +106,142 @@ func _edit(key: String, title: String, placeholder: String, max_length: int) -> 
 			App.set_profile(key, text))
 
 
-func _number(title: String, value: String) -> Control:
-	var card := UI.card(UI.SURFACE, 14, 20)
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var v := UI.vbox(0)
-	v.add_child(UI.caption(title))
-	v.add_child(UI.trimmed(value, 22, UI.INK, true, 600))
-	card.add_child(v)
-	return card
+## Every achievement with how far along you are, in order: the hours
+## focused, then every gift, then each animal's set.
+static func achievement_rows() -> Array:
+	return App.achievement_rows()
+
+
+## The achievements under the card: a heading with how many you have, then
+## your best medals filling the rest of the screen, ending in "See all".
+func _achievements() -> Control:
+	var rows := achievement_rows()
+	var section := UI.vbox(8)
+	section.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	section.add_child(ProfileCard.achievements_head(rows))
+	var medals := MedalCard.new(rows)
+	medals.shrank.connect(func(): section.size_flags_vertical = Control.SIZE_FILL)
+	section.add_child(medals)
+	return section
+
+
+## The achievements under a new account's setup card, when there's room
+## for a row of medals; on a short screen they're left out and the card
+## takes the room. When every medal fits with room to spare, the card takes
+## that too, as it does once setup is done.
+func _spare_achievements(card: Control) -> Control:
+	var section := _achievements()
+	# A plain Control, so the medals never squeeze the card or the setup.
+	var room := Control.new()
+	room.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	room.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	room.add_child(section)
+	card.size_flags_vertical = Control.SIZE_FILL
+	room.resized.connect(func():
+		var least := section.get_combined_minimum_size().y
+		if room.size.y < least:
+			# Hidden whole, so the column leaves no gap for it either.
+			room.hide()
+			card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		else:
+			section.size = Vector2(room.size.x, maxf(least, room.size.y))
+		, CONNECT_DEFERRED)
+	(section.get_child(1) as MedalCard).shrank.connect(func():
+		room.size_flags_vertical = Control.SIZE_FILL
+		room.custom_minimum_size.y = section.get_combined_minimum_size().y
+		card.size_flags_vertical = Control.SIZE_EXPAND_FILL, CONNECT_DEFERRED)
+	return room
+
+
+## A new save slot's first stop, under the card (it has no achievements
+## yet): a tick by each thing to fill in, and "Start walking", which only
+## works once both are done and lets you leave this screen.
+func _setup() -> Control:
+	var c := UI.card(UI.SURFACE, 20)
+	var v := UI.vbox(12)
+	c.add_child(v)
+	v.add_child(UI.label(Text.t("setup.welcome"), 20, UI.INK, true, 600))
+	var p := App.state.profile
+	var todo := UI.hbox(20)
+	todo.add_child(_todo(Text.t("setup.name"), str(p.get("username", "")).strip_edges() != ""))
+	todo.add_child(_todo(Text.t("setup.school"), str(p.get("institution", "")).strip_edges() != ""))
+	v.add_child(todo)
+	var go := UI.button(Text.t("setup.start"), func():
+		App.finish_setup()
+		App.go("focus"), "accent")
+	go.disabled = not App.profile_complete()
+	v.add_child(go)
+	return c
+
+
+## One thing a new account fills in, ticked once it's done.
+func _todo(text: String, done: bool) -> Control:
+	var row := UI.hbox(8)
+	var dot := UI.panel(UI.ACCENT if done else UI.SURFACE_SOFT, 999, 0)
+	dot.custom_minimum_size = Vector2(22, 22)
+	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if done:
+		var tick := UI.icon_rect("check", 14, UI.ON_COLOUR)
+		tick.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		tick.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		dot.add_child(tick)
+	row.add_child(dot)
+	row.add_child(UI.label(text, 15, UI.INK if done else UI.INK_SOFT, false, 700))
+	row.accessibility_name = Text.t("setup.step_done" if done else "setup.step_todo", {"step": text})
+	return row
 
 
 # --- Settings ----------------------------------------------------------------
 
 func open_settings() -> void:
 	var m := Modal.open(480)
-	m.body.add_child(m.heading_row("Settings"))
+	# The title stays put while the settings scroll.
+	m.header.add_child(m.heading_row(Text.t("settings.title")))
 	var s := UI.vbox(10)
-	s.add_child(_toggle("Sound effects", "Taps, pops, barks and the bong.", "sound"))
+	s.add_child(_account_row())
 	s.add_child(UI.divider())
-	s.add_child(_toggle("Ambience", "Water, birdsong and wind while you walk.", "ambience"))
+	s.add_child(_toggle(Text.t("settings.sound"), Text.t("settings.sound_note"), "sound"))
 	s.add_child(UI.divider())
-	s.add_child(_toggle("Reduce motion", "Gentler scenery and quicker, simpler animations.", "reduce_motion"))
+	s.add_child(_toggle(Text.t("settings.ambience"), Text.t("settings.ambience_note"), "ambience"))
 	s.add_child(UI.divider())
-	s.add_child(_toggle("Keep the screen on", "Stops your phone or laptop sleeping during a walk.", "keep_screen_on"))
+	s.add_child(_toggle(Text.t("settings.reduce_motion"), Text.t("settings.reduce_motion_note"), "reduce_motion"))
+	s.add_child(UI.divider())
+	s.add_child(_toggle(Text.t("settings.keep_screen_on"), Text.t("settings.keep_screen_on_note"), "keep_screen_on"))
 	s.add_child(UI.divider())
 	s.add_child(_location_toggle())
-	m.body.add_child(s)
-	var about := UI.para("Paws & Progress %s  ·  Fonts: Fredoka and Nunito (SIL Open Font License)" % ProjectSettings.get_setting("application/config/version", ""), 13, UI.INK_FAINT)
+	for row in Display.settings_rows(get_window()):
+		s.add_child(UI.divider())
+		s.add_child(row)
+	var about := UI.para(Text.t("settings.about", {"version": ProjectSettings.get_setting("application/config/version", "")}), 13, UI.INK_FAINT)
 	about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	m.body.add_child(about)
+	s.add_child(about)
+	# Clear of the scrollbar, so the switches never touch it.
+	var room := MarginContainer.new()
+	room.add_child(s)
+	m.body.add_child(room)
+	UI.clear_of_bar(m.body.get_parent() as ScrollContainer, room)
+
+
+## Whose save this is, and "Switch account" for the other saves on this
+## device (AccountSwitcher).
+func _account_row() -> Control:
+	var row := UI.hbox(14)
+	var face := UI.character_portrait({}, Vector2(44, 44), true)
+	face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(face)
+	var text := UI.vbox(2)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var username := str(App.state.profile.get("username", ""))
+	text.add_child(UI.trimmed(username if username != "" else Text.t("accounts.unnamed"), 16, UI.INK, false, 800))
+	text.add_child(UI.para(Text.t("accounts.note"), 13))
+	row.add_child(text)
+	var switch := UI.button(Text.t("accounts.title"), AccountSwitcher.open, "quiet")
+	switch.custom_minimum_size.y = 40
+	switch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	switch.add_theme_font_size_override("font_size", 14)
+	row.add_child(switch)
+	return row
 
 
 func _toggle(title: String, detail: String, key: String) -> Control:
@@ -148,7 +252,7 @@ func _toggle(title: String, detail: String, key: String) -> Control:
 	text.add_child(UI.para(detail, 13))
 	row.add_child(text)
 	var sw := Switch.new(bool(App.state.settings.get(key, false)))
-	sw.tooltip_text = title
+	sw.accessibility_name = title
 	sw.toggled.connect(func(on: bool):
 		App.set_setting(key, on)
 		if key == "ambience":
@@ -163,14 +267,14 @@ func _location_toggle() -> Control:
 	var row := UI.hbox(16)
 	var text := UI.vbox(2)
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text.add_child(UI.label("Local sunrise and weather", 16, UI.INK, false, 800))
-	var detail := "Walks follow the real sky where you are, from your rough location (worked out from your internet connection)."
+	text.add_child(UI.label(Text.t("settings.weather"), 16, UI.INK, false, 800))
+	var detail := Text.t("settings.weather_note")
 	if Outdoors.place_name() != "":
-		detail += " Now: %s, %s." % [Outdoors.place_name(), Weather.look(Outdoors.weather(), Content.weathers)["name"].to_lower()]
+		detail += " " + Text.t("settings.weather_now", {"place": Outdoors.place_name(), "weather": Weather.look(Outdoors.weather(), Content.weathers)["name"].to_lower()})
 	text.add_child(UI.para(detail, 13))
 	row.add_child(text)
 	var sw := Switch.new(Outdoors.enabled())
-	sw.tooltip_text = "Local sunrise and weather"
+	sw.accessibility_name = Text.t("settings.weather")
 	sw.toggled.connect(Outdoors.set_enabled)
 	row.add_child(sw)
 	return row
@@ -189,13 +293,13 @@ func open_rewards() -> void:
 	var at := float(p["level"]) + float(p["into"]) / maxf(1.0, float(p["needed"]))
 	var m := Modal.open(460)
 	# The title and where you are stay put; only the rewards scroll.
-	m.header.add_child(m.heading_row("Rewards"))
+	m.header.add_child(m.heading_row(Text.t("rewards.title")))
 	var head := UI.hbox(12)
 	head.add_child(UI.level_badge(p["level"], 44))
 	var words := UI.vbox(0)
-	words.add_child(UI.label("Level %d" % p["level"], 18, UI.INK, true, 600))
+	words.add_child(UI.label(Text.t("rewards.level", {"level": p["level"]}), 18, UI.INK, true, 600))
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_child(UI.para("%d XP to level %d. You get 1 XP for each minute focused, and more for gifts." % [int(p["needed"]) - int(p["into"]), int(p["level"]) + 1], 13, UI.INK_SOFT, 700))
+	words.add_child(UI.para(Text.t("rewards.to_next", {"xp": int(p["needed"]) - int(p["into"]), "level": int(p["level"]) + 1}), 13, UI.INK_SOFT, 700))
 	head.add_child(words)
 	m.header.add_child(head)
 
@@ -260,8 +364,7 @@ func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.alignment = BoxContainer.ALIGNMENT_CENTER
 	words.add_child(UI.trimmed(title, 17, UI.INK if open else UI.INK_SOFT, false, 800))
-	var kind := "place" if r["type"] == "place" else "animal"
-	var when := ("From the start" if level == 1 else "Level %d" % level) + "  ·  new " + kind
+	var when := Text.t("rewards.new_place" if r["type"] == "place" else "rewards.new_animal", {"when": Text.t("rewards.from_start") if level == 1 else Text.t("rewards.level", {"level": level})})
 	words.add_child(UI.label(when, 13, UI.INK_FAINT, false, 700))
 	row.add_child(words)
 	if not open:

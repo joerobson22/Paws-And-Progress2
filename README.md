@@ -30,8 +30,19 @@ macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
 ## How it's laid out
 
 The app is five screens arranged like a plus sign. Swipe between them, use
-the arrow keys on a keyboard (Esc comes back to the middle), or tap a dot on
-the little map at the bottom, which shows where you are:
+the arrow keys on a keyboard (Esc comes back to the middle), click the big
+faint arrows at the screen's edges (computers only: one on every side of the
+focus screen, and one back home on the others), or use the little map in the
+bottom left corner, which shows where you are. It grows up and to the right
+into a tile per screen, each with its icon (a home for focus, a present for
+gifts, a tick for completed, a person for your profile and a bar chart for
+stats). With a mouse it grows while the pointer is over it and shrinks a
+moment after it leaves; on phones tap it to grow it, and tap it again (or
+anywhere else) to shrink it. Pick a tile to go there.
+
+On computers, Settings also picks the window's mode (windowed, maximised,
+fullscreen or exclusive fullscreen) and its size. The window can't get
+smaller than 800 × 560 points, so layouts never squash.
 
 ```
                  Profile
@@ -41,31 +52,62 @@ the little map at the bottom, which shows where you are:
                   Stats
 ```
 
-- **Focus** (middle): a greeting (from a long list in `data/greetings.json`)
+- **Focus** (middle): a greeting (from a long list in `data/text.json`)
   above the orb (it grows under the pointer), and the sun/moon switch for dark
   mode. Tap the orb and the choose focus screen grows out of it, set in the
   place you'll walk (holding still, with the place's growth in front of your
   pets): pick the place from the row at the top (in the order they unlock),
   with the project and the pet's name under it. Swipe through your pets (each
-  one's kind and time focused is under it), tap one to start a walk, adopt a
-  new one with the + (what it's for, the pet's name, its animal and three
-  colours; a locked animal hides the colours), or complete or delete one.
-  Debug builds (running from the editor) also show a switch in the top left
-  that unlocks every animal and place.
-- **Gifts** (left): a shelf for your three favourites (press and hold a gift to
-  drag it up; drag a shelf gift sideways to swap it along), every gift you've
-  found (filter by rarity, A–Z or animal; pick the same one again to reverse
-  it; only this collection scrolls), and trade-ins (10 commons for a rare,
-  5 rares for an epic, 3 epics for a legendary).
-- **Completed** (right): a panel per finished project; tap one to give it a
-  GCSE, A-Level or university grade badge.
-- **Profile** (up): your character (tap it or the pencil to customise) with
-  your level badge in the bottom left (tap it for every reward) and your XP
-  along the bottom, account details, and the settings behind the gear in the
-  top left.
-- **Stats** (down): this week's focus split by project, past weeks with any
-  focus in them, your streak (one rest day allowed after three days in a row)
-  and the friends leaderboard.
+  one's kind and time focused is under it), tap one to start a walk, or
+  complete or delete one with the buttons at the bottom. The × in the top left
+  goes back. The + in the top right adopts a new one (what it's for, the pet's
+  name, its animal and three colours; a locked animal hides the colours):
+  while you fill that in the bottom buttons go, the × cancels and the + turns
+  into a tick that adopts it. Debug builds (running from the editor) also show
+  two small switches beside the home icon in the top left: one unlocks every
+  animal and place, the other turns the window into a phone's shape and lays
+  the app out as on a phone (tap-to-open map, no edge arrows); turning it off
+  puts the window back as it was.
+- **Gifts** (left): three rings under "Collection stats" for how your
+  collection's coming along: gifts discovered (green), pets' gift tables
+  completed (blue) and cosmetics unlocked from gifts (purple). Under them,
+  every gift you have, eight to a row (five on a phone), each with its count;
+  only this list scrolls. Sort by rarity, A–Z or pet type (pick the same one
+  again and its arrow flips over to reverse it). Tap a gift for a closer look
+  and its trade-in (10 commons for a rare, 5 rares for an epic, 3 epics for a
+  legendary); trading away the last of a shelf gift takes it off the shelf.
+- **Completed** (right): four headline numbers (projects finished, their
+  total focus time, the biggest by focus time and the longest from start to
+  finish), then a scrolling list with a panel per finished project. "Sort by"
+  orders it by most gifts, biggest, longest, grade, pet type or A–Z; pick the
+  same option again to reverse it. Grades sort best first across scales (a
+  First, an A* and a 9 share the top band, university first). Tap the circled
+  "?" in a panel's corner to give it a GCSE, A-Level or university grade, and
+  tap the grade to change it.
+- **Profile** (up): one card with your character (the pencil customises it),
+  your level badge in the bottom left (it shines under the pointer; tap it
+  for every reward) and your XP along the bottom. Beside it, your details at
+  the top and your gift shelf of three favourites at the bottom. The shelf's
+  pencil opens the shelf editor, with every gift you have (sorted the same
+  way as on Gifts). There it's all drag and drop: onto an empty spot to put a
+  gift up, onto a full one to swap it in, along the shelf to rearrange, and
+  off it to take one down. Gifts on the shelf are greyed out in the
+  collection. On a phone, press and hold a gift first, as dragging scrolls
+  the list. Under the card, as many achievements as fit: earned ones first
+  (hardest won first), then the ones you're closest to. "See all" lists every
+  one with how far along it is: 10, 50, 100, 500, 1,000 and 10,000 hours
+  focused, every gift found, and a set for each animal's gifts
+  (`data/achievements.json`). The page never scrolls. The settings are
+  behind the gear in the top right.
+- **Stats** (down): this week's focus split by project (the projects scroll
+  sideways under the chart), past weeks with any focus in them, your streak
+  as a flame with the days beside it (a blue shield on the flame when you've
+  earned a rest day: one allowed after three days in a row), and the friends
+  leaderboard, which scrolls inside its card. "See full" lists everyone in a
+  popup. Tap a friend's face or name for their profile: their character,
+  where they study, when they joined, their week, their gift shelf (tap a
+  gift for a look) and their achievements. Tap yours for your profile. The
+  page never scrolls. Debug builds come with sample friends (`core/friends.gd`).
 
 On a walk, the button in the corner is a pie chart of the gift your pet will
 bring back. For the first ten minutes a dark green slice sweeps round; then it
@@ -119,6 +161,48 @@ it, then flick it. Your pet will fetch it, wading in if it lands in the water.
 On first launch on desktop, a save from the original app
 (`…/app_userdata/Paws-And-Progress/gamedata.save`) is imported automatically.
 
+## Running it on an iPhone
+
+The iOS export preset is already in `export_presets.cfg`: iPhone only,
+portrait, iOS 14 and up, with the paw icon (and a dark mode version) and a
+paw launch screen. These steps need your Mac, Apple ID and phone, so they
+can't be done for you. Do steps 1 to 4 once.
+
+1. **Xcode.** Install it from the Mac App Store, open it once, and let it
+   install the iOS platform. In **Xcode → Settings → Accounts**, add your
+   Apple ID. A free account works: the app runs for 7 days, then you run it
+   from Xcode again. The paid Developer Program (about £79 a year) removes that
+   limit and is needed for TestFlight and the App Store.
+2. **Export templates.** In Godot: **Editor → Manage Export Templates →
+   Download and Install**. They must match your Godot version exactly.
+3. **Your Team ID.** In Godot: **Project → Export → iOS**, and paste it into
+   **App Store Team ID**. It's 10 letters and digits:
+   - Paid account: [Membership details](https://developer.apple.com/account#MembershipDetailsCard).
+   - Free account: in **Keychain Access**, open the "Apple Development: …"
+     certificate (Xcode makes it on first run); it's the
+     **Organizational Unit**.
+
+   It isn't a secret, so the change to `export_presets.cfg` is fine to commit.
+4. **Your phone.** Plug it in, tap **Trust**, then turn on **Settings →
+   Privacy & Security → Developer Mode** and let it restart.
+5. **Export.** In **Project → Export**, pick **iOS**, then **Export
+   Project…**, and keep the path it offers, `build/ios/PawsAndProgress.ipa`
+   (`build/` isn't committed). The preset only makes the Xcode project
+   there, so Xcode does the signing in the next step.
+6. **Run.** Open `build/ios/PawsAndProgress.xcodeproj`, choose your iPhone
+   at the top of the window, and press **⌘R**. With a free account, the
+   first launch is blocked until you go to **Settings → General → VPN &
+   Device Management** and trust your Apple ID.
+
+The bundle ID is `com.joerobson22.pawsandprogress` (**Bundle Identifier**
+in the preset). Change it now if you want a different one; it can't change
+once the app is on the App Store. If Xcode says it's taken, add something
+to the end.
+
+Before the App Store, fill in the privacy details: the weather looks up a
+rough location from your IP address (`core/outdoors.gd`), which counts as
+"coarse location" data.
+
 ## Tests
 
 ```sh
@@ -127,11 +211,12 @@ godot --headless --path . -s tests/run_tests.gd   # unit tests
 godot --headless --path . -s tests/smoke.gd       # drives the whole app with sample data
 ```
 
-The smoke run draws every place, swipes between panes, drags a gift onto the
-shelf, sorts and trades gifts, opens every popup, picks a place (and tries a
-locked one), adopts a pet, walks for "50 minutes" through to the gift and the
-XP bar, throws the gift for the pet to fetch, and switches to dark mode and
-back.
+The smoke run draws every place, opens the map and swipes between panes,
+arranges the shelf by dragging (on, swapped in, along and off), sorts and
+trades gifts, grades a project from its "?", opens every popup (achievements
+included), picks a place (and tries a locked one), adopts a pet, walks for
+"50 minutes" through to the gift and the XP bar, throws the gift for the pet
+to fetch, and switches to dark mode and back.
 CI runs all three on every push (`.github/workflows/ci.yml`). With a display,
 `-s tests/smoke.gd -- --shots=<dir>` saves a screenshot of each step.
 
@@ -141,6 +226,7 @@ CI runs all three on every push (`.github/workflows/ci.yml`). With a display,
 core/            game logic, no UI
   app.gd           autoload "App": state, saving, walks, trades, navigation
   content.gd       autoload "Content": loads data/*.json
+  text.gd          every word on screen, from data/text.json
   outdoors.gd      autoload "Outdoors": location (with permission), weather
   day_cycle.gd     the sky and light at any hour
   sun_times.gd     sunrise and sunset anywhere, worked out on the device
@@ -153,11 +239,17 @@ core/            game logic, no UI
   gift_roller.gd   gift odds, guaranteed rarities, pity timer, trade-ins
   levels.gd        XP from the walk log, levels, and what each one unlocks
   stats.gd         weekly totals, records, streaks (from the session log)
+  achievements.gd  achievements and how far along each one is
+  friends.gd       the leaderboard order, and sample friends for debug builds
+  collection.gd    the gifts screen's rings: discovered, gift tables, cosmetics
+  display.gd       the computer window: mode, size, minimum, debug phone view
   models/          ProjectData, FocusSession resources
 data/            all content: animals, gifts, drop table, places (biomes),
-                 levels, cosmetics, grades, walk quotes, home greetings
+                 levels, cosmetics, grades, achievements, and text.json
+                 (every word on screen, home greetings and walk quotes)
 scenes/
-  main.gd          the app shell: panes, swiping, minimap, flows, popups
+  main.gd          the app shell: panes, swiping, minimap, edge arrows,
+                   flows, popups
   panes/           focus, gifts, completed, profile, stats (and their base, Pane)
   choose_focus/    choosing and adopting pets
   walk/            the walk, its chunked scenery, focus complete, focus ended
@@ -166,13 +258,17 @@ ui/
   ui.gd            palette, type, theme and builders every screen uses
   motion.gd        every animation: one ease-in-out tween style and timings
   modal.gd         popups, confirmations, prompts, colour picker
-  components/      orb, minimap, carousel, gift tile, gift button, project
-                   panel, character and animal drawings, ...
+  components/      orb, minimap, edge arrow, carousel, gift tile, grid, shelf and
+                   details popup, medal card, stat panel, gift button,
+                   leaderboard, friend profile, profile card pieces,
+                   project panel, character and animal drawings, ...
 tests/           headless unit tests and the smoke run
 ```
 
 ## Consistent by construction
 
+- **Words:** screens never write their own text. Every line comes from
+  `data/text.json` through `Text` (see below).
 - **Look:** screens never style things themselves. Colours, type, buttons,
   cards, tags, badges and portraits all come from `ui/ui.gd`, so a change there
   shows up everywhere. Its palette has a light and a dark set; switching
@@ -182,6 +278,43 @@ tests/           headless unit tests and the smoke run
   bounces, when "Reduce motion" is on).
 - **Popups:** every popup is a `Modal`, so they all open, dim, close and scroll
   the same way.
+- **Screens:** each screen's title carries its icon from the app map
+  (`Pane.title_row`). Screens are laid out with `Pane.frame()`, which never
+  scrolls: content fits the window, and only a panel's own list scrolls
+  (`UI.scroll_area`).
+- **Pointer:** anything tappable shows a grab hand (`ui/cursor.gd`). There are no tooltips.
+- **Sorting:** every sort menu is a `Dropdown` ("Sort by"). Picking the current
+  option again flips its arrow, then reverses the order;
+  `Dropdown.for_setting` remembers the choice.
+
+## Changing the words (no code needed)
+
+Every word the app shows is in `data/text.json`, grouped by screen
+(`"profile"`, `"stats"`, ...), with buttons and words used everywhere under
+`"common"`. Change the text on the right and it changes in the app; leave the
+names on the left alone.
+
+```json
+"delete_title": "Delete {project}?",
+"days": { "one": "{n} day", "other": "{n} days" },
+```
+
+- Words in `{braces}` are filled in by the app. Keep them, but move them
+  wherever reads best.
+- A `"one"` / `"other"` pair is the line for one thing and for many.
+- Small headings over lists are put in capitals by the app, so write them
+  normally.
+- **Home greetings:** add a line to `"greetings"`, under the time of day it's
+  for (`"morning"`, `"afternoon"`, `"evening"`, `"night"`) or `"anytime"`.
+  `{name}` becomes the player's name.
+- **Walk quotes:** add a line to `"quotes"`.
+- Names and descriptions of animals, gifts, places, clothes, grades and
+  achievements stay with the rest of their details in the other `data/` files.
+
+In code, `Text.t("profile.title")` gets a line,
+`Text.t("choose_focus.say_hello", {"pet": name})` fills one in,
+`Text.count("stats.days", n)` picks one or many, and `Text.list("quotes")`
+gets a list. The unit tests check that every key the code uses is in the file.
 
 ## Adding content (no code needed)
 
@@ -192,11 +325,11 @@ tests/           headless unit tests and the smoke run
 - **Trade-in rates:** `trade_in` on each rarity in `data/gifts.json`.
 - **Clothes:** `data/cosmetics.json`.
 - **Grades:** `data/grades.json`.
-- **Walk quotes:** `data/quotes.json`.
+- **Achievements:** `data/achievements.json` (hour goals; the gift sets come
+  from the animals and gifts).
 - **Place:** add a stack of layers to `data/biomes.json` (and an icon), and
   give it a level in `data/levels.json`.
 - **Level rewards and XP:** `data/levels.json`.
-- **Home greetings:** `data/greetings.json`.
 
 ## Art and sound status
 

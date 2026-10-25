@@ -12,9 +12,8 @@ var day_cycle: Dictionary = {}
 ## How each kind of weather looks (see Weather).
 var weathers: Dictionary = {}
 var grade_scales: Array = []
-var quotes: Array = []
-## Home screen lines: {morning, afternoon, evening, night, anytime}.
-var greetings: Dictionary = {}
+## What the profile's achievements are (see Achievements.list()).
+var achievements: Dictionary = {}
 ## XP rules and level rewards (data/levels.json).
 var levels: Dictionary = {}
 ## [{id, name}] in the order the customise popup lists them.
@@ -44,8 +43,7 @@ func _init() -> void:
 	var keys: Array = day_cycle.get("keys", [])
 	keys.sort_custom(func(x, y): return float(x["hour"]) < float(y["hour"]))
 	grade_scales = _load("res://data/grades.json").get("scales", [])
-	quotes = _load("res://data/quotes.json").get("quotes", [])
-	greetings = _load("res://data/greetings.json")
+	achievements = _load("res://data/achievements.json")
 	levels = _load("res://data/levels.json")
 	var c := _load("res://data/cosmetics.json")
 	cosmetic_slots = c.get("slots", [])
@@ -73,13 +71,14 @@ func animal(id: String) -> Dictionary:
 func pet_called(p: ProjectData, start_of_sentence: bool = false) -> String:
 	if p.pet_name != "":
 		return p.pet_name
-	return ("Your " if start_of_sentence else "your ") + str(animal(p.animal_id).get("name", "pet")).to_lower()
+	return Text.t("pet.your_kind_start" if start_of_sentence else "pet.your_kind",
+		{"kind": str(animal(p.animal_id).get("name", "pet")).to_lower()})
 
 
 ## "Biscuit · Staffy", or just "Staffy" for a pet without a name.
 func pet_label(p: ProjectData) -> String:
 	var kind := str(animal(p.animal_id).get("name", ""))
-	return kind if p.pet_name == "" else "%s · %s" % [p.pet_name, kind]
+	return kind if p.pet_name == "" else Text.t("pet.name_and_kind", {"name": p.pet_name, "kind": kind})
 
 
 func animal_default_colours(id: String) -> Array[Color]:
@@ -91,10 +90,6 @@ func animal_default_colours(id: String) -> Array[Color]:
 
 func gift(id: String) -> Dictionary:
 	return _gifts_by_id.get(id, {})
-
-
-func gifts_for(animal_id: String) -> Array:
-	return gifts.filter(func(g): return g["animal"] == animal_id)
 
 
 func rarity_colour(rarity_id: String) -> Color:
@@ -153,10 +148,35 @@ func grade(ref: String) -> Dictionary:
 	return {}
 
 
+## Where a grade stands among every grade, best first, for sorting: [band,
+## scale, place]. Each scale's grades are spread over the same five bands
+## (the university classes), so a 9, an A* and a First share the top band;
+## within a band university comes first, then A-Level, then GCSE. Anything
+## without a grade sorts after all of them.
+func grade_rank(ref: String) -> Array:
+	var g := grade(ref)
+	if g.is_empty():
+		return [99, 99, 99]
+	var order := ["uni", "alevel", "gcse"]
+	for scale in grade_scales:
+		if scale["id"] != g["scale"]:
+			continue
+		var place := 0
+		for i in scale["grades"].size():
+			if scale["grades"][i]["id"] == g["id"]:
+				place = i
+		var last := maxi(1, scale["grades"].size() - 1)
+		var band := roundi(4.0 * place / last)
+		var which := order.find(g["scale"])
+		return [band, which if which >= 0 else order.size(), place]
+	return [99, 99, 99]
+
+
 # --- Quotes ------------------------------------------------------------------
 
 ## The same quote for the same key, so a walk keeps its quote across restarts.
 func quote(key: int) -> String:
+	var quotes := Text.list("quotes")
 	if quotes.is_empty():
 		return ""
 	return str(quotes[posmod(key, quotes.size())])
@@ -173,11 +193,11 @@ func greeting(hour: int, username: String, rng: RandomNumberGenerator) -> String
 		part = "afternoon"
 	elif hour >= 17 and hour < 22:
 		part = "evening"
-	var pool: Array = greetings.get(part, []) if rng.randf() < 0.5 else greetings.get("anytime", [])
+	var pool: Array = Text.list("greetings." + part) if rng.randf() < 0.5 else Text.list("greetings.anytime")
 	pool = pool.filter(func(l): return username != "" or not str(l).contains("{name}"))
 	if pool.is_empty():
-		return "Ready when you are"
-	return str(pool[rng.randi_range(0, pool.size() - 1)]).replace("{name}", username)
+		return Text.t("greetings.fallback")
+	return Text.fill(str(pool[rng.randi_range(0, pool.size() - 1)]), {"name": username})
 
 
 # --- Cosmetics ---------------------------------------------------------------

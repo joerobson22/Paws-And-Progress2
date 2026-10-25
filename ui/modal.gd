@@ -13,10 +13,12 @@ static var _stack: Array[Modal] = []
 ## Tapping the backdrop or pressing Escape closes it (with a null result).
 var dismissible := true
 ## The card and the column inside it; fill `body` with content. Anything in
-## `header` stays put above it while a long body scrolls.
+## `header` stays put above it while a long body scrolls, and anything in
+## `footer` stays put below it.
 var card: PanelContainer
 var header: VBoxContainer
 var body: VBoxContainer
+var footer: VBoxContainer
 var _backdrop: ColorRect
 var _scroll: ScrollContainer
 var _max_width := 440.0
@@ -29,6 +31,12 @@ static func is_open() -> bool:
 
 static func top() -> Modal:
 	return _stack.back() if not _stack.is_empty() else null
+
+
+## Closes every popup, newest first.
+static func close_all() -> void:
+	while top():
+		top().close()
 
 
 ## Opens an empty popup; fill `body` and it animates in on the next frame.
@@ -48,13 +56,13 @@ static func open(max_width: float = 440.0, can_dismiss: bool = true, padding: in
 
 ## A yes/no question. Closes with true or false. `tone` styles the yes
 ## button: "danger" (red), "success" (green) or "primary".
-static func confirm(title: String, text: String, yes: String, tone: String = "danger", no: String = "Cancel") -> Modal:
+static func confirm(title: String, text: String, yes: String, tone: String = "danger", no: String = "") -> Modal:
 	var m := open(400)
 	m.body.add_child(m.heading(title))
 	var p := UI.para(text, 16)
 	m.body.add_child(p)
 	var row := UI.hbox(10)
-	var cancel := UI.button(no, m.close.bind(false), "quiet")
+	var cancel := UI.button(no if no != "" else Text.t("common.cancel"), m.close.bind(false), "quiet")
 	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(cancel)
 	var ok := UI.button(yes, m.close.bind(true), tone)
@@ -76,10 +84,10 @@ static func prompt(title: String, value: String, placeholder: String = "", max_l
 	edit.select_all_on_focus = true
 	m.body.add_child(edit)
 	var row := UI.hbox(10)
-	var cancel := UI.button("Cancel", m.close.bind(null), "quiet")
+	var cancel := UI.button(Text.t("common.cancel"), m.close.bind(null), "quiet")
 	cancel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(cancel)
-	var save := UI.button("Save", func(): m.close(edit.text.strip_edges()), "accent")
+	var save := UI.button(Text.t("common.save"), func(): m.close(edit.text.strip_edges()), "accent")
 	save.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(save)
 	m.body.add_child(row)
@@ -116,14 +124,13 @@ static func colour(title: String, start: Color, on_change: Callable, swatches: A
 		for c in swatches:
 			var dot := Button.new()
 			dot.custom_minimum_size = Vector2(34, 34)
-			dot.tooltip_text = "#" + (c as Color).to_html(false)
 			UI.style_button(dot, c, UI.INK, 999)
 			dot.pressed.connect(func():
 				picker.color = c
 				on_change.call(c))
 			flow.add_child(dot)
 		m.body.add_child(flow)
-	m.body.add_child(UI.button("Done", func(): m.close(picker.color), "accent"))
+	m.body.add_child(UI.button(Text.t("common.done"), func(): m.close(picker.color), "accent"))
 	return m
 
 
@@ -140,7 +147,7 @@ func heading_row(text: String) -> HBoxContainer:
 	var h := heading(text)
 	h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(h)
-	var x := UI.round_button("close", "Close", close.bind(null), UI.SURFACE_SOFT, UI.INK, 36, false)
+	var x := UI.round_button("close", Text.t("common.close"), close.bind(null), UI.SURFACE_SOFT, UI.INK, 36, false)
 	x.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(x)
 	return row
@@ -155,6 +162,7 @@ func close(result: Variant = null) -> void:
 	# Let taps straight through while it fades away.
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UI.ignore_mouse(card)
 	var t := Motion.tween(self, "modal")
 	t.set_parallel(true)
@@ -199,6 +207,11 @@ func _build(padding: int) -> void:
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(body)
 	body.minimum_size_changed.connect(_fit)
+	footer = UI.vbox(16)
+	footer.visible = false
+	footer.child_entered_tree.connect(func(_child): footer.visible = true)
+	footer.minimum_size_changed.connect(_fit)
+	column.add_child(footer)
 	resized.connect(_fit)
 
 
@@ -212,8 +225,18 @@ func _fit() -> void:
 	_scroll.custom_minimum_size.x = w
 	body.custom_minimum_size.x = w
 	header.custom_minimum_size.x = w
+	footer.custom_minimum_size.x = w
+	_scroll.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, room())
+
+
+## The most height the body gets before it scrolls: the screen less the
+## card's padding, the header and the footer. Something no taller than this
+## never makes the body scroll, so it can scroll inside itself instead.
+func room() -> float:
+	var pad := card.get_theme_stylebox("panel").get_minimum_size()
 	var above := header.get_combined_minimum_size().y + 16.0 if header.visible else 0.0
-	_scroll.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, maxf(80.0, view.y - 48.0 - pad.y - above))
+	var below := footer.get_combined_minimum_size().y + 16.0 if footer.visible else 0.0
+	return maxf(80.0, get_viewport_rect().size.y - 48.0 - pad.y - above - below)
 
 
 ## Scrolls the body so `target` (somewhere inside it) sits in the middle,

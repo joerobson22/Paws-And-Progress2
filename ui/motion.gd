@@ -13,6 +13,11 @@ const NORMAL := 0.34
 const SLOW := 0.6
 
 
+## While true, animations jump straight to where they end: the screen is
+## being rebuilt in new colours and should look exactly as it did.
+static var still := false
+
+
 ## True when the player asked for less motion: animations run quicker and
 ## skip their bounces.
 static func reduced() -> bool:
@@ -23,6 +28,8 @@ static func reduced() -> bool:
 
 ## How long an animation of `seconds` should really take.
 static func time(seconds: float) -> float:
+	if still:
+		return 0.0
 	return seconds * (0.5 if reduced() else 1.0)
 
 
@@ -78,7 +85,7 @@ static func pop(item: CanvasItem, amount: float = 0.18, seconds: float = 0.38) -
 		(item as Control).pivot_offset = (item as Control).size * 0.5
 	var rest: Vector2 = item.get("scale")
 	var t := tween(item, "scale")
-	if reduced():
+	if reduced() or still:
 		t.tween_property(item, "scale", rest, 0.01)
 		return t
 	t.tween_property(item, "scale", rest * (1.0 + amount), seconds * 0.45)

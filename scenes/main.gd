@@ -2,10 +2,13 @@ extends Control
 ## App shell. Five panes are laid out like a plus sign with the focus screen
 ## in the middle: gifts to the left, completed projects to the right, your
 ## profile above and stats below. Swipe between them, use the arrow keys
-## (Esc comes back to the middle), or tap a dot on the minimap. Every pane is built once and kept, so each one is as
-## you left it when you come back. Full-screen flows (choosing a focus, the
-## walk, the end of a walk) open over everything through a growing circle.
-## Screens ask to move with App.go().
+## (Esc comes back to the middle), click the big faint arrows at the edges
+## (computers), or open the minimap (bottom left on computers, bottom middle
+## on phones) and pick one. Every pane is built once and kept, so each one
+## is as you left it when you come back. Full-screen flows (choosing a focus, the walk, the end of a
+## walk) open over everything through a growing circle.
+## Screens ask to move with App.go(). A new save slot stays on the profile
+## screen, with no map or arrows, until its profile is filled in.
 
 const PANES := {
 	"focus": [Vector2i(0, 0), "res://scenes/panes/focus.gd"],
@@ -24,11 +27,18 @@ const FLOWS := {
 ## (phones) get a smaller design size so text stays its intended size.
 const DESIGN_SHORT_SIDE := 720.0
 const PHONE_MIN_SHORT_SIDE := 360.0
+## Computers: the window's short side in design units, whatever its size.
+const DESKTOP_SHORT_SIDE := 600.0
+const MIN_DESKTOP_SCALE := 0.75
+## The minimap's gap from the bottom (and the left, on computers).
+const MAP_INSET := 18.0
 ## A drag becomes a swipe once it moves this far...
 const SWIPE_START := 16.0
 ## ...and goes through when let go past this much of the screen, or flicked.
 const SWIPE_COMMIT := 0.22
 const FLICK_SPEED := 1.6  # screens per second
+## How long the old colours take to fade into the new ones.
+const PALETTE_FADE := 0.8
 
 var _world := Control.new()
 var _panes := {}  # Vector2i -> Pane
@@ -38,8 +48,16 @@ var _moving := false
 var _flow_layer := Control.new()
 var _flows: Array[CircleReveal] = []
 var _modal_layer := Control.new()
+## Holds the picture of the old colours while it fades out.
+var _fade_layer := Control.new()
+var _fading := 0
 var _minimap: Minimap
+var _arrows := {}  # Vector2i direction -> NavArrow
 var _bg := ColorRect.new()
+## The window settings last put in place, so only a change to them moves it.
+var _window_applied := ""
+## True while a new save slot keeps you on the profile screen.
+var _locked := false
 
 var _press := false
 var _press_pos := Vector2.ZERO
@@ -53,6 +71,7 @@ var _synthetic := false
 
 
 func _ready() -> void:
+	_apply_window()
 	_fit_design_size()
 	UI.set_dark(UI.wants_dark(str(App.state.settings.get("theme", "auto"))))
 	theme = UI.build_theme()
@@ -65,24 +84,39 @@ func _ready() -> void:
 
 	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_world)
+	if App.setup_pending():
+		_at = PANES["profile"][0]
 	for pane_name in PANES:
 		var cell: Vector2i = PANES[pane_name][0]
 		var pane: Pane = load(PANES[pane_name][1]).new()
 		pane.name = pane_name.capitalize()
 		pane.visible = cell == _at
+		pane.arrows = _ways_from(cell)
 		_world.add_child(pane)
 		_panes[cell] = pane
 		_names[cell] = pane_name
 
+	add_child(Cursor.new())
+	add_child(SmoothScroll.new())
+	for dir in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+		var arrow := NavArrow.new(dir)
+		arrow.pressed.connect(func(d: Vector2i): _go_cell(_at + d))
+		add_child(arrow)
+		_arrows[dir] = arrow
 	_minimap = Minimap.new()
+	_minimap.hover_grow = not App.phone_layout()
 	_minimap.cells = _names
 	_minimap.picked.connect(_go_cell)
 	add_child(_minimap)
 
-	for layer in [_flow_layer, _modal_layer]:
+	for layer in [_fade_layer, _flow_layer, _modal_layer]:
 		layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(layer)
+	# Flows and popups always draw on top, even over things lifted above
+	# the fade between light and dark.
+	_flow_layer.z_index = 2
+	_modal_layer.z_index = 2
 	Modal.layer = _modal_layer
 
 	App.navigate.connect(_open)
@@ -91,6 +125,7 @@ func _ready() -> void:
 	_layout()
 	_panes[_at].show_pane()
 	_minimap.show_cell(_at, true)
+	_sync_lock(true)
 
 	# Closing the app ends a walk; say so the next time it opens.
 	if not App.ended_walk.is_empty():
@@ -100,23 +135,40 @@ func _ready() -> void:
 		_maybe_ask_location()
 
 
-## Phones report a short side of ~390 points, so a fixed 720 design size
-## would draw everything at half size. Use the window's own size in points
-## there, and the 720 design size (scaled up) on bigger screens.
+## On phones the design size is the screen's own size in points, so text
+## stays its intended size; the debug phone view does the same with a
+## phone's width. On computers everything scales with the window: its short
+## side is always DESKTOP_SHORT_SIDE design units, so a bigger window draws
+## everything bigger (never below MIN_DESKTOP_SCALE).
 func _fit_design_size() -> void:
 	var window := get_window()
-	var points := Vector2(DisplayServer.window_get_size()) / _screen_scale()
-	var side := clampf(minf(points.x, points.y), PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
+	var side: float
+	if App.debug_phone_view():
+		side = float(Display.PHONE.x)
+	elif OS.has_feature("mobile"):
+		var points := Vector2(DisplayServer.window_get_size()) / Display.screen_scale()
+		side = clampf(minf(points.x, points.y), PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
+	else:
+		var window_size := Vector2(DisplayServer.window_get_size())
+		var short := maxf(1.0, minf(window_size.x, window_size.y))
+		side = maxf(short / maxf(short / DESKTOP_SHORT_SIDE, MIN_DESKTOP_SCALE), PHONE_MIN_SHORT_SIDE)
 	var target := Vector2i(roundi(side), roundi(side))
 	if window.content_scale_size != target:
 		window.content_scale_size = target
 
 
-## Physical pixels per point: Retina/iOS report it directly; Android via DPI.
-static func _screen_scale() -> float:
-	if OS.get_name() == "Android":
-		return maxf(1.0, DisplayServer.screen_get_dpi() / 160.0)
-	return maxf(1.0, DisplayServer.screen_get_scale())
+## Puts the window settings (and the debug phone view) in place, if they
+## changed since last time.
+func _apply_window() -> void:
+	var s := App.state.settings
+	var want := "%s|%s|%s" % [s.get("window_mode", ""), s.get("resolution", ""), App.debug_phone_view()]
+	if want == _window_applied:
+		return
+	_window_applied = want
+	Display.apply(get_window())
+	if _minimap:
+		_minimap.hover_grow = not App.phone_layout()
+		_layout()
 
 
 func _layout() -> void:
@@ -127,22 +179,54 @@ func _layout() -> void:
 	if not _moving and not _swiping:
 		_world.position = -Vector2(_at) * size
 	var insets := UI.safe_insets(self)
-	_minimap.position = Vector2(roundf((size.x - _minimap.size.x) * 0.5), size.y - _minimap.size.y - 18.0 - insets["bottom"])
+	var floor_y: float = size.y - MAP_INSET - insets["bottom"]
+	if App.phone_layout():
+		# Phones: in the middle (of the part clear of the notch), for either thumb.
+		_minimap.dock(Vector2((insets["left"] + size.x - insets["right"]) * 0.5, floor_y), true)
+	else:
+		_minimap.dock(Vector2(MAP_INSET + insets["left"], floor_y))
+	for dir in _arrows:
+		_arrows[dir].dock(size, insets)
+
+
+## The ways on from `cell`: every way from the middle, and back to the
+## middle from a screen at the side.
+func _ways_from(cell: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for dir in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+		if PANES.values().any(func(p): return p[0] == cell + dir) and (cell == Vector2i.ZERO or cell + dir == Vector2i.ZERO):
+			out.append(dir)
+	return out
+
+
+## The edge arrows show (computers only) once you've arrived on a screen,
+## and hide while moving, during walks and while a popup is up.
+func _process(_delta: float) -> void:
+	var show := not App.phone_layout() and not _moving and not _swiping \
+		and _flows.is_empty() and not Modal.is_open() and not _locked
+	var ways: Array[Vector2i] = _ways_from(_at) if show else ([] as Array[Vector2i])
+	for dir in _arrows:
+		_arrows[dir].appear(ways.has(dir))
 
 
 # --- Light and dark ----------------------------------------------------------
 
 func _on_state_changed() -> void:
+	_apply_window()
+	_fit_design_size()
+	_sync_lock()
 	var want := UI.wants_dark(str(App.state.settings.get("theme", "auto")))
 	if want != UI.dark:
 		_switch_palette(want)
 
 
-## Swaps light and dark: everything on screen is rebuilt in the new colours
-## under a snapshot of the old ones, which then fades away.
+## Swaps light and dark without anything moving: the screen on show is
+## rebuilt in the new colours exactly as it was (same layout, scroll and
+## text, no entry animations), under a picture of the old colours that
+## then fades away. What a pane keeps through a rebuild (the orb, the
+## toggle) is lifted above the picture so it carries on moving.
 func _switch_palette(dark: bool) -> void:
-	# A picture of the screen as it was, to fade away over the new colours
-	# (there's no picture to take when running without a display).
+	# There's no picture to take when running without a display.
 	var snapshot: Image = null
 	if DisplayServer.get_name() != "headless":
 		snapshot = get_viewport().get_texture().get_image()
@@ -150,24 +234,68 @@ func _switch_palette(dark: bool) -> void:
 	theme = UI.build_theme()
 	_bg.color = UI.BG
 	_minimap.queue_redraw()
+	for dir in _arrows:
+		_arrows[dir].refresh()
+	var lifted: Array[Node] = []
+	Motion.still = true
 	for cell in _panes:
 		var pane: Pane = _panes[cell]
 		if pane.shown:
 			pane.rebuild()
+			lifted.append_array(pane.keeps())
 		else:
 			pane.mark_dirty()
 	if snapshot == null or snapshot.is_empty():
+		_settle.call_deferred()
 		return
 	var cover := TextureRect.new()
 	cover.texture = ImageTexture.create_from_image(snapshot)
 	cover.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cover.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	cover.stretch_mode = TextureRect.STRETCH_SCALE
 	cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_modal_layer.add_child(cover)
-	Motion.fade(cover, 0.0, Motion.SLOW).tween_callback(cover.queue_free)
+	_fade_layer.add_child(cover)
+	_fading += 1
+	for node in lifted:
+		(node as CanvasItem).z_index = 1
+	await _settle()
+	Motion.fade(cover, 0.0, PALETTE_FADE).tween_callback(func():
+		cover.queue_free()
+		_fading -= 1
+		if _fading == 0:
+			for node in lifted:
+				if is_instance_valid(node):
+					(node as CanvasItem).z_index = 0)
+
+
+## Some screens start animations a frame after they're built, so animations
+## stay still until then.
+func _settle() -> void:
+	await get_tree().process_frame
+	Motion.still = false
 
 
 # --- Navigation --------------------------------------------------------------
+
+## Hides the map while a new save slot keeps you on the profile screen
+## (the arrows hide in _process), and brings it back after.
+func _sync_lock(instant: bool = false) -> void:
+	var locked := App.setup_pending()
+	if locked == _locked:
+		return
+	_locked = locked
+	_minimap.shrink(true)
+	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE if locked else Control.MOUSE_FILTER_STOP
+	if instant:
+		_minimap.modulate.a = 0.0 if locked else 1.0
+	else:
+		Motion.fade(_minimap, 0.0 if locked else 1.0, Motion.FAST)
+
+
+## True if you can go to `cell`: anywhere, unless a new save slot is
+## keeping you on the profile screen.
+func _can_go(cell: Vector2i) -> bool:
+	return _panes.has(cell) and (not _locked or cell == PANES["profile"][0])
 
 func _open(screen: String, params: Dictionary) -> void:
 	if PANES.has(screen):
@@ -184,7 +312,7 @@ func _open(screen: String, params: Dictionary) -> void:
 ## Slides to a pane. Panes off to the side only connect to the middle, so
 ## going from one side to another passes through the focus screen.
 func _go_cell(cell: Vector2i) -> void:
-	if not _panes.has(cell) or _moving or cell == _at:
+	if not _can_go(cell) or _moving or cell == _at:
 		return
 	if _at != Vector2i.ZERO and cell != Vector2i.ZERO:
 		await _slide_to(Vector2i.ZERO, Motion.NORMAL * 0.75)
@@ -225,6 +353,7 @@ func _open_flow(screen: String, params: Dictionary, instant: bool = false) -> vo
 	_flow_layer.add_child(reveal)
 	var below := _flows.duplicate()
 	_flows.append(reveal)
+	_minimap.shrink(true)
 	Motion.fade(_minimap, 0.0, Motion.FAST)
 	var t := reveal.open(instant)
 	if t:
@@ -271,9 +400,8 @@ func _maybe_ask_location() -> void:
 	await get_tree().create_timer(1.5).timeout
 	if Outdoors.asked() or not _flows.is_empty() or Modal.is_open() or _at != Vector2i.ZERO:
 		return
-	var m := Modal.confirm("Bring your weather along?",
-		"Your walks can follow the real sunrise, sunset and weather where you are. Your rough location comes from your internet connection and is only used to look those up. You can change this in settings.",
-		"Allow", "accent", "Not now")
+	var m := Modal.confirm(Text.t("weather_prompt.title"), Text.t("weather_prompt.body"),
+		Text.t("weather_prompt.allow"), "accent", Text.t("weather_prompt.not_now"))
 	Outdoors.set_enabled(await m.closed == true)
 
 
@@ -337,7 +465,7 @@ func _input(e: InputEvent) -> void:
 				step = Vector2i.UP
 			KEY_DOWN:
 				step = Vector2i.DOWN
-		if step != Vector2i.ZERO and _panes.has(_at + step):
+		if step != Vector2i.ZERO and _can_go(_at + step):
 			get_viewport().set_input_as_handled()
 			_go_cell(_at + step)
 
@@ -354,7 +482,7 @@ func _try_swipe(pos: Vector2) -> void:
 	# The finger drags the screen: moving right brings in the pane on the left.
 	var step := Vector2i(-signi(roundi(along)), 0) if horizontal else Vector2i(0, -signi(roundi(along)))
 	var target := _at + step
-	if not _panes.has(target) or _scroll_blocks(pos, horizontal, along):
+	if not _can_go(target) or _scroll_blocks(pos, horizontal, along):
 		# Not a swipe: leave this drag to whatever's under the finger.
 		_press = false
 		return

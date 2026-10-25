@@ -63,6 +63,8 @@ const SERIES := [
 
 const RADIUS := 18
 const WIDE_BREAKPOINT := 900.0
+## The side of a screen's icon tile (icon_tile).
+const ICON_TILE := 44
 
 static var _fonts: Dictionary = {}
 
@@ -143,15 +145,6 @@ static func build_theme() -> Theme:
 		t.set_stylebox("grabber", bar, grab)
 		t.set_stylebox("grabber_highlight", bar, box(Color(INK, 0.3), Color.TRANSPARENT, 99))
 		t.set_stylebox("grabber_pressed", bar, box(Color(INK, 0.4), Color.TRANSPARENT, 99))
-
-	var tip := box(INK, Color.TRANSPARENT, 10)
-	tip.content_margin_left = 10
-	tip.content_margin_right = 10
-	tip.content_margin_top = 6
-	tip.content_margin_bottom = 6
-	t.set_stylebox("panel", "TooltipPanel", tip)
-	t.set_color("font_color", "TooltipLabel", BG)
-	t.set_font_size("font_size", "TooltipLabel", 13)
 	return t
 
 
@@ -312,17 +305,92 @@ static func trimmed(text: String, size: int = 15, colour: Color = INK, display: 
 	return l
 
 
-## A pane's title with an optional muted line underneath. Returns the row so
-## panes can put something on the right (like the streak).
-static func title_row(title: String, subtitle: String = "") -> HBoxContainer:
-	var row := hbox(12)
-	var words := vbox(0)
+## A pane's title, with its icon from the app map in a green tile to the
+## left (the same look as the map's tile for where you are). Returns the row
+## so panes can put something on the right (like the settings gear).
+static func title_row(title: String, icon: String = "") -> HBoxContainer:
+	var row := hbox(14)
+	if icon != "":
+		row.add_child(icon_tile(icon))
+	var words := label(title, 32, INK, true, 600)
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_child(label(title, 32, INK, true, 600))
-	if subtitle != "":
-		words.add_child(label(subtitle, 14, INK_SOFT, false, 700))
+	words.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(words)
 	return row
+
+
+## A screen's app-map icon in a green tile, as beside its title.
+static func icon_tile(icon: String) -> PanelContainer:
+	var tile := panel(ACCENT, 14, 0)
+	tile.custom_minimum_size = Vector2(ICON_TILE, ICON_TILE)
+	tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.add_child(icon_rect(icon, 24, ON_COLOUR))
+	return tile
+
+
+## A panel's own scrolling area, the one part of a screen that scrolls (the
+## screens themselves never do). Scrolls down, or sideways with `sideways`,
+## and fills the room it's given.
+static func scroll_area(sideways: bool = false) -> ScrollContainer:
+	var sc := ScrollContainer.new()
+	if sideways:
+		sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		sc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	else:
+		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	return sc
+
+
+## A scroll_area() for a list of cards that lets their shadows show: the
+## scrolling part reaches `room` past the holder's edges (into the screen's
+## gutter), with the same room inside it round `content`, so the cards line
+## up with everything above them yet aren't cut off flat at the sides. Put
+## the returned holder in the layout; `content` goes inside it, and the
+## ScrollContainer is the holder's only child.
+static func shadow_scroll(content: Control, room: int = 16) -> Control:
+	var holder := Control.new()
+	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sc := scroll_area()
+	sc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sc.offset_left = -room
+	sc.offset_top = -room
+	sc.offset_right = room
+	sc.offset_bottom = room
+	holder.add_child(sc)
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for side in ["left", "top", "right", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, room)
+	sc.add_child(margin)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(content)
+	# The scrollbar takes its width from the room on the right, not from the
+	# cards, so they keep lining up with what's above.
+	var bar := sc.get_v_scroll_bar()
+	var fit := func():
+		var used := int(bar.get_combined_minimum_size().x) if bar.visible else 0
+		margin.add_theme_constant_override("margin_right", maxi(0, room - used))
+	bar.visibility_changed.connect(fit)
+	fit.call()
+	return holder
+
+
+## Keeps `content` (a MarginContainer inside `sc`) clear of `sc`'s scrollbar:
+## while the bar shows, `gap` more room on its side (the right for a list
+## that scrolls down, the bottom for a sideways strip), so nothing touches
+## it; none when everything fits.
+static func clear_of_bar(sc: ScrollContainer, content: MarginContainer, gap: int = 10) -> void:
+	var sideways := sc.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED
+	var bar: ScrollBar = sc.get_h_scroll_bar() if sideways else sc.get_v_scroll_bar()
+	var side := "margin_bottom" if sideways else "margin_right"
+	var fit := func():
+		content.add_theme_constant_override(side, gap if bar.visible else 0)
+	bar.visibility_changed.connect(fit)
+	fit.call()
 
 
 # --- Buttons -----------------------------------------------------------------
@@ -357,7 +425,7 @@ static func button(text: String, on_press: Callable, kind: String = "primary") -
 static func round_button(icon: String, tip: String, on_press: Callable, fill: Color = SURFACE,
 		ink: Color = INK, diameter: int = 52, shadow: bool = true) -> Button:
 	var b := Button.new()
-	b.tooltip_text = tip
+	b.accessibility_name = tip
 	b.custom_minimum_size = Vector2(diameter, diameter)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -370,36 +438,6 @@ static func round_button(icon: String, tip: String, on_press: Callable, fill: Co
 		sb.set_content_margin_all(0)
 	if on_press.is_valid():
 		b.pressed.connect(on_press)
-	return b
-
-
-## A rounded-square icon button; `knockout` draws the icon in the page colour
-## so it looks cut out of the button.
-static func square_button(icon: String, tip: String, on_press: Callable, fill: Color = SURFACE,
-		ink: Color = INK, side: int = 48, knockout: Color = Color.TRANSPARENT) -> Button:
-	var b := round_button(icon, tip, on_press, fill, ink, side)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
-		var sb: StyleBoxFlat = b.get_theme_stylebox(state)
-		sb.set_corner_radius_all(16)
-	b.icon = Icons.texture(icon, int(side * 0.5), knockout if knockout.a > 0.0 else Color.WHITE, 3.0)
-	if knockout.a > 0.0:
-		for state in ["icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_hover_pressed_color", "icon_focus_color"]:
-			b.add_theme_color_override(state, Color.WHITE)
-	return b
-
-
-## The see-through "‹ Back" button at the top left of full-screen flows.
-static func back_button(on_press: Callable, text: String = "Back") -> Button:
-	var b := button(text, on_press, "ghost")
-	b.icon = Icons.texture("back", 20, Color.WHITE, 3.0)
-	b.add_theme_font_size_override("font_size", 18)
-	b.add_theme_font_override("font", font(false, 900))
-	b.add_theme_constant_override("h_separation", 4)
-	b.custom_minimum_size = Vector2(0, 48)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
-		var sb: StyleBoxFlat = b.get_theme_stylebox(state)
-		sb.content_margin_left = 8
-		sb.content_margin_right = 14
 	return b
 
 
@@ -616,5 +654,5 @@ static func grade_badge(grade_ref: String, diameter: int = 44) -> Control:
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	p.add_child(l)
-	p.tooltip_text = "%s %s" % [g.get("scale_name", ""), g.get("name", "")]
+	p.accessibility_name = Text.t("project.grade_name", {"scale": g.get("scale_name", ""), "grade": g.get("name", "")})
 	return p

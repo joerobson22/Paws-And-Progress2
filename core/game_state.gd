@@ -38,6 +38,8 @@ static func default_profile() -> Dictionary:
 		"legacy_total_seconds": 0,
 		"legacy_longest_seconds": 0,
 		"legacy_best_week_seconds": 0,
+		# A new save slot asks for a name and where you study first.
+		"setup_pending": false,
 	}
 
 
