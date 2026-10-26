@@ -1,11 +1,19 @@
 class_name AnimalView
 extends Node2D
-## Placeholder animal drawn from simple shapes, recoloured per part.
-## The origin is where its feet touch the ground; it faces right.
-## Replace with Joe's sprite rig per animal (Content.animal(id).sprite_dir) later;
-## keep the same properties so the screens using it don't need to change.
+## An animal: Joe's own art when there is some, else a placeholder drawn from
+## simple shapes, recoloured per part. The origin is where its feet touch the
+## ground; it faces right.
+## Art is a scene at <sprite_dir>animal.tscn (see art/README.md): a Node2D with
+## a Sprite2D per limb (head, body, each leg, tail...) that the AnimationPlayer
+## moves separately, painted in pure red, green and blue: a shader maps those
+## to the animal's colours (first, second and third in animals.json "parts").
+## Optional Marker2Ds "Neck" (where the lead clips on) and "Mouth" (where a
+## gift is held), and an AnimationPlayer with a looping "walk" and optionally
+## "idle". Animals without a scene keep the placeholder, so art can arrive
+## one animal at a time.
 
 ## Where each shape's mouth is, so it can carry a gift.
+const SHADER := "res://art/animal_colours.gdshader"
 const MOUTHS := {
 	"dog": Vector2(70, -54), "bear": Vector2(66, -52), "cat": Vector2(50, -46),
 	"rabbit": Vector2(34, -42), "snail": Vector2(50, -14), "bird": Vector2(36, -38),
@@ -14,16 +22,24 @@ const MOUTHS := {
 @export var animal_id: String = "staffy":
 	set(v):
 		animal_id = v
+		_load_rig()
 		queue_redraw()
-@export var walking: bool = false
+@export var walking: bool = false:
+	set(v):
+		walking = v
+		_animate()
 ## A livelier gait for fetching: quicker steps, bigger strides and bounce.
-var running := false
+var running := false:
+	set(v):
+		running = v
+		_animate()
 ## Multiplier on top of the animal's own walk speed.
 @export var speed: float = 1.0
 
 var colours: Array[Color] = []:
 	set(v):
 		colours = v
+		_tint_rig()
 		queue_redraw()
 ## How far below the water it is, in its own pixels (0 on dry land), and the
 ## water's colour: the part under the surface is hidden behind it.
@@ -31,12 +47,16 @@ var submerged := 0.0:
 	set(v):
 		submerged = v
 		queue_redraw()
+		if _overlay:
+			_overlay.queue_redraw()
 var water_colour := Color("#7fb2c9")
 ## A gift id to carry in its mouth, or "".
 var held_gift := "":
 	set(v):
 		held_gift = v
 		queue_redraw()
+		if _overlay:
+			_overlay.queue_redraw()
 ## 0 normally, up to 1 when it's dejected: head, ears and tail hang, the
 ## eyes droop and it sighs now and then.
 var sad := 0.0:
@@ -46,9 +66,111 @@ var sad := 0.0:
 
 var _phase: float = 0.0
 var _sigh: float = 0.0
+## The art scene's root and its animations, if this animal has art.
+var _rig: Node2D
+var _player: AnimationPlayer
+## Draws the water and the held gift over the art.
+var _overlay: _Overlay
+var _material: ShaderMaterial
+
+
+## The scene holding an animal's art, or "" if it has none yet.
+static func rig_path(id: String) -> String:
+	var dir := str(Content.animal(id).get("sprite_dir", ""))
+	var path := dir.path_join("animal.tscn")
+	return path if dir != "" and ResourceLoader.exists(path) else ""
+
+
+func has_art() -> bool:
+	return _rig != null
+
+
+## Swaps the placeholder for `scene`'s art (or back, for null).
+func set_rig(scene: PackedScene) -> void:
+	if _rig:
+		_rig.free()
+		_rig = null
+		_player = null
+		_material = null
+	if _overlay:
+		_overlay.free()
+		_overlay = null
+	if scene != null:
+		_rig = scene.instantiate() as Node2D
+	if _rig == null:
+		queue_redraw()
+		return
+	var size_scale := float(Content.animal(animal_id).get("size", 1.0))
+	_rig.scale = Vector2(size_scale, size_scale)
+	add_child(_rig)
+	_overlay = _Overlay.new()
+	_overlay.view = self
+	add_child(_overlay)
+	_player = _rig.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	_tint_rig()
+	_animate()
+	queue_redraw()
+
+
+func _load_rig() -> void:
+	var path := rig_path(animal_id)
+	set_rig(load(path) as PackedScene if path != "" else null)
+
+
+## Every limb (Sprite2D) in the art gets the colour-mapping shader, which
+## turns its red, green and blue paint into the animal's three colours.
+func _tint_rig() -> void:
+	if _rig == null:
+		return
+	if _material == null:
+		_material = ShaderMaterial.new()
+		_material.shader = load(SHADER) as Shader
+		_paint_limbs(_rig)
+	var parts: Array = Content.animal(animal_id).get("parts", [])
+	for i in 3:
+		var name: String = parts[i] if i < parts.size() else ""
+		_material.set_shader_parameter(["colour_r", "colour_g", "colour_b"][i], _part(name, Color.WHITE))
+
+
+func _paint_limbs(node: Node) -> void:
+	for child in node.get_children():
+		if child is Sprite2D or child is AnimatedSprite2D:
+			(child as CanvasItem).material = _material
+		_paint_limbs(child)
+
+
+func _animate() -> void:
+	if _player == null:
+		return
+	var anim := "walk" if walking else "idle"
+	if not _player.has_animation(anim):
+		if walking or not _player.has_animation("walk"):
+			return
+		_player.stop()
+		return
+	_player.speed_scale = _anim_speed()
+	if _player.current_animation != anim or not _player.is_playing():
+		_player.play(anim)
+
+
+func _anim_speed() -> float:
+	return (0.6 + float(Content.animal(animal_id).get("walk_speed", 1.0))) * speed * (2.4 if running else 1.0)
+
+
+## A point marked in the art (a Marker2D by that name), in this node's space.
+func _marker(marker: String, fallback: Vector2) -> Vector2:
+	var node := _rig.find_child(marker, true, false) as Node2D if _rig else null
+	if node == null:
+		return fallback * float(Content.animal(animal_id).get("size", 1.0))
+	if not node.is_inside_tree() or not is_inside_tree():
+		return _rig.transform * node.position
+	return global_transform.affine_inverse() * node.global_position
 
 
 func _process(delta: float) -> void:
+	if _rig:
+		_animate_rig(delta)
+		return
 	if walking:
 		var walk_speed := float(Content.animal(animal_id).get("walk_speed", 1.0))
 		_phase += delta * TAU * (0.6 + walk_speed) * speed * (2.4 if running else 1.0)
@@ -56,6 +178,14 @@ func _process(delta: float) -> void:
 	if sad > 0.0:
 		_sigh += delta
 		queue_redraw()
+
+
+func _animate_rig(delta: float) -> void:
+	if _player and _player.has_animation("walk"):
+		_player.speed_scale = _anim_speed()
+	if sad > 0.0:
+		_sigh += delta
+		_rig.position = Vector2(2, 3) * sad + Vector2(0, (sin(_sigh * 1.3) * 0.5 + 0.5) * sad)
 
 
 ## How far the head hangs, in the animal's own pixels.
@@ -94,6 +224,8 @@ func _part(part: String, fallback: Color) -> Color:
 
 
 func _draw() -> void:
+	if _rig:
+		return
 	var data := Content.animal(animal_id)
 	var s := float(data.get("size", 1.0))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(s, s))
@@ -110,16 +242,24 @@ func _draw() -> void:
 			_draw_bear()
 		_:
 			_draw_dog()
+	_draw_over(self, str(data.get("shape", "dog")))
+
+
+## The water over the legs and the gift in the mouth, on whichever node
+## draws last.
+func _draw_over(canvas: CanvasItem, shape: String) -> void:
 	if submerged > 0.5:
-		draw_rect(Rect2(-90, -submerged, 190, submerged + 10), Color(water_colour, 0.92))
-		draw_line(Vector2(-60, -submerged), Vector2(80, -submerged), Color(1, 1, 1, 0.55), 2.0, true)
+		canvas.draw_rect(Rect2(-90, -submerged, 190, submerged + 10), Color(water_colour, 0.92))
+		canvas.draw_line(Vector2(-60, -submerged), Vector2(80, -submerged), Color(1, 1, 1, 0.55), 2.0, true)
 	if held_gift != "":
-		_draw_held_gift(str(data.get("shape", "dog")))
+		_draw_held_gift(canvas, shape)
 
 
 ## Where a lead clips on, in this node's own space: the neck, just behind
 ## the head, rising and falling with each step.
 func neck() -> Vector2:
+	if _rig:
+		return _marker("Neck", Vector2(34, -55))
 	var data := Content.animal(animal_id)
 	var lift := 0.0
 	var at := Vector2(34, -55)
@@ -144,18 +284,33 @@ func neck() -> Vector2:
 
 ## The gift's position in this node's own space (for glows behind it).
 func mouth() -> Vector2:
+	if _rig:
+		return _marker("Mouth", MOUTHS.get(str(Content.animal(animal_id).get("shape", "dog")), Vector2(60, -50)))
 	var s := float(Content.animal(animal_id).get("size", 1.0))
 	return MOUTHS.get(str(Content.animal(animal_id).get("shape", "dog")), Vector2(60, -50)) * s
 
 
-func _draw_held_gift(shape: String) -> void:
+func _draw_held_gift(canvas: CanvasItem, shape: String) -> void:
 	var g := Content.gift(held_gift)
 	var colour := Content.rarity_colour(g.get("rarity", "common"))
-	var at: Vector2 = MOUTHS.get(shape, Vector2(60, -50))
-	draw_circle(at, 15, Color(colour, 0.22), true, -1.0, true)
-	draw_circle(at, 11, UI.SURFACE, true, -1.0, true)
-	var icon := Icons.texture("gift", 16, colour)
-	draw_texture(icon, at - Vector2(8, 8))
+	var at: Vector2 = _marker("Mouth", MOUTHS.get(shape, Vector2(60, -50))) / float(Content.animal(animal_id).get("size", 1.0)) if _rig else MOUTHS.get(shape, Vector2(60, -50))
+	canvas.draw_circle(at, 15, Color(colour, 0.22), true, -1.0, true)
+	canvas.draw_circle(at, 11, UI.SURFACE, true, -1.0, true)
+	var art := GiftArt.texture_for(held_gift)
+	if art:
+		canvas.draw_texture_rect(art, Rect2(at - Vector2(9, 9), Vector2(18, 18)), false)
+	else:
+		canvas.draw_texture(Icons.texture("gift", 16, colour), at - Vector2(8, 8))
+
+
+## Sits above the art so the water and the gift in the mouth draw over it.
+class _Overlay extends Node2D:
+	var view: AnimalView
+
+	func _draw() -> void:
+		var s := float(Content.animal(view.animal_id).get("size", 1.0))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(s, s))
+		view._draw_over(self, str(Content.animal(view.animal_id).get("shape", "dog")))
 
 
 func _ellipse(centre: Vector2, radius: Vector2, colour: Color, angle: float = 0.0) -> void:

@@ -63,3 +63,19 @@ func test_grade_rank_orders_across_scales() -> void:
 	refs.sort_custom(func(a, b): return content.grade_rank(a) < content.grade_rank(b))
 	eq(refs, ["uni/first", "alevel/a_star", "gcse/9", "uni/upper_second", "alevel/a", "gcse/8", "gcse/4", "uni/fail", ""])
 	content.free()
+
+
+## Art is found by convention, so a typo'd path would silently show the placeholder.
+func test_art_paths_are_well_formed() -> void:
+	for a in load_json("res://data/animals.json")["animals"]:
+		var dir: String = a["sprite_dir"]
+		check(dir.begins_with("res://art/animals/") and dir.ends_with("/"), "%s sprite_dir %s" % [a["id"], dir])
+		if ResourceLoader.exists(dir + "animal.tscn"):
+			check(a["parts"].size() <= 3, "%s: the shader maps three colours" % a["id"])
+	for b in load_json("res://data/biomes.json")["biomes"]:
+		for layer in b["layers"]:
+			if layer.has("art"):
+				check(ResourceLoader.exists(layer["art"]), "%s art %s" % [b["id"], layer["art"]])
+	check(ResourceLoader.exists("res://art/animal_colours.gdshader"))
+	check(load("res://art/templates/animal/animal.tscn") is PackedScene, "the animal template loads")
+	check(load("res://art/templates/scenery/tile.tscn") is PackedScene, "the scenery template loads")
