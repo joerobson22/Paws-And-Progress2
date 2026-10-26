@@ -8,9 +8,17 @@ uniform vec4 colour_r : source_color = vec4(1.0);
 uniform vec4 colour_g : source_color = vec4(1.0);
 uniform vec4 colour_b : source_color = vec4(1.0);
 
+// The sprite's own colour (its modulate, and the light and fade a scene puts
+// on it), kept to multiply into the result.
+varying vec4 tint;
+
+void vertex() {
+	tint = COLOR;
+}
+
 void fragment() {
 	vec4 px = texture(TEXTURE, UV);
 	float total = px.r + px.g + px.b;
 	vec3 mapped = (px.r * colour_r.rgb + px.g * colour_g.rgb + px.b * colour_b.rgb) / max(total, 1.0);
-	COLOR = vec4(mapped, px.a) * COLOR;
+	COLOR = vec4(mapped, px.a) * tint;
 }

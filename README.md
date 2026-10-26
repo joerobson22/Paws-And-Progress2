@@ -336,13 +336,13 @@ gets a list. The unit tests check that every key the code uses is in the file.
 Art is placeholder, drawn in code, until you drop your own into `art/`; see
 [art/README.md](art/README.md) for how to add animals (a rig of separate
 limbs, painted red, green and blue and recoloured by a shader), gift images
-and scenery tiles you arrange in the Godot editor. Anything without art keeps
+scenery tiles you arrange in the Godot editor, and the character with its cosmetics. Anything without art keeps
 its placeholder:
 
 - Animals: `ui/components/animal_view.gd` draws each animal from its
   recolourable parts. A rig at `animal.sprite_dir`
   (e.g. `res://art/animals/staffy/animal.tscn`) replaces the drawing.
-- Character: `ui/components/character_view.gd`, one look per cosmetic `style`.
+- Character: `ui/components/character_view.gd`, one look per cosmetic `style`; a rig in `art/character/` with per-item pieces in `art/cosmetics/<id>/` replaces it.
 - Gifts: `ui/components/gift_art.gd` (every screen showing a gift uses it).
 - Scenery: `scenes/walk/scenery.gd` draws each place's layers in chunks,
   the sun and moon, the growth in front of the walker, and the weather
