@@ -17,10 +17,12 @@ extends Control
 ## cross it, and every layer is tinted to match through its node's
 ## modulate, so a change of light costs no redrawing. The real weather
 ## shows too, the way this place shows it (Weather): clouds, rain and
-## lightning, snow, a blizzard. Real art will replace each layer's drawer with
-## sprite chunks; the data stays.
+## lightning, snow, a blizzard. A layer with "art" repeats that scene instead
+## of drawing its kind (see art/README.md).
 
 const CHUNK := 384.0
+## The screen height (in pixels) that layer art scenes are drawn for.
+const ART_HEIGHT := 720.0
 ## Layers that move with the time and so redraw every frame.
 const ANIMATED := ["water", "reeds", "fronds", "undergrowth", "vines", "stalks"]
 ## How often the light catches up with the clock, in seconds.
@@ -109,7 +111,8 @@ func _ready() -> void:
 			front.add_child(node)
 		else:
 			add_child(node)
-		_layers.append({"data": layer, "node": node, "chunks": {}, "animated": ANIMATED.has(str(layer["kind"]))})
+		var tile = _art_tile(layer)
+		_layers.append({"data": layer, "node": node, "chunks": {}, "animated": ANIMATED.has(str(layer["kind"])), "tile": tile})
 	_fx = _Fx.new()
 	_fx.scenery = self
 	add_child(_fx)
@@ -321,6 +324,9 @@ func ambience() -> String:
 func _place_chunks() -> void:
 	for layer in _layers:
 		var offset := scroll * float(layer["data"]["parallax"])
+		if layer["tile"] != null:
+			_place_tiles(layer, offset)
+			continue
 		var first := floori(offset / CHUNK) - 1
 		var last := floori((offset + size.x) / CHUNK) + 1
 		var chunks: Dictionary = layer["chunks"]
@@ -340,6 +346,49 @@ func _place_chunks() -> void:
 			chunk.position.x = i * CHUNK - offset
 			if layer["animated"]:
 				chunk.queue_redraw()
+
+
+## The layer's art as {scene, width}, or null: a layer with "art" (a scene
+## path in biomes.json) repeats that scene instead of drawing its kind.
+## The scene is drawn for a screen ART_HEIGHT tall, its origin on the line
+## the layer stands on (its "y"), and is as wide as its ReferenceRect named
+## "TileBounds" (else the layer's "tile_width", else 768).
+func _art_tile(layer: Dictionary) -> Variant:
+	var path := str(layer.get("art", ""))
+	if path == "" or not ResourceLoader.exists(path):
+		return null
+	var scene := load(path) as PackedScene
+	if scene == null:
+		return null
+	var probe := scene.instantiate()
+	var bounds := probe.get_node_or_null("TileBounds") as Control
+	var width := bounds.size.x if bounds and bounds.size.x > 0.0 else float(layer.get("tile_width", 768))
+	probe.free()
+	return {"scene": scene, "width": width}
+
+
+## Lays copies of a layer's art scene side by side, making ones that scroll
+## into view and freeing ones that leave, like the drawn chunks.
+func _place_tiles(layer: Dictionary, offset: float) -> void:
+	var k := size.y / ART_HEIGHT
+	var width: float = layer["tile"]["width"] * k
+	if width <= 1.0:
+		return
+	var first := floori(offset / width) - 1
+	var last := floori((offset + size.x) / width) + 1
+	var tiles: Dictionary = layer["chunks"]
+	for i in tiles.keys():
+		if i < first or i > last:
+			tiles[i].queue_free()
+			tiles.erase(i)
+	for i in range(first, last + 1):
+		var tile: Node2D = tiles.get(i)
+		if tile == null:
+			tile = (layer["tile"]["scene"] as PackedScene).instantiate()
+			tile.scale = Vector2(k, k)
+			layer["node"].add_child(tile)
+			tiles[i] = tile
+		tile.position = Vector2(i * width - offset, size.y * float(layer["data"]["y"]))
 
 
 func _rebuild() -> void:

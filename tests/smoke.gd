@@ -237,6 +237,8 @@ func _run() -> void:
 	await _wait(20)
 	check(app.state.settings.get("location") == "off" and not root.get_node("Outdoors").enabled(), "Not now leaves it off")
 
+	await _art_check(main)
+
 	if not _quick:
 		await _scenery_gallery(main)
 
@@ -871,6 +873,53 @@ func _run() -> void:
 	quit(0)
 
 
+## Drop-in art: an animal rig of separate limbs that the shader paints with the
+## animal's colours, gift images, and scenery tiles, each beside its placeholder.
+func _art_check(main: Node) -> void:
+	var view_class := _class("res://ui/components/animal_view.gd")
+	var rig: PackedScene = load("res://art/templates/animal/animal.tscn")
+	var view: Node2D = view_class.new()
+	view.animal_id = "staffy"
+	root.add_child(view)
+	check(not view.has_art() and view_class.rig_path("staffy") == "", "no art yet means the placeholder")
+	var placeholder_mouth: Vector2 = view.mouth()
+	view.set_rig(rig)
+	view.colours = [Color("#112233"), Color("#445566"), Color("#778899")] as Array[Color]
+	view.walking = true
+	await _wait(10)
+	check(view.has_art(), "the rig replaces the placeholder")
+	var limbs: Array = _all(view._rig, func(n): return n is Sprite2D)
+	check(limbs.size() >= 6, "the rig is separate limbs (%d)" % limbs.size())
+	var painted: bool = limbs.all(func(n): return n.material is ShaderMaterial)
+	check(painted, "every limb has the colour shader")
+	var mat: ShaderMaterial = limbs[0].material
+	check(mat.get_shader_parameter("colour_r") == Color("#112233") and mat.get_shader_parameter("colour_b") == Color("#778899"), "red, green and blue map to the first, second and third colours")
+	check(view._player.current_animation == "walk" and view._player.is_playing(), "walking plays the walk animation")
+	view.walking = false
+	check(not view._player.is_playing() or view._player.current_animation == "idle", "stopping stops the walk")
+	view.held_gift = "staffy_common"
+	view.submerged = 10.0
+	await _wait(5)
+	check(view.mouth() != placeholder_mouth and view.neck() != Vector2.ZERO, "the lead and the gift use the rig's markers")
+	view.free()
+	var gifts_class := _class("res://ui/components/gift_art.gd")
+	check(gifts_class.texture_for("no_such_gift") == null, "a gift without art has no picture")
+	# A scenery layer with art lays its tile scene instead of drawing.
+	var scenery: Control = _class("res://scenes/walk/scenery.gd").new()
+	scenery.biome = {"id": "t", "layers": [{"kind": "art", "art": "res://art/templates/scenery/tile.tscn", "parallax": 0.5, "y": 0.7, "height": 0.2, "colour": "#ffffff"}]}
+	root.add_child(scenery)
+	scenery.size = main.size
+	scenery.scroll = 5000.0
+	await _wait(5)
+	var tiles: Dictionary = scenery._layers[0]["chunks"]
+	check(tiles.size() >= 2 and tiles.values().all(func(t): return t.get_node_or_null("Rock") != null), "art tiles repeat across the screen (%d)" % tiles.size())
+	scenery.scroll = 90000.0
+	await _wait(5)
+	check(scenery._layers[0]["chunks"].size() < 8, "and are freed once passed")
+	scenery.queue_free()
+	await process_frame
+
+
 ## Every place round the clock and in every weather, plus the day-cycle and
 ## weather pictures for the docs. Slow with a display (it's all software
 ## rendering there), so --quick skips it.
@@ -966,7 +1015,9 @@ func _fill_sample_data() -> void:
 		p.created_unix = now - 30 * 86400
 		app.add_project(p)
 		for d in 16:
-			if (d + i) % 3 == 0:
+			# Today always has a session, so each project shows in this week's
+			# chart whichever day of the week the test runs on.
+			if d > 0 and (d + i) % 3 == 0:
 				continue
 			var s := FocusSession.new()
 			s.project_id = p.id

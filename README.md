@@ -333,13 +333,15 @@ gets a list. The unit tests check that every key the code uses is in the file.
 
 ## Art and sound status
 
-All art is placeholder, drawn in code, so the game runs before any sprites
-exist:
+Art is placeholder, drawn in code, until you drop your own into `art/`; see
+[art/README.md](art/README.md) for how to add animals (a rig of separate
+limbs, painted red, green and blue and recoloured by a shader), gift images
+and scenery tiles you arrange in the Godot editor. Anything without art keeps
+its placeholder:
 
 - Animals: `ui/components/animal_view.gd` draws each animal from its
-  recolourable parts. Real art goes in `animal.sprite_dir` (e.g.
-  `res://animals/staffy/`); swap the drawing for a sprite rig with the same
-  properties.
+  recolourable parts. A rig at `animal.sprite_dir`
+  (e.g. `res://art/animals/staffy/animal.tscn`) replaces the drawing.
 - Character: `ui/components/character_view.gd`, one look per cosmetic `style`.
 - Gifts: `ui/components/gift_art.gd` (every screen showing a gift uses it).
 - Scenery: `scenes/walk/scenery.gd` draws each place's layers in chunks,
