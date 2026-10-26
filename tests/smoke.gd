@@ -1015,7 +1015,9 @@ func _fill_sample_data() -> void:
 		p.created_unix = now - 30 * 86400
 		app.add_project(p)
 		for d in 16:
-			if (d + i) % 3 == 0:
+			# Today always has a session, so each project shows in this week's
+			# chart whichever day of the week the test runs on.
+			if d > 0 and (d + i) % 3 == 0:
 				continue
 			var s := FocusSession.new()
 			s.project_id = p.id
