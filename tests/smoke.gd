@@ -902,6 +902,37 @@ func _art_check(main: Node) -> void:
 	await _wait(5)
 	check(view.mouth() != placeholder_mouth and view.neck() != Vector2.ZERO, "the lead and the gift use the rig's markers")
 	view.free()
+	# The character: a rig dressed with each worn item's pieces.
+	var char_class := _class("res://ui/components/character_view.gd")
+	check(char_class.rig_path() == "" and char_class.rig_path("res://art/templates/") != "", "the character has no art yet in art/, only the template")
+	var character: Node2D = char_class.new()
+	character.art_root = "res://art/templates/"
+	character.look = {"skin_tone": 2, "hair_tone": 1, "cosmetics": {"hat": "hat_beanie", "top": "top_jumper"}}
+	root.add_child(character)
+	await _wait(5)
+	check(character.has_art(), "the character's rig loads")
+	var worn: Array = character._dressing
+	check(worn.size() == 4, "the beanie is one piece and the jumper three (%d)" % worn.size())
+	check(character._body.all(func(sp): return sp.material is ShaderMaterial and sp.material.get_shader_parameter("colour_r") == character._skin()), "skin tone paints the body")
+	check(worn.any(func(sp): return sp.get_parent().name == "Head") and worn.any(func(sp): return sp.get_parent().name == "ArmFront"), "pieces sit on their limbs")
+	character.walking = true
+	await _wait(20)
+	check(character._player.current_animation == "walk", "walking plays the walk animation")
+	check(character.hand != Vector2(22, -78) and character.hand.length() > 10.0, "the lead clips on at the Hand marker (%s)" % character.hand)
+	character.sad = 1.0
+	await _wait(5)
+	check(character._dressing.size() == 4, "sad keeps the same pieces when there is no sad art")
+	character.sad = 0.0
+	character.part = "hat"
+	await _wait(3)
+	check(character._dressing.size() == 1 and character._body.all(func(sp): return not sp.visible), "a hat on its own hides the body")
+	character.part = "hair"
+	check(character._body.any(func(sp): return sp.visible), "hair on its own keeps the head")
+	character.part = ""
+	character.face_only = true
+	await _wait(3)
+	check(character._rig.position != Vector2.ZERO and not character._limbs["LegFront"]["node"].visible, "an avatar is the head and shoulders, centred on the face")
+	character.free()
 	var gifts_class := _class("res://ui/components/gift_art.gd")
 	check(gifts_class.texture_for("no_such_gift") == null, "a gift without art has no picture")
 	# A scenery layer with art lays its tile scene instead of drawing.

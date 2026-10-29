@@ -79,3 +79,24 @@ func test_art_paths_are_well_formed() -> void:
 	check(ResourceLoader.exists("res://art/animal_colours.gdshader"))
 	check(load("res://art/templates/animal/animal.tscn") is PackedScene, "the animal template loads")
 	check(load("res://art/templates/scenery/tile.tscn") is PackedScene, "the scenery template loads")
+
+
+## An item's art folder is named after the item and its files after limbs, or the art silently never shows.
+func test_cosmetic_art_folders_match_items() -> void:
+	var ids := {}
+	for item in load_json("res://data/cosmetics.json")["items"]:
+		ids[item["id"]] = true
+	for g in load_json("res://data/gifts.json")["gifts"]:
+		if g.has("slot"):
+			ids[g["id"]] = true
+	var stems := ["torso", "head", "arm_back", "arm_front", "leg_back", "leg_front"]
+	for root in ["res://art/cosmetics/", "res://art/templates/cosmetics/"]:
+		var dir := DirAccess.open(root)
+		if dir == null:
+			continue
+		for folder in dir.get_directories():
+			check(ids.has(folder), "%s%s isn't a cosmetic's id" % [root, folder])
+			for file in DirAccess.get_files_at(root + folder):
+				if file.get_extension() in ["png", "svg", "webp"]:
+					var stem := file.get_basename().trim_suffix("_behind").trim_suffix("_sad")
+					check(stems.has(stem), "%s%s/%s isn't a limb" % [root, folder, file])

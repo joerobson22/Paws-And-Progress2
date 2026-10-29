@@ -1,33 +1,56 @@
 class_name CharacterView
 extends Node2D
-## The player's character (or a friend's), drawn from simple shapes until
-## real art exists. The origin is at the feet and it faces right.
+## The player's character (or a friend's): Joe's own art when there is some
+## (art/character/character.tscn, see art/README.md), else drawn from simple
+## shapes. The origin is at the feet and it faces right.
 ## `look` is {skin_tone, hair_tone, cosmetics: {slot: item id}}; leave it
 ## empty to follow the player's own profile. `face_only` draws just the head
 ## and shoulders, centred on the face, for avatars. `part` draws just one
 ## slot's item on its own (see part_rect()), for the customise list.
 
 const STICK := Color("#7a5236")
+const ART_ROOT := "res://art/"
+const SHADER := "res://art/animal_colours.gdshader"
+## The rig's limbs (node names, found anywhere in the rig) and the file name
+## each cosmetic uses for its piece on that limb.
+const LIMBS := {"Torso": "torso", "Head": "head", "ArmBack": "arm_back", "ArmFront": "arm_front", "LegBack": "leg_back", "LegFront": "leg_front"}
+## Cosmetics stack on a limb in this order, first at the bottom.
+const DRESS_ORDER := ["trousers", "shoes", "gloves", "top", "neckwear", "face", "hair", "hat", "walking_stick"]
+const EXTENSIONS := ["png", "svg", "webp"]
 ## Where the head sits, standing still.
 const HEAD := Vector2(2, -124)
 
-@export var walking: bool = false
-@export var speed: float = 1.0
+@export var walking: bool = false:
+	set(v):
+		walking = v
+		_animate()
+@export var speed: float = 1.0:
+	set(v):
+		speed = v
+		_animate()
+## Where the art lives (the folder holding character/ and cosmetics/).
+var art_root := ART_ROOT:
+	set(v):
+		art_root = v
+		_load_rig()
 
 var look: Dictionary = {}:
 	set(v):
 		look = v
 		queue_redraw()
+		_dress()
 var face_only := false:
 	set(v):
 		face_only = v
 		queue_redraw()
+		_dress()
 ## A slot id ("hat", "top"...) to draw only what's worn there, or "" for
 ## the whole character.
 var part := "":
 	set(v):
 		part = v
 		queue_redraw()
+		_dress()
 ## Reaching forward for the lead on a walk; arms down for portraits.
 var holding_lead := true
 ## Hand position in local space, so the walk screen can draw the lead.
@@ -36,14 +59,188 @@ var hand := Vector2(22, -78)
 ## a frown, and a sigh now and then.
 var sad := 0.0:
 	set(v):
+		var changed := (v > 0.5) != (sad > 0.5)
 		sad = v
 		queue_redraw()
+		if changed:
+			_dress()
 
 var _phase: float = 0.0
 var _sigh: float = 0.0
+## The art rig, its animations, each limb's node and rest pose (in the rig's
+## space), the pieces of clothing laid on the limbs, and the rig's own sprites.
+var _rig: Node2D
+var _player: AnimationPlayer
+var _limbs := {}
+var _dressing: Array[Node] = []
+var _body: Array[Sprite2D] = []
+var _materials := {}
+var _rig_base := Vector2.ZERO
+static var _textures := {}
+
+
+func _ready() -> void:
+	_load_rig()
+
+
+## The scene holding the character's art, or "" if it has none yet.
+static func rig_path(root: String = ART_ROOT) -> String:
+	var path := root + "character/character.tscn"
+	return path if ResourceLoader.exists(path) else ""
+
+
+func has_art() -> bool:
+	return _rig != null
+
+
+func _load_rig() -> void:
+	if _rig:
+		_rig.free()
+		_rig = null
+		_player = null
+		_limbs.clear()
+		_dressing.clear()
+		_body.clear()
+	var path := rig_path(art_root)
+	if path == "":
+		queue_redraw()
+		return
+	_rig = (load(path) as PackedScene).instantiate() as Node2D
+	if _rig == null:
+		return
+	add_child(_rig)
+	_player = _rig.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	for limb in LIMBS:
+		var node := _rig.find_child(limb, true, false) as Node2D
+		if node:
+			_limbs[limb] = {"node": node, "rest": _rest_in_rig(node)}
+	for sprite in _rig.find_children("*", "Sprite2D", true, false):
+		_body.append(sprite)
+	queue_redraw()
+	_dress()
+	_animate()
+
+
+## A node's transform in the rig's space as the scene has it (the standing
+## pose, before any animation moves it).
+func _rest_in_rig(node: Node2D) -> Transform2D:
+	var t := node.transform
+	var up := node.get_parent()
+	while up != _rig and up is Node2D:
+		t = (up as Node2D).transform * t
+		up = up.get_parent()
+	return t
+
+
+func _animate() -> void:
+	if _player == null:
+		return
+	var anim := "walk" if walking else "idle"
+	_player.speed_scale = 1.4 * speed
+	if part != "" or not _player.has_animation(anim):
+		_player.stop()
+	elif _player.current_animation != anim or not _player.is_playing():
+		_player.play(anim)
+
+
+static func _texture(path_no_ext: String) -> Texture2D:
+	if not _textures.has(path_no_ext):
+		_textures[path_no_ext] = null
+		for ext in EXTENSIONS:
+			var path: String = path_no_ext + "." + ext
+			if ResourceLoader.exists(path):
+				_textures[path_no_ext] = load(path)
+				break
+	return _textures[path_no_ext]
+
+
+## Red, green and blue paint become a colour, a shade of it and a light one.
+func _tone_material(colour: Color) -> ShaderMaterial:
+	var key := colour.to_html()
+	if not _materials.has(key):
+		var m := ShaderMaterial.new()
+		m.shader = load(SHADER) as Shader
+		m.set_shader_parameter("colour_r", colour)
+		m.set_shader_parameter("colour_g", colour.darkened(0.2))
+		m.set_shader_parameter("colour_b", colour.lightened(0.2))
+		_materials[key] = m
+	return _materials[key]
+
+
+## Puts the look on the rig: skin on its own sprites, then each worn item's
+## pieces on the limbs they belong to. An item <id> has a folder
+## cosmetics/<id>/ with a full-canvas image per limb (torso.png, head.png,
+## arm_front.png...), `_behind` after the name to go under the limb's art
+## and `_sad` to replace it when they're sad. Starter items with a colour
+## and hair take the colour (red, green and blue paint as for animals);
+## wearable gifts show as drawn. An item with no art isn't shown.
+func _dress() -> void:
+	if _rig == null:
+		return
+	for n in _dressing:
+		if is_instance_valid(n):
+			n.free()
+	_dressing.clear()
+	var skin := _tone_material(_skin())
+	var head_sprites: Array = []
+	if _limbs.has("Head"):
+		head_sprites = (_limbs["Head"]["node"] as Node).find_children("*", "Sprite2D", false, false)
+	for sprite in _body:
+		sprite.material = skin
+		# Seen on their own, items hide the body (the head stays for hair and a face).
+		sprite.visible = part == "" or (part in ["hair", "face"] and head_sprites.has(sprite))
+	for limb in ["ArmBack", "ArmFront", "LegBack", "LegFront"]:
+		if _limbs.has(limb):
+			(_limbs[limb]["node"] as Node2D).visible = not face_only
+	_rig_base = Vector2.ZERO
+	if face_only and _limbs.has("Head"):
+		_rig_base = -(_limbs["Head"]["rest"] as Transform2D).origin
+	_rig.position = _rig_base
+	var slots: Array = [part] if part != "" else DRESS_ORDER
+	for slot in slots:
+		var item := _item(slot)
+		var id := str(item.get("id", ""))
+		if id == "":
+			continue
+		var material: ShaderMaterial = null
+		if slot == "hair":
+			material = _tone_material(_hair())
+		elif item.has("colour") and not item.has("rarity"):
+			material = _tone_material(Color.from_string(item["colour"], Color.WHITE))
+		for limb in _limbs:
+			var stem: String = LIMBS[limb]
+			var dir: String = art_root + "cosmetics/" + id + "/"
+			var above: Texture2D = _texture(dir + stem + "_sad") if sad > 0.5 else null
+			if above == null:
+				above = _texture(dir + stem)
+			_attach(limb, above, false, material)
+			_attach(limb, _texture(dir + stem + "_behind"), true, material)
+	_animate()
+
+
+func _attach(limb: String, tex: Texture2D, behind: bool, material: Material) -> void:
+	if tex == null:
+		return
+	var node: Node2D = _limbs[limb]["node"]
+	var sprite := Sprite2D.new()
+	sprite.texture = tex
+	sprite.centered = false
+	# The image is a whole canvas with the feet at the bottom middle; the limb
+	# moves, so lay the canvas back where it was when the limb was at rest.
+	sprite.offset = Vector2(-tex.get_width() * 0.5, -tex.get_height())
+	sprite.transform = (_limbs[limb]["rest"] as Transform2D).affine_inverse()
+	sprite.material = material
+	node.add_child(sprite)
+	if behind:
+		sprite.show_behind_parent = true
+		node.move_child(sprite, 0)
+	_dressing.append(sprite)
 
 
 func _process(delta: float) -> void:
+	if _rig:
+		_process_rig(delta)
+		return
 	if walking:
 		_phase += delta * TAU * 1.4 * speed
 		queue_redraw()
@@ -52,9 +249,22 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 
+## The slump when they're sad (a hung head, sinking shoulders), on top of
+## the animation, and the hand where the lead clips on.
+func _process_rig(delta: float) -> void:
+	if sad > 0.0:
+		_sigh += delta
+	var drop := 4.0 * sad + (sin(_sigh * 1.3) * 0.5 + 0.5) * 1.5 * sad if sad > 0.0 else 0.0
+	_rig.position = _rig_base + Vector2(0, 0 if face_only else drop)
+	var marker := _rig.find_child("Hand", true, false) as Node2D
+	if marker and is_inside_tree():
+		hand = global_transform.affine_inverse() * marker.global_position
+
+
 ## Redraws after the look it follows has changed.
 func refresh() -> void:
 	queue_redraw()
+	_dress()
 
 
 func _look() -> Dictionary:
@@ -111,6 +321,8 @@ func _hair() -> Color:
 
 
 func _draw() -> void:
+	if _rig:
+		return
 	var skin := _skin()
 	var hair := _hair()
 	if part != "":
