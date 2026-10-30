@@ -12,6 +12,9 @@
 		"sort_by": "Sort by",
 		"labelled": "{label}: {value}"
 	},
+	"save": {
+		"reset": "Your save was from an older version, so this is a fresh start. The old one is kept beside it as save.old."
+	},
 	"greetings": {
 		"_doc": "The line above the focus orb on the home screen. One is picked each time you come home: half the time a greeting for the time of day (morning 5am to noon, afternoon to 5pm, evening to 10pm, then night), otherwise a line from 'anytime'. '{name}' becomes the player's name; lines with it are skipped until they've set one. 'fallback' shows if a list is ever empty.",
 		"morning": [
@@ -151,9 +154,7 @@
 		"adopt": "Adopt",
 		"delete_pet": "Delete pet",
 		"complete_project": "Complete project",
-		"level_short": "Lv {level}",
-		"place_locked": "{place} unlocks at level {level}",
-		"place_locked_name": "{place} · unlocks at level {level}",
+		"place_locked_name": "{place} · locked · {rule}",
 		"no_pets_title": "No pets yet",
 		"no_pets_body": "Tap the + to adopt one for something you're working on.",
 		"tap_to_walk": "Tap your pet to start walking",
@@ -174,7 +175,7 @@
 		"colour_name": "{role} colour",
 		"scroll_animals": "Scroll for more animals",
 		"name_pet": "Name your {kind}",
-		"animal_locked": "Unlocks at level {level}",
+		"animal_locked": "{rule} to unlock",
 		"say_hello": "Say hello to {pet}"
 	},
 	"pet": {
@@ -207,7 +208,8 @@
 		"found": "{pet} found you {a_rarity} gift",
 		"xp": "+{xp} xp",
 		"level_up": "Level {level}!",
-		"level_up_unlocks": "Level {level}! {unlocked} unlocked"
+		"level_up_unlocks": "Level {level}! {unlocked} unlocked",
+		"unlocked": "{unlocked} unlocked!"
 	},
 	"ended": {
 		"title": "Focus ended",
@@ -229,7 +231,7 @@
 		"empty_body": "Focus for {minutes} minutes and your pet dives into the bushes to find you one."
 	},
 	"gift": {
-		"from": "from the {animal}",
+		"from": "from the {table} table",
 		"new": "NEW",
 		"wearable": "Wearable ({slot}). Dress your character on your profile, above the focus screen.",
 		"you_have": "You have {n}",
@@ -319,8 +321,8 @@
 		"hours_description": "Focus for {hours} hours in total",
 		"all_gifts_name": "Full collection",
 		"all_gifts_description": "Find every gift",
-		"animal_name": "{animal} set",
-		"animal_description": "Find all {count} of the {animal}'s gifts"
+		"table_name": "{table} set",
+		"table_description": "Find all {count} of the {table} table's gifts"
 	},
 	"rewards": {
 		"title": "Rewards",
@@ -328,7 +330,21 @@
 		"to_next": "{xp} XP to level {level}. You get 1 XP for each minute focused, and more for gifts.",
 		"from_start": "From the start",
 		"new_place": "{when}  ·  new place",
-		"new_animal": "{when}  ·  new animal"
+		"new_animal": "{when}  ·  new animal",
+		"exploring": "Unlocked by exploring"
+	},
+	"unlock": {
+		"locked_title": "{name} is locked",
+		"start": "Yours from the start",
+		"level": "Reach level {level}",
+		"hours": "Focus for {hours} hours",
+		"hours_in": "Focus for {hours} hours {where}",
+		"table": "Find every gift in the {table} table",
+		"all_tables": "Find every gift in every table",
+		"progress_level": "Level {have} of {goal}",
+		"progress_hours": "{have} of {goal}",
+		"hours_short": "{hours}h",
+		"progress_gifts": "{have} of {goal} gifts found"
 	},
 	"level_bar": {
 		"caption": "Level {level}  ·  {xp} / {needed} XP"

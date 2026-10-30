@@ -253,10 +253,10 @@ func _run() -> void:
 	# The gifts screen: three rings (gifts discovered, pets' gift tables
 	# completed and cosmetics unlocked), then every gift you have, with its
 	# count, in a list that scrolls on its own. The shelf is on the profile.
-	var counts: Dictionary = _class("res://core/collection.gd").progress(app.state.inventory, _content().gifts, _content().animals)
+	var counts: Dictionary = _class("res://core/collection.gd").progress(app.state.inventory, _content().gifts)
 	var rings: Array = _all(gifts_pane._stats, func(n): return _is(n, "progress_ring.gd"))
 	check(rings.size() == 3 and is_equal_approx(rings[0].value, float(counts["found"]) / counts["gifts"])
-		and is_equal_approx(rings[1].value, float(counts["tables"]) / counts["animals"])
+		and is_equal_approx(rings[1].value, float(counts["tables"]) / counts["total_tables"])
 		and is_equal_approx(rings[2].value, float(counts["cosmetics"]) / counts["wearables"]), "three rings (%s)" % [counts])
 	check(_find(gifts_pane, func(n): return _is(n, "gift_shelf.gd")) == null, "no shelf on the gifts screen")
 	var have: int = app.state.inventory.keys().filter(func(id): return app.state.gift_count(id) > 0).size()
@@ -300,29 +300,29 @@ func _run() -> void:
 	await _wait(20)
 
 	# Trading in ten commons for a rare.
-	var rares: int = app.state.gift_count("staffy_rare")
-	details.open("staffy_common")
+	var rares: int = app.state.gift_count("dog_rare")
+	details.open("dog_common")
 	await _wait(20)
-	details.trade(modal_class.top(), "staffy_common")
+	details.trade(modal_class.top(), "dog_common")
 	await _wait(25)
-	check(app.state.gift_count("staffy_common") == 2 and app.state.gift_count("staffy_rare") == rares + 1, "trade in")
+	check(app.state.gift_count("dog_common") == 2 and app.state.gift_count("dog_rare") == rares + 1, "trade in")
 	await _shot("trade_result")
 	_close_modal()
 	await _wait(10)
 
 	# Trading in every last one of a shelf gift takes it off the shelf.
-	app.state.inventory["staffy_common"] = 10
-	app.place_on_shelf("staffy_common", 0)
+	app.state.inventory["dog_common"] = 10
+	app.place_on_shelf("dog_common", 0)
 	await _wait(10)
-	details.open("staffy_common")
+	details.open("dog_common")
 	await _wait(20)
-	details.trade(modal_class.top(), "staffy_common")
+	details.trade(modal_class.top(), "dog_common")
 	await _wait(25)
-	check(not app.state.shelf().has("staffy_common"), "trading away all of a shelf gift takes it off the shelf")
+	check(not app.state.shelf().has("dog_common"), "trading away all of a shelf gift takes it off the shelf")
 	_close_modal()
 	await _wait(10)
-	app.state.inventory["staffy_common"] = 12
-	app.place_on_shelf("staffy_common", 0)
+	app.state.inventory["dog_common"] = 12
+	app.place_on_shelf("dog_common", 0)
 	await _wait(10)
 
 	# A drag the other way goes back to the middle; a short drag snaps back.
@@ -604,21 +604,36 @@ func _run() -> void:
 	await _wait(40)
 	await _shot("choose_focus")
 	var chooser: Node = main._flows.back().get_child(0)
-	# Places in the order they unlock; the project, then the pet, then a hint,
+	# Places in the data file's order; the project, then the pet, then a hint,
 	# with its kind and time under the pet.
 	var order: Array = chooser._places.keys()
-	check(order[0] == "lake" and order.size() == _content().biomes.size(), "places start at the lakeside")
-	for i in range(1, order.size()):
-		check(_levels().unlock_level("place", order[i], _content().levels) >= _levels().unlock_level("place", order[i - 1], _content().levels), "places in unlock order")
+	check(order == _content().biomes.map(func(b): return b["id"]), "places in biomes.json order")
+	var grid: GridContainer = chooser._place_grid
+	var places_box: Control = chooser._pick.get_node("Places")
+	check(places_box.get_global_rect().position.x >= 0.0 and places_box.get_global_rect().end.x <= main.size.x, "the place buttons fit across the screen (%s in %s)" % [places_box.get_global_rect(), main.size.x])
+	if main.size.x < 600.0:
+		check(grid.columns < order.size() and grid.columns >= ceili(order.size() / 2.0), "on a phone they wrap onto two even rows (%d a row)" % grid.columns)
+	for id in order:
+		var button: Button = chooser._places[id]
+		var lock: bool = button.get_node("Lock").visible
+		check(lock != app.is_unlocked("place", id), "%s has a padlock only while locked" % id)
 	check(chooser._words.get_child(0) == chooser._title and chooser._title.text != "", "project title first")
 	if main.size.y >= 600.0:
 		check(chooser._words.get_rect().end.y < chooser._scenery.path_y() - chooser.PET_HEIGHT * 0.86, "words above the pets")
 	check(chooser._under.text.contains("focused") and chooser._under.position.y > chooser._scenery.path_y(), "kind and time under the pet")
 	var level: int = app.level()
 	check(level > 1 and level < 15, "sample player is part way up (level %d)" % level)
+	var first_pet: Resource = chooser._current_project()
 	chooser._pick_place("beach")
 	await _wait(50)
-	check(app.state.settings.get("walk_biome") == "beach", "picking an unlocked place")
+	check(first_pet.place == "beach" and chooser._scenery.biome["id"] == "beach", "picking an unlocked place sends this pet there")
+	chooser._pets.go_to(1)
+	await _wait(50)
+	var second_pet: Resource = chooser._current_project()
+	check(chooser._scenery.biome["id"] == app.project_place(second_pet), "the next pet stands in its own place (%s)" % chooser._scenery.biome["id"])
+	chooser._pets.go_to(0)
+	await _wait(50)
+	check(chooser._scenery.biome["id"] == "beach", "and the first is still at the beach")
 	await _shot("choose_beach")
 	# In the jungle the growth stands in front of the pets, under the words,
 	# and the scene holds still while you choose.
@@ -636,9 +651,12 @@ func _run() -> void:
 	app.state.settings["debug_unlock_all"] = false
 	await _wait(50)
 	chooser._pick_place("moon")
-	await _wait(20)
-	check(app.state.settings.get("walk_biome") == "beach", "a locked place can't be picked")
+	await _wait(30)
+	check(first_pet.place == "beach", "a locked place can't be picked")
+	check(modal_class.is_open(), "it shows what unlocks it instead")
 	await _shot("place_locked")
+	_close_modal()
+	await _wait(10)
 	chooser._pets.go_to(2)
 	await _wait(25)
 	chooser._on_right()
@@ -667,7 +685,14 @@ func _run() -> void:
 	await _wait(25)
 	check(chooser._new.disabled, "a locked animal can't be adopted")
 	check(chooser._swatch_row.modulate.a < 0.05, "a locked animal hides the colour buttons")
+	check(not chooser._animal_hint.text.contains("level") or _content().unlock_rule("animal", _content().animals[locked]["id"]).has("level"), "the hint says what unlocks it")
 	await _shot("new_pet_locked")
+	chooser._animals.activated.emit(locked)
+	await _wait(30)
+	check(modal_class.is_open(), "tapping a locked animal shows how far along you are")
+	await _shot("animal_locked_popup")
+	_close_modal()
+	await _wait(10)
 	chooser._animals.go_to(1)
 	await _wait(25)
 	check(chooser._swatch_row.modulate.a > 0.95, "an open animal shows them again")
@@ -787,10 +812,10 @@ func _run() -> void:
 	app.start_walk(app.state.projects[0].id, -1, "forest")
 	app.state.active.start_unix -= 25 * 60
 	app.state.active.last_seen_unix = app.now() - 2 * 60
-	var logged: int = app.state.sessions.size()
+	var logged: int = app.state.total_seconds()
 	var ended: Dictionary = app._end_left_walk()
 	var stopped: int = ended["session"].focus_seconds
-	check(app.state.active == null and app.state.sessions.size() == logged + 1, "a walk left running is logged")
+	check(app.state.active == null and app.state.total_seconds() == logged + stopped, "a walk left running is logged")
 	check(stopped >= 22 * 60 and stopped <= 24 * 60, "up to when the app was last open (%ds)" % stopped)
 	check(ended["session"].gift_id == "", "with no gift")
 	main._open_flow("ended", ended, true)
@@ -879,9 +904,9 @@ func _art_check(main: Node) -> void:
 	var view_class := _class("res://ui/components/animal_view.gd")
 	var rig: PackedScene = load("res://art/templates/animal/animal.tscn")
 	var view: Node2D = view_class.new()
-	view.animal_id = "staffy"
+	view.animal_id = "dog1"
 	root.add_child(view)
-	check(not view.has_art() and view_class.rig_path("staffy") == "", "no art yet means the placeholder")
+	check(not view.has_art() and view_class.rig_path("dog1") == "", "no art yet means the placeholder")
 	var placeholder_mouth: Vector2 = view.mouth()
 	view.set_rig(rig)
 	view.colours = [Color("#112233"), Color("#445566"), Color("#778899")] as Array[Color]
@@ -897,7 +922,7 @@ func _art_check(main: Node) -> void:
 	check(view._player.current_animation == "walk" and view._player.is_playing(), "walking plays the walk animation")
 	view.walking = false
 	check(not view._player.is_playing() or view._player.current_animation == "idle", "stopping stops the walk")
-	view.held_gift = "staffy_common"
+	view.held_gift = "dog_common"
 	view.submerged = 10.0
 	await _wait(5)
 	check(view.mouth() != placeholder_mouth and view.neck() != Vector2.ZERO, "the lead and the gift use the rig's markers")
@@ -1034,7 +1059,8 @@ func _fill_sample_data() -> void:
 	app.state.profile["cosmetics"]["hat"] = "bird_epic"
 	app.state.profile["cosmetics"]["face"] = "face_glasses"
 	var now: int = app.now()
-	var animals := ["staffy", "tabby_cat", "snail", "bird", "bear", "rabbit"]
+	var animals := ["dog1", "cat1", "snail", "bird", "bear", "rabbit"]
+	var places := ["lake", "forest", "lake", "beach", "farm", "lake"]
 	var names := ["Dissertation", "Spanish", "Portfolio", "Statistics", "Guitar", "Reading"]
 	var pets := ["Biscuit", "Mochi", "", "Pip", "Bruno", ""]
 	for i in animals.size():
@@ -1050,21 +1076,21 @@ func _fill_sample_data() -> void:
 			# chart whichever day of the week the test runs on.
 			if d > 0 and (d + i) % 3 == 0:
 				continue
-			var s := FocusSession.new()
-			s.project_id = p.id
-			s.start_unix = now - d * 86400 - i * 3600
-			s.focus_seconds = 600 + 300 * ((i + d) % 4)
-			s.gift_id = "%s_%s" % [animals[i], ["common", "common", "rare", "epic"][(i + d) % 4]]
-			app.state.sessions.append(s)
+			var seconds := 600 + 300 * ((i + d) % 4)
+			var rarity: String = ["common", "common", "rare", "epic"][(i + d) % 4]
+			var gift := "%s_%s" % [content.table_of(animals[i]), rarity]
+			app.state.log_focus(_class("res://core/stats.gd").local_day(now - d * 86400 - i * 3600, app.tz_bias()), p.id, places[i], seconds)
+			app.state.xp += _levels().walk_xp(seconds, rarity, content.levels)
+			p.gifts[gift] = int(p.gifts.get(gift, 0)) + 1
 	app.complete_project(app.state.projects[5].id)
 	app.complete_project(app.state.projects[4].id)
 	app.state.projects[5].grade = "uni/first"
 	app.state.projects[4].grade = "alevel/a_star"
 	for g in content.gifts.slice(0, 24):
 		app.state.inventory[g["id"]] = 1 + (hash(g["id"]) % 4)
-	app.state.inventory["staffy_common"] = 12
+	app.state.inventory["dog_common"] = 12
 	app.state.inventory["bird_epic"] = 1
-	app.state.place_on_shelf("staffy_common", 0)
+	app.state.place_on_shelf("dog_common", 0)
 	app.state.place_on_shelf("bird_epic", 2)
 	app.friends = _class("res://core/friends.gd").sample()
 	app.state_changed.emit()
@@ -1119,7 +1145,7 @@ func _stats_and_friends(main: Node) -> void:
 		var shown := _all(popup, medal)
 		var mei: Dictionary = app.friends.filter(func(f): return f["name"] == "Mei")[0]
 		var ach := _class("res://core/achievements.gd")
-		var mei_rows: Array = ach.progress(ach.list(_content().achievements, _content().animals, _content().gifts), int(mei["focused_seconds"]), mei["gifts"], _content().gifts)
+		var mei_rows: Array = ach.progress(ach.list(_content().achievements, _content().tables, _content().gifts), int(mei["focused_seconds"]), mei["gifts"], _content().gifts)
 		check(shown.size() == mei_rows.filter(func(r): return r["earned"]).size() and shown.all(func(n): return n.info["earned"]), "and only the achievements they've earned")
 		check(_find(popup, func(n): return n is Label and n.text == "See all") == null, "with no See all")
 		await _shot("friend_profile")
@@ -1206,7 +1232,7 @@ func _accounts(main: Node) -> void:
 	check(new_slot != home_slot and not modal_class.is_open(), "the + makes a new account and closes the popups")
 	check(main._at == profile_cell and app.setup_pending(), "it opens on the new account's profile")
 	check(app.friends.is_empty(), "a new account has no friends")
-	check(app.state.projects.is_empty() and app.state.sessions.is_empty() and app.state.inventory.is_empty(), "and nothing else either")
+	check(app.state.projects.is_empty() and app.state.days.is_empty() and app.state.inventory.is_empty(), "and nothing else either")
 	check(app.state.settings.get("location") == "off", "it keeps your settings")
 	await _shot("account_new")
 	check(main._minimap.modulate.a < 0.01 and main._arrows.values().all(func(a): return not a.visible), "no map or arrows till it's filled in")
@@ -1322,14 +1348,14 @@ func _shelf_editor(editor: Node) -> void:
 	var modal_class := _class("res://ui/modal.gd")
 	var editor_modal: Node = modal_class.top()
 	await _shot("shelf_editor")
-	var common: Control = _editor_tile(editor, "staffy_common")
+	var common: Control = _editor_tile(editor, "dog_common")
 	check(common != null and common.mouse_filter == Control.MOUSE_FILTER_IGNORE, "a shelf gift is greyed out in the collection")
 	check(_all(editor._grid, func(n): return n is Label and n.text.begins_with("×")).is_empty(), "no counts in the editor")
 	# Putting one up: hold a gift and drop it on the empty middle spot.
-	var rare_at: Vector2 = await _shown_point(_editor_tile(editor, "staffy_rare"))
+	var rare_at: Vector2 = await _shown_point(_editor_tile(editor, "dog_rare"))
 	await _drag(rare_at, editor._slots[1].get_global_rect().get_center(), 12, 0.5)
 	await _wait(30)
-	check(app.state.shelf()[1] == "staffy_rare", "holding a gift and dropping it on an empty spot (shelf is %s)" % [app.state.shelf()])
+	check(app.state.shelf()[1] == "dog_rare", "holding a gift and dropping it on an empty spot (shelf is %s)" % [app.state.shelf()])
 	# Swapping one in: with a mouse, just drag another onto the first spot.
 	var replaced: String = app.state.shelf()[0]
 	var incoming: Control = _find(editor._grid, func(n): return _is(n, "gift_tile.gd") and n.draggable)

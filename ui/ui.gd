@@ -578,12 +578,30 @@ static func animal_portrait(animal_id: String, colours: Array[Color], box_size: 
 	view.colours = colours
 	holder.add_child(view)
 	var place := func():
-		# Big animals (bear, bernese) are drawn larger, so fit by their size too.
+		# Big animals (bear, elephant) are drawn larger, so fit by their size too.
 		var s := minf(holder.size.x / 150.0, holder.size.y / 95.0) / float(Content.animal(animal_id).get("size", 1.0))
 		view.scale = Vector2(s, s)
 		view.position = Vector2(holder.size.x * 0.45, holder.size.y * 0.88)
 	holder.resized.connect(place)
 	return frame
+
+
+## A place's icon in white on a tile of its ground colour (a little darker,
+## so the icon shows), `side` square.
+static func place_tile(biome: Dictionary, side: int) -> PanelContainer:
+	var colour := ACCENT
+	for layer in biome.get("layers", []):
+		if layer["kind"] == "ground":
+			colour = Color.from_string(layer["colour"], ACCENT).darkened(0.3)
+	var tile := panel(colour, roundi(side * 0.28), 0)
+	tile.custom_minimum_size = Vector2(side, side)
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var icon := TextureRect.new()
+	icon.texture = Icons.place(biome, roundi(side * 0.5))
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.add_child(icon)
+	return tile
 
 
 ## The player's (or a friend's) character in a box: the full figure, or just

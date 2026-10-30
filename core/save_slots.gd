@@ -76,6 +76,6 @@ static func summary(state: GameState, achievement_rows: Array) -> Dictionary:
 	return {
 		"name": str(p.get("username", "")),
 		"look": {"skin_tone": p.get("skin_tone", 0), "hair_tone": p.get("hair_tone", 0), "cosmetics": p.get("cosmetics", {})},
-		"focused_seconds": Stats.total_seconds(state.sessions) + int(p.get("legacy_total_seconds", 0)),
+		"focused_seconds": state.total_seconds(),
 		"achievements": roundi(100.0 * earned / achievement_rows.size()) if not achievement_rows.is_empty() else 0,
 	}

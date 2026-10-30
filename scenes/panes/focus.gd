@@ -55,7 +55,7 @@ func keeps() -> Array[Node]:
 
 
 func _pick_line() -> void:
-	var walks := App.state.sessions.size()
+	var walks := int(App.state.profile.get("walks", 0))
 	if _line != "" and walks == _line_walks:
 		return
 	_line_walks = walks
@@ -110,7 +110,7 @@ func _on_resized() -> void:
 func _on_shown() -> void:
 	if is_instance_valid(_orb):
 		_orb.running = true
-	if is_instance_valid(_greeting) and App.state.sessions.size() != _line_walks:
+	if is_instance_valid(_greeting) and int(App.state.profile.get("walks", 0)) != _line_walks:
 		_pick_line()
 		_greeting.text = _line
 		_place()

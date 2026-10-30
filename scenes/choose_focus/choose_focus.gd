@@ -1,15 +1,18 @@
 extends Control
 ## Choose what to focus on, standing in the place you're about to walk.
-## The row of buttons at the top picks the place, in the order they unlock
-## (locked ones are greyed out with a padlock and the level that unlocks
-## them). Under it are the project and the pet's name; swipe left and right
+## The buttons at the top pick where this pet walks (each pet remembers its
+## own, starting in its animal's home); locked places are greyed out under a
+## padlock, and tapping one shows what unlocks it. They wrap onto a second
+## row where there isn't room for one. Under them are the project and the
+## pet's name; swipe left and right
 ## through your pets, which stand on the path with their kind and time
 ## underneath (the one in the middle walks on the spot), and tap one to head
 ## out. At the bottom, the red bin deletes that pet and the green tick
 ## completes its project, each after a check. The × at the top left goes back
 ## home, and the + at the top right switches to adopting a new pet: say what
 ## it's for, give it a name, scroll up and down through the animals (locked
-## ones show the level they unlock at, and no colours) and pick its three
+## ones are grey under a padlock, say what unlocks them, and tapping one
+## shows how far along you are) and pick its three
 ## colours. While adopting the bottom buttons go away, the × cancels and the
 ## + turns into a tick that adopts it.
 ## params: {"from": where the opening circle grew from}
@@ -22,6 +25,11 @@ const SWATCHES := [
 ]
 ## How tall pets stand in the chooser.
 const PET_HEIGHT := 200.0
+## The place buttons: each one's side, the gap between them and the glass
+## panel's padding round them.
+const PLACE_BUTTON := 42
+const PLACE_GAP := 4
+const PLACE_PAD := 6
 ## The scenery drifts by slowly behind the pets, in pixels a second.
 
 ## The pet last in the middle, so the screen reopens where you left it.
@@ -38,6 +46,7 @@ var _pick := Control.new()
 var _adopt_layer := Control.new()
 var _pets: Carousel
 var _places: Dictionary = {}  # place id -> its button
+var _place_grid: GridContainer
 var _place_name: Label
 var _words: VBoxContainer
 var _title: Label
@@ -136,10 +145,33 @@ func _on_new() -> void:
 
 # --- The place ---------------------------------------------------------------
 
-## The saved place, or lakeside if that's somehow locked.
+## Where the pet in the middle walks (the last place picked when there are
+## no pets), or lakeside if that's locked.
 func _place_id() -> String:
 	var id := str(App.state.settings.get("walk_biome", "lake"))
-	return id if App.is_unlocked("place", id) and not Content.biome(id).is_empty() else "lake"
+	var p := _current_project()
+	if p:
+		id = App.project_place(p)
+	return id if App.is_unlocked("place", id) and Content.biome(id).get("id", "") == id else "lake"
+
+
+## A place's name.
+static func _place_title(id: String) -> String:
+	return str(Content.biome(id).get("name", ""))
+
+
+## The project of the pet in the middle (before the pets are laid out, the
+## one the screen will open on), or null with none.
+func _current_project() -> ProjectData:
+	if not is_instance_valid(_pets):
+		var active := App.state.active_projects()
+		for p in active:
+			if p.id == _remembered:
+				return p
+		return active[0] if not active.is_empty() else null
+	if _projects.is_empty():
+		return null
+	return _projects[clampi(_pets.index, 0, _projects.size() - 1)]
 
 
 ## Puts the place's scenery behind everything, fading over the old one.
@@ -172,52 +204,60 @@ func _attach_front() -> void:
 
 
 func _pick_place(id: String) -> void:
-	var level := Levels.unlock_level("place", id, Content.levels)
 	if not App.is_unlocked("place", id):
 		Motion.shake(_places[id], 6.0)
-		Toast.show_text(Text.t("choose_focus.place_locked", {"place": Content.biome(id).get("name", ""), "level": level}), "lock")
+		LockPopup.open("place", id)
 		return
 	if id == _place_id():
 		return
 	App.set_setting("walk_biome", id)
+	var p := _current_project()
+	if p:
+		App.set_project_place(p.id, id)
 	_show_place(id)
 	_refresh_places()
 
 
 func _place_buttons() -> Control:
-	var panel := UI.panel(UI.GLASS, 22, 6)
+	var panel := UI.panel(UI.GLASS, 22, PLACE_PAD)
 	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var row := UI.hbox(4)
-	panel.add_child(row)
+	_place_grid = GridContainer.new()
+	_place_grid.add_theme_constant_override("h_separation", PLACE_GAP)
+	_place_grid.add_theme_constant_override("v_separation", PLACE_GAP)
+	panel.add_child(_place_grid)
 	_places.clear()
-	for b in _places_in_order():
+	for b in Content.biomes:
 		var id: String = b["id"]
-		var cell := UI.vbox(0)
 		var button := Button.new()
-		button.custom_minimum_size = Vector2(42, 42)
+		button.custom_minimum_size = Vector2(PLACE_BUTTON, PLACE_BUTTON)
 		button.accessibility_name = b["name"]
 		button.pressed.connect(_pick_place.bind(id))
-		cell.add_child(button)
+		_place_grid.add_child(button)
 		_places[id] = button
-		if not App.is_unlocked("place", id):
-			var lock := UI.icon_rect("lock", 12, Color.WHITE)
-			lock.position = Vector2(27, 1)
-			lock.size = Vector2(14, 14)
-			button.add_child(lock)
-			var lv := UI.label(Text.t("choose_focus.level_short", {"level": Levels.unlock_level("place", id, Content.levels)}), 10, UI.ON_DARK_SOFT, false, 800)
-			lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			button.accessibility_name = Text.t("choose_focus.place_locked_name", {"place": b["name"], "level": Levels.unlock_level("place", id, Content.levels)})
-			cell.add_child(lv)
-		row.add_child(cell)
+		# While it's locked the place's icon fades back under a padlock
+		# badge in the corner (see _refresh_places).
+		var lock := UI.panel(Color(0.06, 0.1, 0.08, 0.72), 999, 3)
+		lock.name = "Lock"
+		lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lock.add_child(UI.icon_rect("lock", 11, Color.WHITE))
+		button.add_child(lock)
+		lock.position = Vector2(PLACE_BUTTON - 19, PLACE_BUTTON - 19)
+	_fit_place_grid()
 	_refresh_places()
 	return panel
 
 
-## The places in the order they unlock.
-static func _places_in_order() -> Array:
-	var out: Array = Content.biomes.duplicate()
-	out.sort_custom(func(a, b): return Levels.unlock_level("place", a["id"], Content.levels) < Levels.unlock_level("place", b["id"], Content.levels))
-	return out
+## As many place buttons to a row as fit across the screen, shared out
+## evenly between the rows (so 11 on a phone go 6 and 5, not 7 and 4).
+func _fit_place_grid() -> void:
+	if not is_instance_valid(_place_grid):
+		return
+	var count := _places.size()
+	var insets := UI.safe_insets(self)
+	var room: float = size.x - 32.0 - PLACE_PAD * 2.0 - float(insets["left"]) - float(insets["right"])
+	var fit := maxi(1, floori((room + PLACE_GAP) / float(PLACE_BUTTON + PLACE_GAP)))
+	var rows := ceili(count / float(fit))
+	_place_grid.columns = maxi(1, ceili(count / float(maxi(rows, 1))))
 
 
 func _refresh_places() -> void:
@@ -227,11 +267,13 @@ func _refresh_places() -> void:
 		var unlocked := App.is_unlocked("place", id)
 		var on: bool = id == current
 		var fill := Color.WHITE if on else Color(1, 1, 1, 0.0)
-		var ink := UI.ACCENT.darkened(0.2) if on else Color(1, 1, 1, 0.92 if unlocked else 0.35)
+		var ink := UI.ACCENT.darkened(0.2) if on else Color(1, 1, 1, 0.92 if unlocked else 0.42)
+		button.get_node("Lock").visible = not unlocked
+		button.accessibility_name = _place_title(id) if unlocked else Text.t("choose_focus.place_locked_name", {"place": _place_title(id), "rule": Unlocks.describe(Content.unlock_rule("place", id))})
 		UI.style_button(button, fill, ink, 14)
 		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 			(button.get_theme_stylebox(state) as StyleBoxFlat).set_content_margin_all(0)
-		button.icon = Icons.texture(str(Content.biome(id).get("icon", "place_lake")), 22, Color.WHITE, 2.0)
+		button.icon = Icons.place(Content.biome(id), 22)
 		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if _place_name:
 		_place_name.text = str(Content.biome(current).get("name", "")).to_upper()
@@ -313,6 +355,7 @@ func _layout() -> void:
 		return
 	var insets := UI.safe_insets(self)
 	var places := _pick.get_node_or_null("Places") as Control
+	_fit_place_grid()
 	if places:
 		places.size = places.get_combined_minimum_size()
 		places.position = Vector2((size.x - places.size.x) * 0.5, 72.0 + insets["top"])
@@ -338,6 +381,11 @@ func _on_pet_changed(i: int) -> void:
 		(_pets.items[j].get_meta("view") as AnimalView).walking = j == i
 	var p := _projects[i]
 	_remembered = p.id
+	# Each pet walks in its own place.
+	var place := _place_id()
+	if place != str(_scenery.biome.get("id", "")):
+		_show_place(place)
+	_refresh_places()
 	_title.text = p.name
 	_pet_line.text = Content.pet_called(p, true)
 	_under.text = Text.t("choose_focus.pet_under", {"kind": Content.animal(p.animal_id).get("name", ""), "time": Stats.format_duration(App.state.project_seconds(p.id))})
@@ -445,7 +493,7 @@ func _build_adopt() -> void:
 
 	_name_edit = _field(Text.t("choose_focus.project_placeholder"), 40, 18)
 	v.add_child(_name_edit)
-	# Optional: a pet without a name goes by its kind ("your staffy").
+	# Optional: a pet without a name goes by its kind ("your dog 1").
 	_pet_edit = _field("", 24, 16)
 	_pet_edit.custom_minimum_size.y = 46
 	v.add_child(_pet_edit)
@@ -492,12 +540,15 @@ func _build_adopt() -> void:
 	var first_open := -1
 	for i in Content.animals.size():
 		var a: Dictionary = Content.animals[i]
-		var level := Levels.unlock_level("animal", a["id"], Content.levels)
 		var open := App.is_unlocked("animal", a["id"])
-		items.append(_pet(a["id"], Content.animal_default_colours(a["id"]), 150.0, 0 if open else level))
+		items.append(_pet(a["id"], Content.animal_default_colours(a["id"]), 150.0, not open))
 		if open and first_open < 0:
 			first_open = i
 	_animals.changed.connect(_on_animal_changed)
+	_animals.activated.connect(func(i: int):
+		var a: Dictionary = Content.animals[i]
+		if not App.is_unlocked("animal", a["id"]):
+			LockPopup.open("animal", a["id"]))
 	_animals.set_items(items, maxi(first_open, 0))
 	_on_animal_changed(_animals.index)
 
@@ -522,7 +573,7 @@ func _on_animal_changed(i: int) -> void:
 		_animal_hint.add_theme_color_override("font_color", UI.INK_FAINT)
 		_pet_edit.placeholder_text = Text.t("choose_focus.name_pet", {"kind": str(a["name"]).to_lower()})
 	else:
-		_animal_hint.text = Text.t("choose_focus.animal_locked", {"level": Levels.unlock_level("animal", a["id"], Content.levels)})
+		_animal_hint.text = Text.t("choose_focus.animal_locked", {"rule": Unlocks.describe(Content.unlock_rule("animal", a["id"]))})
 		_animal_hint.add_theme_color_override("font_color", UI.INK_SOFT)
 	_new.set_disabled_look(not open)
 	# A locked animal can't be coloured in: the colour buttons fade away, but
@@ -620,9 +671,9 @@ func _set_icon(b: Button, icon: String, tip: String) -> void:
 	b.accessibility_name = tip
 
 
-## An animal standing on a soft shadow, for the carousels. `locked_at` > 0
-## greys it out with a padlock and the level it unlocks at.
-func _pet(animal_id: String, colours: Array[Color], height: float, locked_at: int = 0) -> Control:
+## An animal standing on a soft shadow, for the carousels. `locked` greys
+## it out under a padlock.
+func _pet(animal_id: String, colours: Array[Color], height: float, locked: bool = false) -> Control:
 	var stage := _Stage.new()
 	stage.custom_minimum_size = Vector2(height * 1.25, height)
 	var view := AnimalView.new()
@@ -633,20 +684,20 @@ func _pet(animal_id: String, colours: Array[Color], height: float, locked_at: in
 	var s := minf(stage.custom_minimum_size.x / 175.0, height / 105.0) / float(Content.animal(animal_id).get("size", 1.0))
 	view.scale = Vector2(s, s)
 	view.position = Vector2(stage.custom_minimum_size.x * 0.44, height * 0.86)
-	if locked_at > 0:
+	if locked:
 		stage.set_meta("locked", true)
 		var greys: Array[Color] = []
 		for k in colours.size():
 			greys.append(UI.NEUTRAL.lerp(UI.INK_FAINT, k * 0.3))
 		view.colours = greys
 		view.modulate.a = 0.75
-		var badge := UI.panel(UI.SURFACE_SOFT, 999, 6)
-		var row := UI.hbox(4)
-		row.add_child(UI.icon_rect("lock", 14, UI.INK_SOFT))
-		row.add_child(UI.label(Text.t("choose_focus.level_short", {"level": locked_at}), 13, UI.INK_SOFT, false, 900))
-		badge.add_child(row)
+		# A padlock on a disc over the middle of the animal.
+		var badge := UI.panel(UI.SURFACE_SOFT, 999, 9)
+		badge.add_child(UI.icon_rect("lock", 22, UI.INK_SOFT))
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		stage.add_child(badge)
-		badge.position = Vector2(stage.custom_minimum_size.x * 0.5 - 34.0, height * 0.12)
+		var side := badge.get_combined_minimum_size()
+		badge.position = Vector2(stage.custom_minimum_size.x * 0.48, height * 0.5) - side * 0.5
 	return stage
 
 

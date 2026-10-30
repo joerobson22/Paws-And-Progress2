@@ -283,7 +283,8 @@ func _location_toggle() -> Control:
 # --- Rewards -----------------------------------------------------------------
 
 ## Everything levelling up unlocks, in order, with a line down the left
-## filled to where you are now. The title and your level stay at the top
+## filled to where you are now, then what's unlocked by exploring (hours in
+## a place, a finished gift table). The title and your level stay at the top
 ## while the rewards scroll, and it opens scrolled to where you are.
 func open_rewards() -> void:
 	var table := Content.levels
@@ -315,20 +316,59 @@ func open_rewards() -> void:
 		if here == null and float(rows[i]["level"]) > at:
 			here = row
 	m.body.add_child(list)
+	var others := Unlocks.other_rewards()
+	if not others.is_empty():
+		var heading := UI.label(Text.t("rewards.exploring"), 15, UI.INK_SOFT, false, 800)
+		heading.custom_minimum_size.y = 40
+		heading.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		m.body.add_child(heading)
+		var more := UI.vbox(0)
+		for r in others:
+			more.add_child(_other_row(r))
+		m.body.add_child(more)
 	m.scroll_to(here if here else list.get_child(list.get_child_count() - 1))
 
 
 ## Level 1's animals and places first, then each reward in level order.
 func _reward_list() -> Array:
-	var out: Array = []
-	for b in Content.biomes:
-		if Levels.unlock_level("place", b["id"], Content.levels) == 1:
-			out.append({"level": 1, "type": "place", "id": b["id"]})
-	for a in Content.animals:
-		if Levels.unlock_level("animal", a["id"], Content.levels) == 1:
-			out.append({"level": 1, "type": "animal", "id": a["id"]})
-	out.append_array(Levels.rewards(Content.levels))
-	return out
+	return Unlocks.level_rewards()
+
+
+## An animal or place unlocked by exploring: what it takes and, until it's
+## yours, a padlock; tap a locked one to see how far along you are.
+func _other_row(r: Dictionary) -> Control:
+	var open := App.is_unlocked(r["type"], r["id"])
+	var row := UI.hbox(12)
+	row.custom_minimum_size.y = 72
+	# Lines up with the level rewards' pictures, past their track.
+	var gap := Control.new()
+	gap.custom_minimum_size.x = 22
+	row.add_child(gap)
+	var icon: Control
+	var title := ""
+	if r["type"] == "place":
+		title = Content.biome(r["id"]).get("name", "")
+		icon = UI.place_tile(Content.biome(r["id"]), 56)
+	else:
+		title = Content.animal(r["id"]).get("name", "")
+		icon = UI.animal_portrait(r["id"], Content.animal_default_colours(r["id"]), Vector2(56, 56))
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.modulate.a = 1.0 if open else 0.45
+	row.add_child(icon)
+	var words := UI.vbox(0)
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	words.add_child(UI.trimmed(title, 17, UI.INK if open else UI.INK_SOFT, false, 800))
+	var rule := UI.para(Unlocks.describe(Content.unlock_rule(r["type"], r["id"])), 13, UI.INK_FAINT, 700)
+	words.add_child(rule)
+	row.add_child(words)
+	if not open:
+		row.add_child(UI.icon_rect("lock", 16, UI.INK_FAINT))
+		UI.ignore_mouse(row)
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.mouse_default_cursor_shape = Cursor.HOVER
+		Press.attach(row).tapped.connect(LockPopup.open.bind(r["type"], r["id"]))
+	return row
 
 
 func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
@@ -350,9 +390,7 @@ func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
 	if r["type"] == "place":
 		var b := Content.biome(r["id"])
 		title = b.get("name", "")
-		icon = UI.panel(_place_colour(b), 16, 0)
-		icon.custom_minimum_size = Vector2(56, 56)
-		icon.add_child(UI.icon_rect(str(b.get("icon", "place_lake")), 28, Color.WHITE))
+		icon = UI.place_tile(b, 56)
 	else:
 		title = Content.animal(r["id"]).get("name", "")
 		icon = UI.animal_portrait(r["id"], Content.animal_default_colours(r["id"]), Vector2(56, 56))
@@ -370,14 +408,6 @@ func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
 	if not open:
 		row.add_child(UI.icon_rect("lock", 16, UI.INK_FAINT))
 	return row
-
-
-## A place's tile colour: its ground, a little darker so a white icon shows.
-static func _place_colour(b: Dictionary) -> Color:
-	for layer in b.get("layers", []):
-		if layer["kind"] == "ground":
-			return Color.from_string(layer["colour"], UI.ACCENT).darkened(0.3)
-	return UI.ACCENT
 
 
 ## One row's piece of the progress line, with its dot.

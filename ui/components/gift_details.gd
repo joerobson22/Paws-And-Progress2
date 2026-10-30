@@ -27,8 +27,8 @@ static func open(id: String, fresh: bool = false, yours: bool = true) -> void:
 
 	var meta := UI.hbox(8)
 	meta.add_child(UI.tag(Content.rarity_name(rarity).to_upper(), Content.rarity_colour(rarity), UI.ON_COLOUR))
-	var animal_name: String = Content.animal(g["animal"]).get("name", "")
-	meta.add_child(UI.label(Text.t("gift.from", {"animal": animal_name.to_lower()}), 14, UI.INK_SOFT, false, 700))
+	var table_name: String = Content.table(g["table"]).get("name", "")
+	meta.add_child(UI.label(Text.t("gift.from", {"table": table_name.to_lower()}), 14, UI.INK_SOFT, false, 700))
 	if fresh:
 		meta.add_child(UI.spacer())
 		meta.add_child(UI.tag(Text.t("gift.new"), UI.INK, UI.BG))

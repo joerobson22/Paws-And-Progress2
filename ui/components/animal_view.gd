@@ -17,9 +17,21 @@ const SHADER := "res://art/animal_colours.gdshader"
 const MOUTHS := {
 	"dog": Vector2(70, -54), "bear": Vector2(66, -52), "cat": Vector2(50, -46),
 	"rabbit": Vector2(34, -42), "snail": Vector2(50, -14), "bird": Vector2(36, -38),
+	"sheep": Vector2(62, -50), "pig": Vector2(68, -40), "tortoise": Vector2(56, -16),
+	"frog": Vector2(40, -24), "elephant": Vector2(78, -38), "giraffe": Vector2(70, -158),
+	"snake": Vector2(62, -18), "lizard": Vector2(56, -12), "spider": Vector2(34, -14),
+	"rhino": Vector2(80, -40),
+}
+## Where each shape's lead clips on, before any bounce in its step.
+const NECKS := {
+	"bear": Vector2(30, -58), "cat": Vector2(28, -46), "rabbit": Vector2(14, -40),
+	"snail": Vector2(32, -12), "bird": Vector2(11, -38), "sheep": Vector2(32, -54),
+	"pig": Vector2(34, -44), "tortoise": Vector2(36, -18), "frog": Vector2(22, -26),
+	"elephant": Vector2(40, -78), "giraffe": Vector2(32, -96), "snake": Vector2(40, -14),
+	"lizard": Vector2(30, -12), "spider": Vector2(14, -18), "rhino": Vector2(40, -62),
 }
 
-@export var animal_id: String = "staffy":
+@export var animal_id: String = "dog1":
 	set(v):
 		animal_id = v
 		_load_rig()
@@ -240,6 +252,26 @@ func _draw() -> void:
 			_draw_bird()
 		"bear":
 			_draw_bear()
+		"sheep":
+			_draw_sheep()
+		"pig":
+			_draw_pig()
+		"tortoise":
+			_draw_tortoise()
+		"frog":
+			_draw_frog()
+		"elephant":
+			_draw_elephant()
+		"giraffe":
+			_draw_giraffe()
+		"snake":
+			_draw_snake()
+		"lizard":
+			_draw_lizard()
+		"spider":
+			_draw_spider()
+		"rhino":
+			_draw_rhino()
 		_:
 			_draw_dog()
 	_draw_over(self, str(data.get("shape", "dog")))
@@ -261,24 +293,21 @@ func neck() -> Vector2:
 	if _rig:
 		return _marker("Neck", Vector2(34, -55))
 	var data := Content.animal(animal_id)
+	var shape := str(data.get("shape", "dog"))
+	var at: Vector2 = NECKS.get(shape, Vector2(34, -55))
 	var lift := 0.0
-	var at := Vector2(34, -55)
-	match str(data.get("shape", "dog")):
-		"bear":
-			at = Vector2(30, -58)
-			lift = absf(sin(_phase)) * 2.0 * _stride() if walking else 0.0
-		"cat":
-			at = Vector2(28, -46)
-		"rabbit":
-			at = Vector2(14, -40)
-			lift = absf(sin(_phase * 0.5)) * 14.0 * _stride() if walking else 0.0
-		"snail":
-			at = Vector2(32, -12)
-		"bird":
-			at = Vector2(11, -38)
-			lift = absf(sin(_phase * 0.7)) * 8.0 * _stride() if walking else 0.0
-		_:
-			lift = absf(sin(_phase)) * 2.0 * _stride() if walking else 0.0
+	if walking:
+		match shape:
+			"cat", "snail", "snake", "lizard", "spider", "tortoise":
+				lift = 0.0
+			"rabbit":
+				lift = absf(sin(_phase * 0.5)) * 14.0 * _stride()
+			"frog":
+				lift = _hop(0.5, 16.0)
+			"bird":
+				lift = absf(sin(_phase * 0.7)) * 8.0 * _stride()
+			_:
+				lift = absf(sin(_phase)) * 2.0 * _stride()
 	return (at - Vector2(0, lift)) * float(data.get("size", 1.0))
 
 
@@ -437,3 +466,235 @@ func _draw_bird() -> void:
 	draw_circle(Vector2(18, -40 - hop) + d, 9, body)
 	draw_colored_polygon(PackedVector2Array([Vector2(26, -42 - hop) + d, Vector2(34, -39 - hop) + d, Vector2(26, -36 - hop) + d]), pattern.darkened(0.2))
 	_eye(Vector2(20, -43 - hop) + d, 1.8, body)
+
+
+## How high a hopping animal is off the ground now.
+func _hop(rate: float, height: float) -> float:
+	return absf(sin(_phase * rate)) * height * _stride() if walking else 0.0
+
+
+## A gentle up and down with each step.
+func _bob(height: float = 2.0) -> float:
+	return absf(sin(_phase)) * height * _stride() if walking else 0.0
+
+
+func _draw_sheep() -> void:
+	var legs := _part("Legs", Color("#3a3330"))
+	var wool := _part("Wool", Color("#f1ece2"))
+	var face := _part("Face", Color("#2f2a28"))
+	var bob := _bob()
+	_legs([-24, -12, 14, 26], -26 - bob, 26, 7, legs)
+	# A cloud of wool: overlapping puffs, a shade darker underneath.
+	for k in 7:
+		var a := PI + PI * k / 6.0
+		draw_circle(Vector2(0, -44 - bob) + Vector2(cos(a) * 32.0, sin(a) * 15.0 + 4.0), 15.0, wool.darkened(0.06), true, -1.0, true)
+	_ellipse(Vector2(0, -46 - bob), Vector2(36, 19), wool)
+	draw_circle(Vector2(-30, -50 - bob), 8, wool, true, -1.0, true)
+	var d := _droop()
+	_ellipse(Vector2(42, -56 - bob) + d, Vector2(12, 14), face, -0.3)
+	_ellipse(Vector2(34, -64 - bob) + d, Vector2(9, 4), face.lightened(0.1), -0.5 - 0.6 * sad)
+	draw_circle(Vector2(38, -70 - bob) + d, 7, wool, true, -1.0, true)
+	draw_circle(Vector2(46, -60 - bob) + d, 2.0, Color.WHITE)
+
+
+func _draw_pig() -> void:
+	var legs := _part("Legs", Color("#d98f92"))
+	var body := _part("Body", Color("#f2b5b5"))
+	var snout := _part("Snout", Color("#e58f96"))
+	var bob := _bob()
+	_legs([-26, -14, 16, 28], -22 - bob, 22, 9, legs)
+	# A curly tail.
+	var tail := PackedVector2Array()
+	for k in 12:
+		var a := k / 11.0 * TAU * 1.2
+		tail.append(Vector2(-44, -42 - bob) + Vector2(-4.0 - cos(a) * 5.0, sin(a) * 5.0 - k * 0.4))
+	draw_polyline(tail, body.darkened(0.1), 3, true)
+	_ellipse(Vector2(0, -36 - bob), Vector2(42, 22), body)
+	var d := _droop() * 0.8
+	draw_circle(Vector2(44, -46 - bob) + d, 17, body, true, -1.0, true)
+	draw_colored_polygon(PackedVector2Array([Vector2(32, -58 - bob) + d, Vector2(36, -72 - bob) + d + Vector2(4, 6) * sad, Vector2(44, -60 - bob) + d]), legs)
+	_ellipse(Vector2(62, -42 - bob) + d, Vector2(7, 9), snout)
+	draw_circle(Vector2(63, -45 - bob) + d, 1.6, snout.darkened(0.4))
+	draw_circle(Vector2(63, -39 - bob) + d, 1.6, snout.darkened(0.4))
+	_eye(Vector2(50, -52 - bob) + d, 2.4, body)
+
+
+func _draw_tortoise() -> void:
+	var legs := _part("Legs", Color("#8a8f5a"))
+	var shell := _part("Shell", Color("#6b5a35"))
+	var pattern := _part("Pattern", Color("#a68c55"))
+	var step := sin(_phase) * 3.0 if walking else 0.0
+	for x in [-24, 20]:
+		_ellipse(Vector2(x + step, -6), Vector2(8, 8), legs)
+	for x in [-14, 30]:
+		_ellipse(Vector2(x - step, -6), Vector2(7, 7), legs.darkened(0.1))
+	var d := _droop() * 0.5
+	_ellipse(Vector2(46, -18) + d + Vector2(0, 4) * sad, Vector2(12, 9), legs)
+	_eye(Vector2(51, -21) + d + Vector2(0, 4) * sad, 2.0, legs)
+	# The domed shell, its rim and a few plates.
+	var dome := PackedVector2Array()
+	for k in 25:
+		var a := PI + PI * k / 24.0
+		dome.append(Vector2(cos(a) * 40.0, sin(a) * 34.0 - 8.0))
+	draw_colored_polygon(dome, shell)
+	draw_rect(Rect2(-42, -12, 84, 6), shell.darkened(0.2))
+	for k in 3:
+		var c := Vector2(-20 + k * 20, -24 - (6 if k == 1 else 0))
+		var plate := PackedVector2Array()
+		for j in 7:
+			var a := TAU * j / 6.0
+			plate.append(c + Vector2(cos(a), sin(a)) * 8.0)
+		draw_polyline(plate, pattern, 2.5, true)
+
+
+func _draw_frog() -> void:
+	var legs := _part("Legs", Color("#4f8a3a"))
+	var body := _part("Body", Color("#6fae4a"))
+	var belly := _part("Belly", Color("#d9e6a0"))
+	var hop := _hop(0.5, 16.0)
+	var stretch := clampf(hop / 16.0, 0.0, 1.0)
+	# Back legs fold under it, and kick out as it jumps.
+	_ellipse(Vector2(-16 - 6 * stretch, -8 - hop * 0.6), Vector2(16, 7), legs, -0.2 - 0.4 * stretch)
+	_ellipse(Vector2(-4, -6 - hop * 0.6), Vector2(9, 5), legs)
+	_ellipse(Vector2(16, -6 - hop), Vector2(4, 8), legs)
+	_ellipse(Vector2(0, -20 - hop), Vector2(26, 15), body)
+	_ellipse(Vector2(10, -16 - hop), Vector2(14, 8), belly)
+	var d := _droop() * 0.4
+	for x in [14, 28]:
+		draw_circle(Vector2(x, -36 - hop) + d, 7, body, true, -1.0, true)
+		_eye(Vector2(x + 1, -37 - hop) + d, 3.0, body)
+	draw_arc(Vector2(30, -22 - hop) + d, 8, 0.2 + 0.6 * sad, 1.4 - 0.4 * sad, 8, UI.INK, 1.5, true)
+
+
+func _draw_elephant() -> void:
+	var legs := _part("Legs", Color("#7d7f86"))
+	var body := _part("Body", Color("#9a9ca3"))
+	var ears := _part("Ears", Color("#b8a5a5"))
+	var bob := _bob(2.5)
+	var step := 0.25 * _stride()
+	for i in 4:
+		var x: float = [-30, -12, 16, 34][i]
+		var swing := sin(_phase + PI * (i % 2)) * step if walking else 0.0
+		draw_line(Vector2(x, -34 - bob), Vector2(x, -34 - bob) + Vector2(0, 34).rotated(swing), legs if i % 2 == 0 else legs.darkened(0.08), 16, true)
+	draw_line(Vector2(-46, -58 - bob), Vector2(-54, -34 - bob + sin(_phase * 2.0) * 3.0), body, 3, true)
+	_ellipse(Vector2(0, -60 - bob), Vector2(48, 30), body)
+	var d := _droop() * 0.6
+	_ellipse(Vector2(50, -72 - bob) + d, Vector2(20, 19), body)
+	# The trunk curls down from the face.
+	var trunk := PackedVector2Array()
+	for k in 9:
+		var t := k / 8.0
+		trunk.append(Vector2(64, -68 - bob) + d + Vector2(10.0 * sin(t * 1.6), 46.0 * t) + Vector2(sin(_phase + t * 2.0) * 3.0 * t, 0))
+	draw_polyline(trunk, body, 9, true)
+	draw_line(Vector2(60, -58 - bob) + d, Vector2(72, -52 - bob) + d, Color("#f4efe2"), 4, true)
+	_ellipse(Vector2(38, -70 - bob) + d, Vector2(15, 20), ears, 0.2 + 0.3 * sad)
+	_eye(Vector2(56, -78 - bob) + d, 2.5, body)
+
+
+func _draw_giraffe() -> void:
+	var legs := _part("Legs", Color("#c99a5a"))
+	var body := _part("Body", Color("#e8c07a"))
+	var patches := _part("Patches", Color("#9a5a2c"))
+	var bob := _bob(2.5)
+	_legs([-24, -14, 16, 26], -60 - bob, 60, 7, legs)
+	draw_line(Vector2(-34, -78 - bob), Vector2(-40, -56 - bob + sin(_phase * 2.0) * 3.0), body, 3, true)
+	_ellipse(Vector2(0, -74 - bob), Vector2(36, 20), body)
+	# The long neck leans forward, and lower when it's sad.
+	var head := Vector2(54, -150 - bob).lerp(Vector2(66, -96 - bob), sad * 0.6)
+	draw_line(Vector2(22, -80 - bob), head + Vector2(-8, 10), body, 15, true)
+	for k in 4:
+		var t := (k + 0.5) / 4.0
+		draw_circle(Vector2(22, -80 - bob).lerp(head + Vector2(-8, 10), t), 3.5, patches, true, -1.0, true)
+	for c in [Vector2(-18, -78), Vector2(2, -68), Vector2(16, -80), Vector2(-6, -86)]:
+		draw_circle(c - Vector2(0, bob), 5.5, patches, true, -1.0, true)
+	_ellipse(head, Vector2(15, 9), body, 0.2)
+	draw_line(head + Vector2(-6, -8), head + Vector2(-6, -18), patches, 3, true)
+	draw_line(head + Vector2(0, -8), head + Vector2(0, -18), patches, 3, true)
+	_eye(head + Vector2(0, -2), 2.2, body)
+
+
+func _draw_snake() -> void:
+	var belly := _part("Belly", Color("#e2d2a0"))
+	var body := _part("Body", Color("#a6763a"))
+	var pattern := _part("Pattern", Color("#5a3b25"))
+	var wave := _phase * 0.8 if walking else 0.0
+	var pts := PackedVector2Array()
+	for k in 24:
+		var t := k / 23.0
+		pts.append(Vector2(-60 + 110 * t, -8 - sin(t * 9.0 - wave) * 5.0 * (1.0 - t * 0.5)))
+	draw_polyline(pts, belly, 12, true)
+	draw_polyline(pts, body, 9, true)
+	for k in range(2, 22, 3):
+		draw_circle(pts[k], 2.5, pattern, true, -1.0, true)
+	var d := _droop() * 0.4
+	var lift := 18.0 * (1.0 - sad)
+	var head := Vector2(58, -10 - lift) + d
+	draw_line(pts[pts.size() - 1], head, body, 9, true)
+	_ellipse(head + Vector2(4, 0), Vector2(10, 7), body)
+	_eye(head + Vector2(6, -3), 1.8, body)
+	if walking and fmod(_phase, 3.0) < 0.8:
+		draw_polyline(PackedVector2Array([head + Vector2(13, 2), head + Vector2(20, 2), head + Vector2(23, -1)]), Color("#d04a4a"), 1.5, true)
+
+
+func _draw_lizard() -> void:
+	var legs := _part("Legs", Color("#5a7a3a"))
+	var body := _part("Body", Color("#8aae5a"))
+	var pattern := _part("Pattern", Color("#e2c046"))
+	var sway := sin(_phase * 1.5) * 4.0 if walking else 0.0
+	var tail := PackedVector2Array()
+	for k in 10:
+		var t := k / 9.0
+		tail.append(Vector2(-22 - 40 * t, -12 + t * 6.0 + sin(t * 3.0 + _phase) * 3.0 * t))
+	draw_polyline(tail, body, 7.0, true)
+	for i in 4:
+		var x: float = [-16, -12, 18, 22][i]
+		var swing := (1 if i % 2 == 0 else -1) * sway
+		draw_line(Vector2(x, -12), Vector2(x + swing, -2), legs, 4, true)
+		draw_line(Vector2(x + swing, -2), Vector2(x + swing + 5, 0), legs, 3, true)
+	_ellipse(Vector2(0, -14), Vector2(26, 8), body)
+	for k in 3:
+		draw_circle(Vector2(-12 + k * 10, -18), 2.2, pattern, true, -1.0, true)
+	var d := _droop() * 0.3
+	_ellipse(Vector2(34, -16) + d, Vector2(11, 6), body, -0.1)
+	_eye(Vector2(36, -19) + d, 1.8, body)
+
+
+func _draw_spider() -> void:
+	var legs := _part("Legs", Color("#2b2523"))
+	var body := _part("Body", Color("#3e3430"))
+	var pattern := _part("Pattern", Color("#c9a046"))
+	var bob := _bob(1.5)
+	# Four legs a side, each bent at the knee, stepping in turn.
+	for i in 8:
+		var side := -1.0 if i < 4 else 1.0
+		var k := i % 4
+		var swing := sin(_phase * 1.5 + k * 1.2 + (PI if side > 0 else 0.0)) * 4.0 if walking else 0.0
+		var hip := Vector2(-2 + k * 5, -18 - bob)
+		var knee := hip + Vector2(side * (12 + k * 3) + swing, -16 + k * 3)
+		var foot := Vector2(hip.x + side * (24 + k * 6) + swing * 1.5, 0)
+		draw_polyline(PackedVector2Array([hip, knee, foot]), legs if side > 0 else legs.lightened(0.12), 2.5, true)
+	_ellipse(Vector2(-12, -22 - bob), Vector2(17, 14), body)
+	draw_circle(Vector2(-12, -24 - bob), 4, pattern, true, -1.0, true)
+	var d := _droop() * 0.3
+	draw_circle(Vector2(10, -18 - bob) + d, 9, body, true, -1.0, true)
+	for e in [Vector2(14, -22), Vector2(18, -20)]:
+		_eye(e - Vector2(0, bob) + d, 1.6, body)
+
+
+func _draw_rhino() -> void:
+	var legs := _part("Legs", Color("#6e6a66"))
+	var body := _part("Body", Color("#8c8782"))
+	var horn := _part("Horn", Color("#e2dccf"))
+	var bob := _bob()
+	_legs([-30, -16, 16, 30], -30 - bob, 30, 15, legs)
+	draw_line(Vector2(-46, -52 - bob), Vector2(-52, -34 - bob + sin(_phase * 2.0) * 3.0), body, 3, true)
+	_ellipse(Vector2(0, -52 - bob), Vector2(48, 26), body)
+	var d := _droop() * 0.6
+	# A long, low head, carried lower when it's sad.
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(34, -66 - bob) + d, Vector2(72, -52 - bob) + d, Vector2(80, -38 - bob) + d,
+		Vector2(66, -32 - bob) + d, Vector2(36, -38 - bob) + d]), body)
+	draw_colored_polygon(PackedVector2Array([Vector2(68, -50 - bob) + d, Vector2(80, -74 - bob) + d, Vector2(78, -46 - bob) + d]), horn)
+	draw_colored_polygon(PackedVector2Array([Vector2(56, -56 - bob) + d, Vector2(62, -66 - bob) + d, Vector2(64, -54 - bob) + d]), horn)
+	draw_colored_polygon(PackedVector2Array([Vector2(36, -64 - bob) + d, Vector2(38, -78 - bob) + d + Vector2(4, 6) * sad, Vector2(44, -64 - bob) + d]), body.darkened(0.1))
+	_eye(Vector2(50, -56 - bob) + d, 2.2, body)

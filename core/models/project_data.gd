@@ -19,8 +19,11 @@ const KIND_MODULE := "module"
 @export var due_unix: int = 0
 @export var tags: PackedStringArray = PackedStringArray()
 @export var grade: String = ""
-## Focus time imported from v1, which kept no per-session history.
-@export var legacy_seconds: int = 0
+## Where its walks go, picked on the choose focus screen; "" until one is
+## picked (then it starts in the animal's home, see App.project_place).
+@export var place: String = ""
+## gift id -> how many of its walks brought that gift.
+@export var gifts: Dictionary = {}
 
 
 func is_complete() -> bool:
@@ -43,7 +46,8 @@ func to_dict() -> Dictionary:
 		"due_unix": due_unix,
 		"tags": Array(tags),
 		"grade": grade,
-		"legacy_seconds": legacy_seconds,
+		"place": place,
+		"gifts": gifts,
 	}
 
 
@@ -61,5 +65,9 @@ static func from_dict(d: Dictionary) -> ProjectData:
 	p.due_unix = int(d.get("due_unix", 0))
 	p.tags = PackedStringArray(d.get("tags", []))
 	p.grade = str(d.get("grade", ""))
-	p.legacy_seconds = int(d.get("legacy_seconds", 0))
+	p.place = str(d.get("place", ""))
+	var got = d.get("gifts", {})
+	if got is Dictionary:
+		for id in got:
+			p.gifts[str(id)] = int(got[id])
 	return p
