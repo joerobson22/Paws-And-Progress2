@@ -734,9 +734,10 @@ func _run() -> void:
 	var rows: Array = _all(modal_class.top().body, func(n): return n is Button and n.accessibility_name in app.state.active_projects().map(func(p): return p.name))
 	check(rows.size() == app.state.active_projects().size(), "every ongoing project is listed (%d)" % rows.size())
 	check(_find(modal_class.top().body, func(n): return n is Button and n.text == "New project") != null, "with New project at the bottom")
+	var picked: String = rows[1].accessibility_name
 	rows[1].pressed.emit()
 	await _wait(20)
-	check(chooser._project_pill.text == rows[1].accessibility_name, "picking a project puts it in the pill")
+	check(chooser._project_pill.text == picked, "picking a project puts it in the pill")
 	chooser._open_projects()
 	await _wait(20)
 	var add: Button = _find(modal_class.top().body, func(n): return n is Button and n.text == "New project")
