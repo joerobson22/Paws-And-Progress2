@@ -121,4 +121,6 @@ func _gui_input(e: InputEvent) -> void:
 		_drag_from = e.position
 	elif e is InputEventMouseMotion and _armed and e.position.distance_to(_drag_from) >= Gestures.TAP_SLOP:
 		_armed = false
+		# The drag is the gift's now, not a scroll's or a swipe's.
+		Gestures.claimed = true
 		lifted.emit(self)

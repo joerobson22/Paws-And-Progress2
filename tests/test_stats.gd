@@ -123,6 +123,14 @@ func test_walk_split_over_midnight() -> void:
 	eq(Stats.split_by_day(MONDAY, 0, 0), [], "nothing to share")
 
 
+func test_format_long() -> void:
+	eq(Stats.format_long(0), "0m")
+	eq(Stats.format_long(40 * 60), "40m")
+	eq(Stats.format_long(312 * 3600 + 40 * 60), "1wk 6d 40m", "13 days, no hours")
+	eq(Stats.format_long(31 * 86400 + 3600), "1mo 1d 1h")
+	eq(Stats.format_long(400 * 86400), "1yr 1mo 5d")
+
+
 func test_format_duration() -> void:
 	eq(Stats.format_duration(59), "0m")
 	eq(Stats.format_duration(3600 * 11 + 23 * 60), "11h 23m")
