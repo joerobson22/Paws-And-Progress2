@@ -10,7 +10,8 @@
 		"complete": "Complete",
 		"home": "Home",
 		"sort_by": "Sort by",
-		"labelled": "{label}: {value}"
+		"labelled": "{label}: {value}",
+		"undo": "Undo"
 	},
 	"save": {
 		"reset": "Your save was from an older version, so this is a fresh start. The old one is kept beside it as save.old."
@@ -259,23 +260,38 @@
 		"grade": "Grade",
 		"focus_time": "Focus time",
 		"recently_walked": "Recently walked",
-		"recently_adopted": "Recently adopted"
+		"recently_adopted": "Recently adopted",
+		"top_pet": "Top pet"
 	},
-	"completed": {
-		"title": "Completed",
-		"empty_title": "Nothing finished yet",
-		"empty_body": "When a project's done, tap the green tick on the choose focus screen and it moves here, with everything your pet found along the way.",
-		"your_projects": "Your projects",
-		"finished": "Finished",
+	"projects": {
+		"title": "Projects",
+		"show": "Show",
+		"ongoing": "Ongoing",
+		"completed": "Completed",
+		"all": "All",
+		"complete": "Complete",
+		"x_of_y": "{x} of {y} done",
+		"empty_title_ongoing": "Nothing on the go",
+		"empty_body_ongoing": "Start a project from the project pill when you choose a focus. It shows here while you work on it.",
+		"empty_title_completed": "Nothing finished yet",
+		"empty_body_completed": "When a project's done, swipe it from right to left under Ongoing. It moves here with everything your pets found along the way.",
+		"empty_title_all": "No projects yet",
+		"empty_body_all": "Start a project from the project pill when you choose a focus.",
+		"hint_ongoing": "Swipe left to complete",
+		"hint_completed": "Swipe left to reopen",
+		"hint_all": "Your projects",
 		"graded": "{n} graded",
 		"focus_time": "Focus time",
-		"focus_time_note": "across all of them",
+		"focus_time_note": "across these",
 		"biggest": "Biggest",
 		"longest": "Longest",
 		"days": {
 			"one": "{n} day",
 			"other": "{n} days"
 		},
+		"deleted": "{project} deleted",
+		"reopened": "{project} is ongoing again",
+		"completed_toast": "{project} completed",
 		"grade_title": "Grade for {project}",
 		"remove_grade": "Remove grade",
 		"graded_toast": "{project}: {grade}"
@@ -287,7 +303,12 @@
 		"extra_and_dates": "{extra}  ·  {dates}",
 		"add_grade": "Give it a grade",
 		"change_grade": "{grade} · change the grade",
-		"grade_name": "{scale} {grade}"
+		"grade_name": "{scale} {grade}",
+		"pets": "Pets",
+		"places": "Places",
+		"no_walks": "No walks yet",
+		"ongoing": "Ongoing",
+		"completed": "Completed"
 	},
 	"profile": {
 		"title": "Profile",
@@ -505,5 +526,8 @@
 		"this_one": "this account",
 		"delete_title": "Delete {who}?",
 		"delete_body": "Its projects, walks, gifts and stats go for good. This can't be undone."
+	},
+	"podium": {
+		"rehomed": "{time} · rehomed"
 	}
 }

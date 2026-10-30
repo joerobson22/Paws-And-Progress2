@@ -333,15 +333,42 @@ func _run() -> void:
 	await _wait(30)
 	check(main._at == Vector2i.ZERO, "a short drag snaps back")
 
-	for pane in ["completed", "profile", "stats"]:
+	for pane in ["projects", "profile", "stats"]:
 		app.go(pane)
 		await _wait(50)
 		check(main._at == main.PANES[pane][0], "go %s" % pane)
 		await _shot(pane)
 
-	app.go("completed")
+	app.go("projects")
 	await _wait(50)
-	main._panes[Vector2i(1, 0)]._pick_grade(app.state.completed_projects()[0].id)
+	var projects_pane: Node = main._panes[Vector2i(1, 0)]
+	# Ongoing first: each project with its podiums of pets and places.
+	check(projects_pane._filter() == "ongoing", "projects opens on ongoing")
+	var filter: Node = _find(projects_pane, func(n): return _is(n, "dropdown.gd") and not n.sortable)
+	check(filter != null and filter.get_global_rect().end.x > projects_pane.size.x - 120.0 and filter.get_global_rect().position.y < 90.0, "the filter is in the top right")
+	var ongoing_panels: Array = _all(projects_pane, func(n): return _is(n, "project_panel.gd"))
+	check(ongoing_panels.size() == app.state.active_projects().size(), "one panel per ongoing project (%d)" % ongoing_panels.size())
+	var podiums: Array = _all(ongoing_panels[0], func(n): return _is(n, "podium.gd"))
+	check(podiums.size() == 2, "a podium for pets and one for places")
+	var top_pets: Array = _class("res://core/stats.gd").ranked(app.state.project(ongoing_panels[0].project_id).pets)
+	var first_name: Label = _find(podiums[0], func(n): return n is Label and n.text == app.state.pet(top_pets[0][0]).name)
+	check(first_name != null, "the pet that walked most is first")
+	check(_find(ongoing_panels[0], func(n): return n is Button) == null, "an ongoing project has no grade button")
+	for panel in ongoing_panels:
+		for pod in _all(panel, func(n): return _is(n, "podium.gd")):
+			for l in _all(pod, func(n): return n is Label):
+				check(l.get_global_rect().size.x > 20.0 or l.text.length() < 2, "podium words have room (%s)" % l.text)
+	await _shot("projects_ongoing")
+	# The headline numbers follow the filter: all of them shows a ring.
+	await _tap_menu(filter, "All")
+	await _wait(30)
+	check(_find(projects_pane, func(n): return _is(n, "progress_ring.gd")) != null, "all shows how much is complete")
+	await _shot("projects_all")
+	app.set_setting("projects_filter", "completed")
+	await _wait(30)
+	check(_all(projects_pane, func(n): return _is(n, "project_panel.gd")).size() == app.state.completed_projects().size(), "completed shows the finished ones")
+
+	projects_pane._pick_grade(app.state.completed_projects()[0].id)
 	await _wait(25)
 	await _shot("grade_picker")
 	_close_modal()
@@ -352,15 +379,15 @@ func _run() -> void:
 	var kept_grade: String = ungraded.grade
 	app.set_grade(ungraded.id, "")
 	await _wait(20)
-	var ungraded_panel: Node = _find(main._panes[Vector2i(1, 0)], func(n): return _is(n, "project_panel.gd") and n.project_id == ungraded.id)
+	var ungraded_panel: Node = _find(projects_pane, func(n): return _is(n, "project_panel.gd") and n.project_id == ungraded.id)
 	var ask: Control = _find(ungraded_panel, func(n): return n is Button) if ungraded_panel else null
 	check(ask != null and ask.get_child_count() == 1, "an ungraded project shows a \"?\"")
 	if ask:
 		# The list scrolls on its own: bring the panel into view first.
-		main._panes[Vector2i(1, 0)].scroll.ensure_control_visible(ungraded_panel)
+		projects_pane.scroll.ensure_control_visible(ungraded_panel)
 		await _wait(5)
-		# On its animal, top left (the middle can be under the minimap).
-		var on_panel: Vector2 = ungraded_panel.get_global_rect().position + Vector2(56, 44)
+		# On its name, top left (the middle can be under the minimap).
+		var on_panel: Vector2 = ungraded_panel.get_global_rect().position + Vector2(70, 26)
 		await _drag(on_panel, on_panel, 1)
 		await _wait(15)
 		check(not _class("res://ui/modal.gd").is_open(), "the rest of the panel doesn't open anything")
@@ -374,23 +401,66 @@ func _run() -> void:
 	app.set_grade(ungraded.id, kept_grade)
 	await _wait(10)
 
-	# Completed's own sort menu re-sorts just its list: the screen around it
-	# (and its stats) stays as it is.
-	var completed_pane: Node = main._panes[Vector2i(1, 0)]
-	var stats_panel: Node = _find(completed_pane, func(n): return _is(n, "stat_panel.gd"))
-	check(stats_panel != null, "completed shows its stats")
-	var done_sort: Node = _find(completed_pane, func(n): return _is(n, "dropdown.gd"))
+	# The sort menu re-sorts just the list: the screen around it (and its
+	# stats) stays as it is.
+	var stats_panel: Node = _find(projects_pane, func(n): return _is(n, "stat_panel.gd"))
+	check(stats_panel != null, "projects shows its stats")
+	var done_sort: Node = _find(projects_pane, func(n): return _is(n, "dropdown.gd") and n.sortable)
 	done_sort._open()
 	await _wait(15)
 	await _shot("completed_sort")
 	await _tap_menu(done_sort, "Grade")
 	await _wait(15)
-	var first_panel: Node = _find(completed_pane, func(n): return _is(n, "project_panel.gd"))
-	var best: Array = completed_pane.sort_projects(app.state.completed_projects(), "grade", false)
+	var first_panel: Node = _find(projects_pane, func(n): return _is(n, "project_panel.gd"))
+	var best: Array = projects_pane.sort_projects(app.state.completed_projects(), "grade", false)
 	check(app.state.settings.get("completed_sort") == "grade" and first_panel.project_id == best[0].id,
 		"sorting completed by grade puts the best first")
 	check(is_instance_valid(stats_panel), "sorting doesn't rebuild the screen")
 	await _shot("completed_by_grade")
+
+	# Swiping a project left completes it, with confetti; right deletes it,
+	# and Undo brings it back. Neither moves to another screen.
+	app.set_setting("projects_filter", "ongoing")
+	await _wait(30)
+	var going: int = app.state.active_projects().size()
+	var row: Control = _find(projects_pane, func(n): return _is(n, "swipe_row.gd"))
+	var row_id: String = row.content.project_id
+	projects_pane.scroll.ensure_control_visible(row)
+	await _wait(5)
+	var r: Rect2 = row.get_global_rect()
+	var y: float = maxf(r.position.y, projects_pane.scroll.get_global_rect().position.y) + 30.0
+	await _drag(Vector2(r.end.x - 30.0, y), Vector2(r.end.x - 30.0 - r.size.x * 0.3, y), 8, 0.0, false)
+	await _wait(2)
+	check(row._offset < -r.size.x * 0.2 and main._at == Vector2i(1, 0), "the panel follows the finger, not the screen")
+	await _shot("projects_swiping")
+	await _drag_on(Vector2(r.end.x - 30.0 - r.size.x * 0.3, y), Vector2(r.end.x - 30.0 - r.size.x * 0.5, y), 4)
+	await _wait(20)
+	await _shot("projects_confetti")
+	await _wait(80)
+	check(app.state.project(row_id).is_complete() and app.state.active_projects().size() == going - 1, "a long swipe left completes it")
+	check(main._at == Vector2i(1, 0), "and the screen stays put")
+	row = _find(projects_pane, func(n): return _is(n, "swipe_row.gd"))
+	row_id = row.content.project_id
+	projects_pane.scroll.ensure_control_visible(row)
+	await _wait(5)
+	r = row.get_global_rect()
+	y = maxf(r.position.y, projects_pane.scroll.get_global_rect().position.y) + 30.0
+	await _drag(Vector2(r.position.x + 30.0, y), Vector2(r.position.x + 30.0 + r.size.x * 0.15, y), 6)
+	await _wait(30)
+	check(app.state.project(row_id) != null and row._offset == 0.0, "a short swipe springs back")
+	await _drag(Vector2(r.position.x + 30.0, y), Vector2(r.position.x + 30.0 + r.size.x * 0.55, y), 8)
+	await _wait(60)
+	check(app.state.project(row_id) == null, "a long swipe right deletes it")
+	var undo: Button = _find(_class("res://ui/modal.gd").layer, func(n): return n is Button and n.text == "Undo")
+	check(undo != null, "with an Undo button")
+	await _shot("projects_deleted")
+	if undo:
+		undo.pressed.emit()
+		await _wait(30)
+	check(app.state.project(row_id) != null, "Undo brings it back")
+	# Put the completed one back, so the rest of the run sees the sample.
+	app.reopen_project(app.state.completed_projects().filter(func(p): return p.grade == "")[0].id)
+	await _wait(20)
 
 	app.go("profile")
 	await _wait(50)
@@ -1587,7 +1657,7 @@ func _fits(pane: Control) -> bool:
 
 ## Presses at `from`, optionally holds still for `hold` seconds, drags to
 ## `to` over a few frames and lets go.
-func _drag(from: Vector2, to: Vector2, steps: int = 10, hold: float = 0.0) -> void:
+func _drag(from: Vector2, to: Vector2, steps: int = 10, hold: float = 0.0, release_at_end: bool = true) -> void:
 	var press := InputEventMouseButton.new()
 	press.button_index = MOUSE_BUTTON_LEFT
 	press.pressed = true
@@ -1597,6 +1667,11 @@ func _drag(from: Vector2, to: Vector2, steps: int = 10, hold: float = 0.0) -> vo
 	await process_frame
 	if hold > 0.0:
 		await create_timer(hold).timeout
+	await _drag_on(from, to, steps, release_at_end)
+
+
+## Carries on a drag that's already pressed down, then lets go.
+func _drag_on(from: Vector2, to: Vector2, steps: int = 10, release_at_end: bool = true) -> void:
 	for i in steps:
 		var m := InputEventMouseMotion.new()
 		m.position = from.lerp(to, float(i + 1) / steps)
@@ -1605,6 +1680,8 @@ func _drag(from: Vector2, to: Vector2, steps: int = 10, hold: float = 0.0) -> vo
 		root.push_input(m, true)
 		# About a frame at 60fps, so swipe speeds are realistic.
 		await create_timer(0.016).timeout
+	if not release_at_end:
+		return
 	var release := InputEventMouseButton.new()
 	release.button_index = MOUSE_BUTTON_LEFT
 	release.pressed = false

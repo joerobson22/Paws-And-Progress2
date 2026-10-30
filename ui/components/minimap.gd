@@ -4,7 +4,7 @@ extends Control
 ## the middle, one each side), with the one you're on filled in, sitting in
 ## the bottom left corner (computers). The highlight glides with you as you swipe. It
 ## grows up and to the right into big tiles, each with an icon fading in for
-## its screen (a home for focus, a present for gifts, a tick for completed, a
+## its screen (a home for focus, a present for gifts, a clipboard for projects, a
 ## person for your profile and a bar chart for stats); pick one to go there.
 ## On phones it sits in the middle at the bottom instead, and grows up from
 ## there, so it's under either thumb.
@@ -18,7 +18,7 @@ signal picked(cell: Vector2i)
 const CELL := Vector2(10.0, 46.0)
 const GAP := Vector2(5.0, 8.0)
 const PAD := Vector2(9.0, 12.0)
-const ICONS := {"focus": "home", "gifts": "gift", "completed": "check", "profile": "user", "stats": "stats"}
+const ICONS := {"focus": "home", "gifts": "gift", "projects": "clipboard", "profile": "user", "stats": "stats"}
 const ICON_PX := 24
 ## With a mouse: how long it stays big after the pointer leaves it.
 const LINGER := 0.3
