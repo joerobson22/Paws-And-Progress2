@@ -3,18 +3,19 @@ extends Control
 ## The buttons at the top pick where this pet walks (each pet remembers its
 ## own, starting in its animal's home); locked places are greyed out under a
 ## padlock, and tapping one shows what unlocks it. They wrap onto a second
-## row where there isn't room for one. Under them are the project and the
-## pet's name; swipe left and right
-## through your pets, which stand on the path with their kind and time
+## row where there isn't room for one. Under them, the project pill says
+## what you're working on: tap it for your ongoing projects, or to start a
+## new one. Then the pet's name; swipe left and right through your pets,
+## which stand on the path with their kind, time walked and adoption date
 ## underneath (the one in the middle walks on the spot), and tap one to head
-## out. At the bottom, the red bin deletes that pet and the green tick
-## completes its project, each after a check. The × at the top left goes back
-## home, and the + at the top right switches to adopting a new pet: say what
-## it's for, give it a name, scroll up and down through the animals (locked
-## ones are grey under a padlock, say what unlocks them, and tapping one
-## shows how far along you are) and pick its three
-## colours. While adopting the bottom buttons go away, the × cancels and the
-## + turns into a tick that adopts it.
+## out. At the bottom, the red bin rehomes that pet after a check, and the
+## sort menu on the right orders the pets. The × at the top left goes back
+## home, and the paw at the top right switches to adopting a new pet: give
+## it a name (filled in with its kind), scroll up and down through the
+## animals (locked ones are grey under a padlock, say what unlocks them, and
+## tapping one shows how far along you are) and pick its three colours.
+## While adopting the bottom buttons go away, the × cancels and the paw
+## turns into a tick that adopts it.
 ## params: {"from": where the opening circle grew from}
 
 ## Quick picks in the colour popup: coat colours first, then a few brighter ones.
@@ -32,14 +33,22 @@ const PLACE_GAP := 4
 const PLACE_PAD := 6
 ## The scenery drifts by slowly behind the pets, in pixels a second.
 
-## The pet last in the middle, so the screen reopens where you left it.
-static var _remembered := ""
+static func sorts() -> Array:
+	return [
+		["focus", Text.t("sort.focus_time")], ["recent", Text.t("sort.recently_walked")],
+		["adopted", Text.t("sort.recently_adopted")], ["type", Text.t("sort.pet_type")],
+	]
+const SORT_KEY := "pet_sort"
 
 var params := {}
 
-var _projects: Array[ProjectData] = []
+## Your pets, in the order picked from the sort menu.
+var _pet_list: Array[PetData] = []
 var _adopting := false
-var _draft: ProjectData
+var _draft: PetData
+## The name box still holds the name it was filled in with, so it follows
+## the animal until you type your own.
+var _name_is_default := true
 var _scenery: Scenery
 var _shade := _Shade.new()
 var _pick := Control.new()
@@ -49,23 +58,23 @@ var _places: Dictionary = {}  # place id -> its button
 var _place_grid: GridContainer
 var _place_name: Label
 var _words: VBoxContainer
-var _title: Label
+var _project_pill: Button
 var _pet_line: Label
-## Under the pet: its kind and how long you've focused with it.
+var _hint: Label
+## Under the pet: its kind, how long it has walked and when you adopted it.
 var _under: Label
 var _animals: Carousel
 var _animal_title: Label
 var _animal_hint: Label
-var _name_edit: LineEdit
 var _pet_edit: LineEdit
 var _swatches: Array[Button] = []
 var _swatch_row: Control
 var _close: Button
 var _left: Button
-var _right: Button
+var _sort: Dropdown
 var _bottom: Control
-## The + at the top right; a tick while adopting.
-var _new: KnockoutButton
+## The paw at the top right; a tick while adopting.
+var _new: Button
 
 
 func _ready() -> void:
@@ -92,9 +101,7 @@ func _ready() -> void:
 	_close = UI.round_button("close", Text.t("common.back"), _on_close, Color.TRANSPARENT, UI.ON_DARK, 48, false)
 	row.add_child(_close)
 	row.add_child(UI.spacer())
-	_new = KnockoutButton.new(48)
-	_new.accessibility_name = Text.t("choose_focus.new_pet")
-	_new.pressed.connect(_on_new)
+	_new = UI.round_button("paw_add", Text.t("choose_focus.new_pet"), _on_new, Color.TRANSPARENT, UI.ON_DARK, 48, false)
 	row.add_child(_new)
 
 	var bottom := MarginContainer.new()
@@ -109,11 +116,13 @@ func _ready() -> void:
 	var buttons := UI.hbox()
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom.add_child(buttons)
-	_left = UI.round_button("bin", Text.t("choose_focus.delete_pet"), _on_left, UI.DANGER, Color.WHITE, 56)
-	_right = UI.round_button("check", Text.t("choose_focus.complete_project"), _on_right, UI.SUCCESS, Color.WHITE, 56)
+	_left = UI.round_button("bin", Text.t("choose_focus.rehome_pet"), _on_left, UI.DANGER, Color.WHITE, 56)
 	buttons.add_child(_left)
 	buttons.add_child(UI.spacer())
-	buttons.add_child(_right)
+	_sort = Dropdown.for_setting(sorts(), SORT_KEY, sorts()[0][0], true).on_dark(56)
+	_sort.opens_up = true
+	_sort.chosen.connect(func(_by, _reversed): _build_pick(_current_pet_id()))
+	buttons.add_child(_sort)
 
 	_build_pick()
 	_style_top(false)
@@ -135,7 +144,7 @@ func _on_close() -> void:
 		go_back()
 
 
-## The + starts adopting; as a tick it adopts.
+## The paw starts adopting; as a tick it adopts.
 func _on_new() -> void:
 	if _adopting:
 		_adopt()
@@ -149,9 +158,9 @@ func _on_new() -> void:
 ## no pets), or lakeside if that's locked.
 func _place_id() -> String:
 	var id := str(App.state.settings.get("walk_biome", "lake"))
-	var p := _current_project()
+	var p := _current_pet()
 	if p:
-		id = App.project_place(p)
+		id = App.pet_place(p)
 	return id if App.is_unlocked("place", id) and Content.biome(id).get("id", "") == id else "lake"
 
 
@@ -160,18 +169,23 @@ static func _place_title(id: String) -> String:
 	return str(Content.biome(id).get("name", ""))
 
 
-## The project of the pet in the middle (before the pets are laid out, the
-## one the screen will open on), or null with none.
-func _current_project() -> ProjectData:
+## The pet in the middle (before the pets are laid out, the one the screen
+## will open on), or null with none.
+func _current_pet() -> PetData:
 	if not is_instance_valid(_pets):
-		var active := App.state.active_projects()
+		var active := App.state.active_pets()
 		for p in active:
-			if p.id == _remembered:
+			if p.id == str(App.state.settings.get("last_pet", "")):
 				return p
 		return active[0] if not active.is_empty() else null
-	if _projects.is_empty():
+	if _pet_list.is_empty():
 		return null
-	return _projects[clampi(_pets.index, 0, _projects.size() - 1)]
+	return _pet_list[clampi(_pets.index, 0, _pet_list.size() - 1)]
+
+
+func _current_pet_id() -> String:
+	var p := _current_pet()
+	return p.id if p else ""
 
 
 ## Puts the place's scenery behind everything, fading over the old one.
@@ -211,9 +225,9 @@ func _pick_place(id: String) -> void:
 	if id == _place_id():
 		return
 	App.set_setting("walk_biome", id)
-	var p := _current_project()
+	var p := _current_pet()
 	if p:
-		App.set_project_place(p.id, id)
+		App.set_pet_place(p.id, id)
 	_show_place(id)
 	_refresh_places()
 
@@ -281,15 +295,68 @@ func _refresh_places() -> void:
 
 # --- Choosing ----------------------------------------------------------------
 
+## Your pets in the order the sort menu says. Focus time and the two
+## "recently"s put the most first; type follows the cast. Ties go to the
+## newest adopted. `reversed` flips the whole order.
+static func sort_pets(pets: Array, by: String, reversed: bool) -> Array:
+	var order := {}
+	for i in Content.animals.size():
+		order[Content.animals[i]["id"]] = i
+	var key := func(p: PetData) -> Array:
+		var first: Array
+		match by:
+			"focus":
+				first = [-App.state.pet_seconds(p.id)]
+			"recent":
+				first = [-p.last_walked_unix]
+			"type":
+				first = [order.get(p.animal_id, 99)]
+			_:
+				first = []
+		return first + [-p.adopted_unix, p.name.to_lower()]
+	var keys := {}
+	for p in pets:
+		keys[p] = key.call(p)
+	var out := pets.duplicate()
+	out.sort_custom(func(a, b): return keys[a] < keys[b])
+	if reversed:
+		out.reverse()
+	return out
+
+
+## Your ongoing projects, the one walked for most recently first (then the
+## newest).
+static func project_choices() -> Array[ProjectData]:
+	var out := App.state.active_projects()
+	out.sort_custom(func(a, b):
+		var ka := maxi(a.last_walked_unix, a.created_unix)
+		var kb := maxi(b.last_walked_unix, b.created_unix)
+		return ka > kb if ka != kb else a.name.to_lower() < b.name.to_lower())
+	return out
+
+
+## The project this walk is for: the last one picked if it's still going,
+## else the one most recently on the go; null with no ongoing projects.
+static func current_project() -> ProjectData:
+	var choices := project_choices()
+	var last := str(App.state.settings.get("last_project", ""))
+	for p in choices:
+		if p.id == last:
+			return p
+	return choices[0] if not choices.is_empty() else null
+
+
 func _build_pick(select_id: String = "") -> void:
 	for c in _pick.get_children():
 		if c.is_in_group(Scenery.FRONT_GROUP):
 			continue  # belongs to its scenery, which frees it
 		_pick.remove_child(c)
 		c.queue_free()
-	_projects = App.state.active_projects()
+	var by := str(App.state.settings.get(SORT_KEY, sorts()[0][0]))
+	var reversed := bool(App.state.settings.get(SORT_KEY + "_reversed", false))
+	_pet_list.assign(sort_pets(App.state.active_pets(), by, reversed))
 	if select_id == "":
-		select_id = _remembered
+		select_id = str(App.state.settings.get("last_pet", ""))
 
 	var places := UI.vbox(4)
 	places.name = "Places"
@@ -301,15 +368,18 @@ func _build_pick(select_id: String = "") -> void:
 	_refresh_places()
 	_pick.add_child(places)
 
-	_words = UI.vbox(2)
+	_words = UI.vbox(4)
 	_words.name = "Words"
 	_words.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_pick.add_child(_words)
-	_left.disabled = _projects.is_empty()
-	_right.disabled = _projects.is_empty()
-	_set_icon(_left, "bin", Text.t("choose_focus.delete_pet"))
-	_set_icon(_right, "check", Text.t("choose_focus.complete_project"))
-	if _projects.is_empty():
+	_project_pill = _make_project_pill()
+	_words.add_child(_project_pill)
+	_refresh_project_pill()
+	_left.disabled = _pet_list.is_empty()
+	# Nothing to sort with fewer than two pets.
+	_sort.visible = _pet_list.size() > 1
+	_set_icon(_left, "bin", Text.t("choose_focus.rehome_pet"))
+	if _pet_list.is_empty():
 		_words.add_child(_shadowed(UI.label(Text.t("choose_focus.no_pets_title"), 30, UI.ON_DARK, true, 600)))
 		var p := _shadowed(UI.label(Text.t("choose_focus.no_pets_body"), 15, UI.ON_DARK_SOFT, false, 700))
 		p.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -318,12 +388,12 @@ func _build_pick(select_id: String = "") -> void:
 		_layout()
 		return
 
-	_title = _shadowed(UI.label("", 32, UI.ON_DARK, true, 600))
-	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_words.add_child(_title)
-	_pet_line = _shadowed(UI.label("", 22, UI.ON_DARK, true, 500))
+	_pet_line = _shadowed(UI.label("", 32, UI.ON_DARK, true, 600))
+	_pet_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_words.add_child(_pet_line)
-	_words.add_child(_shadowed(UI.label(Text.t("choose_focus.tap_to_walk"), 13, UI.ON_DARK_SOFT, false, 700)))
+	_hint = _shadowed(UI.label("", 13, UI.ON_DARK_SOFT, false, 700))
+	_words.add_child(_hint)
+	_refresh_hint()
 	_under = _shadowed(UI.label("", 14, UI.ON_DARK, false, 800))
 	_under.name = "Under"
 	_pick.add_child(_under)
@@ -333,9 +403,9 @@ func _build_pick(select_id: String = "") -> void:
 	_pick.add_child(_pets)
 	var items: Array[Control] = []
 	var start := 0
-	for i in _projects.size():
-		items.append(_pet(_projects[i].animal_id, _projects[i].colours, PET_HEIGHT))
-		if _projects[i].id == select_id:
+	for i in _pet_list.size():
+		items.append(_pet(_pet_list[i].animal_id, _pet_list[i].colours, PET_HEIGHT))
+		if _pet_list[i].id == select_id:
 			start = i
 	_pets.changed.connect(_on_pet_changed)
 	_pets.activated.connect(_start_walk)
@@ -360,6 +430,7 @@ func _layout() -> void:
 		places.size = places.get_combined_minimum_size()
 		places.position = Vector2((size.x - places.size.x) * 0.5, 72.0 + insets["top"])
 	var path := _scenery.path_y()
+	_fit_project_pill()
 	if is_instance_valid(_words):
 		var w := minf(520.0, size.x - 40.0)
 		_words.size = Vector2(w, 0)
@@ -379,61 +450,200 @@ func _layout() -> void:
 func _on_pet_changed(i: int) -> void:
 	for j in _pets.items.size():
 		(_pets.items[j].get_meta("view") as AnimalView).walking = j == i
-	var p := _projects[i]
-	_remembered = p.id
+	var p := _pet_list[i]
+	App.state.settings["last_pet"] = p.id
 	# Each pet walks in its own place.
 	var place := _place_id()
 	if place != str(_scenery.biome.get("id", "")):
 		_show_place(place)
 	_refresh_places()
-	_title.text = p.name
-	_pet_line.text = Content.pet_called(p, true)
-	_under.text = Text.t("choose_focus.pet_under", {"kind": Content.animal(p.animal_id).get("name", ""), "time": Stats.format_duration(App.state.project_seconds(p.id))})
-	Motion.pop(_title, 0.04, 0.25)
+	_pet_line.text = p.name
+	_under.text = Text.t("choose_focus.pet_under", {
+		"kind": Content.animal(p.animal_id).get("name", ""),
+		"time": Stats.format_duration(App.state.pet_seconds(p.id)),
+		"date": Stats.format_date(p.adopted_unix, App.tz_bias()),
+	})
+	Motion.pop(_pet_line, 0.04, 0.25)
 	_layout()
 
 
 func _start_walk(i: int) -> void:
-	var p := _projects[i]
+	var project := current_project()
+	if project == null:
+		# Nothing to walk for yet: say so on the pill, and offer one.
+		Motion.shake(_project_pill, 6.0)
+		_open_projects()
+		return
+	var p := _pet_list[i]
 	var from := _pets.items[i].get_global_rect().get_center()
-	App.start_walk(p.id, -1, _place_id())
+	App.start_walk(project.id, p.id, -1, _place_id())
 	App.go("walk", {"from": from})
 
 
 func _on_left() -> void:
-	var p := _projects[_pets.index]
-	Modal.confirm(Text.t("choose_focus.delete_title", {"project": p.name}),
-		Text.t("choose_focus.delete_body", {"pet": Content.pet_called(p, true)}),
-		Text.t("common.delete"), "danger").closed.connect(func(ok):
+	var p := _pet_list[_pets.index]
+	Modal.confirm(Text.t("choose_focus.rehome_title", {"pet": p.name}),
+		Text.t("choose_focus.rehome_body", {"pet": p.name}),
+		Text.t("choose_focus.rehome"), "danger").closed.connect(func(ok):
 			if ok:
 				var next := _neighbour_id(p.id)
-				App.delete_project(p.id)
-				Toast.show_text(Text.t("choose_focus.deleted", {"project": p.name}), "bin")
-				_build_pick(next))
-
-
-func _on_right() -> void:
-	var p := _projects[_pets.index]
-	Modal.confirm(Text.t("choose_focus.complete_title", {"project": p.name}),
-		Text.t("choose_focus.complete_body", {"pet": Content.pet_called(p)}),
-		Text.t("common.complete"), "success").closed.connect(func(ok):
-			if ok:
-				var next := _neighbour_id(p.id)
-				App.complete_project(p.id)
-				Audio.play("project_complete")
-				Toast.show_text(Text.t("choose_focus.completed", {"project": p.name}))
+				App.rehome_pet(p.id)
+				Toast.show_text(Text.t("choose_focus.rehomed", {"pet": p.name}), "paw")
 				_build_pick(next))
 
 
 ## The pet that should be in the middle once this one's gone.
 func _neighbour_id(id: String) -> String:
 	var i := -1
-	for j in _projects.size():
-		if _projects[j].id == id:
+	for j in _pet_list.size():
+		if _pet_list[j].id == id:
 			i = j
-	if i + 1 < _projects.size():
-		return _projects[i + 1].id
-	return _projects[i - 1].id if i > 0 else ""
+	if i + 1 < _pet_list.size():
+		return _pet_list[i + 1].id
+	return _pet_list[i - 1].id if i > 0 else ""
+
+
+# --- The project ---------------------------------------------------------------
+
+## A see-through pill with the project's name and a little arrow, so it
+## reads as something to open.
+func _make_project_pill() -> Button:
+	var b := Button.new()
+	UI.style_button(b, UI.GLASS, Color.WHITE, 999)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		var sb: StyleBoxFlat = b.get_theme_stylebox(state)
+		sb.content_margin_left = 16
+		sb.content_margin_right = 14
+		sb.content_margin_top = 4
+		sb.content_margin_bottom = 4
+	b.custom_minimum_size.y = 40
+	b.add_theme_font_size_override("font_size", 16)
+	b.add_theme_constant_override("h_separation", 8)
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	b.pressed.connect(_open_projects)
+	return b
+
+
+func _refresh_project_pill() -> void:
+	var p := current_project()
+	if p:
+		_project_pill.text = p.name
+		_project_pill.icon = Icons.texture("sort_down", 14, Color.WHITE, 2.6)
+		_project_pill.accessibility_name = Text.t("choose_focus.project_named", {"project": p.name})
+	else:
+		_project_pill.text = Text.t("choose_focus.new_project")
+		_project_pill.icon = Icons.texture("plus", 14, Color.WHITE, 2.6)
+		_project_pill.accessibility_name = _project_pill.text
+	_fit_project_pill()
+
+
+## Long project names stop short of the screen's edges, trimmed with "…".
+func _fit_project_pill() -> void:
+	if not is_instance_valid(_project_pill) or size.x <= 0.0:
+		return
+	# Measured at full length: a button that trims its words to fit asks
+	# for no room for them at all.
+	_project_pill.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	_project_pill.clip_text = false
+	_project_pill.custom_minimum_size.x = 0.0
+	var room := minf(460.0, size.x - 48.0)
+	if _project_pill.get_combined_minimum_size().x > room:
+		_project_pill.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		_project_pill.clip_text = true
+		_project_pill.custom_minimum_size.x = room
+
+
+func _refresh_hint() -> void:
+	if is_instance_valid(_hint):
+		_hint.text = Text.t("choose_focus.tap_to_walk" if current_project() else "choose_focus.pick_project_first")
+
+
+## Your ongoing projects, newest walked first, each with its time so far;
+## tap one to walk for it. "New project" at the bottom starts one.
+func _open_projects() -> void:
+	var m := Modal.open(420)
+	m.body.add_child(m.heading_row(Text.t("choose_focus.projects_title")))
+	var current := current_project()
+	var list := UI.vbox(4)
+	for p in project_choices():
+		var on := current != null and p.id == current.id
+		var row := UI.button("", func():
+			App.set_setting("last_project", p.id)
+			m.close(), "quiet" if on else "ghost")
+		row.custom_minimum_size.y = 52
+		row.accessibility_name = p.name
+		var inside := UI.hbox(10)
+		inside.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		inside.offset_left = 16
+		inside.offset_right = -16
+		var title := UI.trimmed(p.name, 16, UI.INK, false, 800)
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		inside.add_child(title)
+		var time := UI.label(Stats.format_duration(App.state.project_seconds(p.id)), 14, UI.INK_SOFT, false, 700)
+		time.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		inside.add_child(time)
+		UI.ignore_mouse(inside)
+		row.add_child(inside)
+		list.add_child(row)
+	if not list.get_children().is_empty():
+		m.body.add_child(list)
+		m.body.add_child(UI.divider())
+	var add := UI.button(Text.t("choose_focus.new_project"), _new_project.bind(m), "accent")
+	add.icon = Icons.texture("plus", 18, Color.WHITE, 2.6)
+	m.body.add_child(add)
+	m.closed.connect(func(_r):
+		if is_instance_valid(_project_pill):
+			_refresh_project_pill()
+			_refresh_hint()
+			_layout())
+
+
+## Swaps the project list for a name box and project-or-module pills.
+func _new_project(m: Modal) -> void:
+	for c in m.body.get_children():
+		m.body.remove_child(c)
+		c.queue_free()
+	m.body.add_child(m.heading_row(Text.t("choose_focus.new_project")))
+	var edit := LineEdit.new()
+	edit.placeholder_text = Text.t("choose_focus.project_placeholder")
+	edit.max_length = 40
+	edit.custom_minimum_size.y = 50
+	m.body.add_child(edit)
+	var kind := [ProjectData.KIND_PROJECT]
+	var kinds := UI.hbox(8)
+	# Remade on each pick; held in an array so the pills can call it again.
+	var fill_kinds: Array[Callable] = []
+	fill_kinds.append(func():
+		for c in kinds.get_children():
+			kinds.remove_child(c)
+			c.queue_free()
+		for k in [ProjectData.KIND_PROJECT, ProjectData.KIND_MODULE]:
+			var pill := UI.pill_button(Text.t("choose_focus.kind_project" if k == ProjectData.KIND_PROJECT else "choose_focus.kind_module"), kind[0] == k, func():
+				kind[0] = k
+				fill_kinds[0].call())
+			pill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			kinds.add_child(pill))
+	fill_kinds[0].call()
+	m.body.add_child(kinds)
+	var create := func():
+		var title := edit.text.strip_edges()
+		if title == "":
+			edit.placeholder_text = Text.t("choose_focus.name_first")
+			Motion.shake(edit)
+			edit.grab_focus()
+			return
+		var p := ProjectData.new()
+		p.name = title
+		p.kind = kind[0]
+		App.add_project(p)
+		App.set_setting("last_project", p.id)
+		Toast.show_text(Text.t("choose_focus.project_started", {"project": title}), "check")
+		m.close()
+	m.body.add_child(UI.button(Text.t("choose_focus.start_project"), create, "accent"))
+	edit.text_submitted.connect(func(_t): create.call())
+	edit.grab_focus.call_deferred()
 
 
 # --- Adopting ----------------------------------------------------------------
@@ -441,7 +651,8 @@ func _neighbour_id(id: String) -> String:
 func _start_adopting() -> void:
 	if _adopting:
 		return
-	_draft = ProjectData.new()
+	_draft = PetData.new()
+	_name_is_default = true
 	_build_adopt()
 	_show_mode(true)
 
@@ -451,15 +662,14 @@ func _show_mode(adopting: bool, select_id: String = "") -> void:
 	_adopting = adopting
 	var hide_layer := _pick if adopting else _adopt_layer
 	var show_layer := _adopt_layer if adopting else _pick
-	_new.set_tick(adopting)
 	_new.accessibility_name = Text.t("choose_focus.adopt" if adopting else "choose_focus.new_pet")
 	_close.accessibility_name = Text.t("common.cancel" if adopting else "common.back")
 	if not adopting:
-		_new.set_disabled_look(false)
+		_new.disabled = false
 		_build_pick(select_id)
-	# The bin and the tick at the bottom are for the pets you have.
+	# The bin and the sort menu at the bottom are for the pets you have.
 	_bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for b in [_left, _right]:
+	for b in [_left, _sort]:
 		b.mouse_filter = Control.MOUSE_FILTER_IGNORE if adopting else Control.MOUSE_FILTER_STOP
 	Motion.fade(_bottom, 0.0 if adopting else 1.0, Motion.FAST)
 	_style_top(adopting)
@@ -491,13 +701,9 @@ func _build_adopt() -> void:
 	var v := UI.vbox(8)
 	margin.add_child(v)
 
-	_name_edit = _field(Text.t("choose_focus.project_placeholder"), 40, 18)
-	v.add_child(_name_edit)
-	# Optional: a pet without a name goes by its kind ("your dog 1").
-	_pet_edit = _field("", 24, 16)
-	_pet_edit.custom_minimum_size.y = 46
+	_pet_edit = _field(Text.t("choose_focus.name_pet_placeholder"), 24, 18)
 	v.add_child(_pet_edit)
-	_name_edit.text_submitted.connect(func(_t): _pet_edit.grab_focus())
+	_pet_edit.text_changed.connect(func(_t): _name_is_default = false)
 	_pet_edit.text_submitted.connect(func(_t): _pet_edit.release_focus())
 
 	_animals = Carousel.new()
@@ -571,11 +777,12 @@ func _on_animal_changed(i: int) -> void:
 	if open:
 		_animal_hint.text = Text.t("choose_focus.scroll_animals")
 		_animal_hint.add_theme_color_override("font_color", UI.INK_FAINT)
-		_pet_edit.placeholder_text = Text.t("choose_focus.name_pet", {"kind": str(a["name"]).to_lower()})
+		if _name_is_default:
+			_pet_edit.text = App.free_pet_name(a["id"])
 	else:
 		_animal_hint.text = Text.t("choose_focus.animal_locked", {"rule": Unlocks.describe(Content.unlock_rule("animal", a["id"]))})
 		_animal_hint.add_theme_color_override("font_color", UI.INK_SOFT)
-	_new.set_disabled_look(not open)
+	_new.disabled = not open
 	# A locked animal can't be coloured in: the colour buttons fade away, but
 	# keep their space so the scroller above doesn't jump.
 	for b in _swatches:
@@ -611,24 +818,24 @@ func _set_colour(c: Color, k: int) -> void:
 
 
 func _adopt() -> void:
-	var project_name := _name_edit.text.strip_edges()
-	if project_name == "":
-		_name_edit.placeholder_text = Text.t("choose_focus.name_first")
-		Motion.shake(_name_edit)
-		_name_edit.grab_focus()
+	var pet_name := _pet_edit.text.strip_edges()
+	if pet_name == "":
+		_pet_edit.placeholder_text = Text.t("choose_focus.name_first")
+		Motion.shake(_pet_edit)
+		_pet_edit.grab_focus()
 		return
-	_draft.name = project_name
-	_draft.pet_name = _pet_edit.text.strip_edges()
-	App.add_project(_draft)
+	_draft.name = pet_name
+	App.add_pet(_draft)
 	Audio.play(str(Content.animal(_draft.animal_id).get("sound", "")), 1.0, -6.0)
-	Toast.show_text(Text.t("choose_focus.say_hello", {"pet": Content.pet_called(_draft)}), "paw")
+	Toast.show_text(Text.t("choose_focus.say_hello", {"pet": pet_name}), "paw")
 	_show_mode(false, _draft.id)
 
 
 # --- Pieces ------------------------------------------------------------------
 
 ## The × reads white over scenery and ink over the adopt form, with a faint
-## disc under the pointer. The + is white over scenery and green on the form.
+## disc under the pointer. The paw is a ghost button over the scenery (a
+## thin ring, see-through inside) and a solid green tick on the form.
 func _style_top(on_form: bool) -> void:
 	var ink := UI.INK if on_form else UI.ON_DARK
 	UI.style_button(_close, Color.TRANSPARENT, ink, 999)
@@ -641,7 +848,24 @@ func _style_top(on_form: bool) -> void:
 			"pressed", "hover_pressed":
 				sb.bg_color = Color(ink, 0.2)
 	_close.icon = Icons.texture("close", 24, Color.WHITE, 3.0)
-	_new.fill_colour = UI.SUCCESS if on_form else Color.WHITE
+	if on_form:
+		UI.style_button(_new, UI.SUCCESS, Color.WHITE, 999)
+		_new.icon = Icons.texture("check", 22, Color.WHITE, 3.0)
+	else:
+		UI.style_button(_new, Color.TRANSPARENT, UI.ON_DARK, 999)
+		_new.icon = Icons.texture("paw_add", 24, Color.WHITE, 2.4)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		var sb: StyleBoxFlat = _new.get_theme_stylebox(state)
+		sb.set_content_margin_all(0)
+		if on_form:
+			continue
+		sb.set_border_width_all(2)
+		sb.border_color = Color(UI.ON_DARK, 0.75)
+		match state:
+			"hover":
+				sb.bg_color = Color(UI.ON_DARK, 0.12)
+			"pressed", "hover_pressed":
+				sb.bg_color = Color(UI.ON_DARK, 0.2)
 
 
 ## Light text with a soft shadow, centred, so it reads over any scenery.

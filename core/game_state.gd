@@ -10,9 +10,11 @@ const SHELF_SIZE := 3
 
 var profile: Dictionary = default_profile()
 var projects: Array[ProjectData] = []
+## Every pet ever adopted, rehomed ones too (they still show on projects).
+var pets: Array[PetData] = []
 ## Focus time by local day (Stats.local_day): {day: {"projects": {project id:
-## seconds}, "places": {place id: seconds}}}. Every stat is worked out from
-## these; walks aren't kept one by one.
+## seconds}, "pets": {pet id: seconds}, "places": {place id: seconds}}}.
+## Every stat is worked out from these; walks aren't kept one by one.
 var days: Dictionary = {}
 ## Every XP point earned. Levels are worked out from it (Levels.level_for),
 ## so changing the level thresholds moves everyone's level at once.
@@ -86,15 +88,29 @@ func completed_projects() -> Array[ProjectData]:
 	return out
 
 
-## Adds `seconds` of focus on a project, in a place, to day `day`.
-func log_focus(day: int, project_id: String, place_id: String, seconds: int) -> void:
+func pet(id: String) -> PetData:
+	for p in pets:
+		if p.id == id:
+			return p
+	return null
+
+
+## The pets that are still yours (not rehomed), oldest first.
+func active_pets() -> Array[PetData]:
+	var out: Array[PetData] = []
+	out.assign(pets.filter(func(p): return not p.is_rehomed()))
+	return out
+
+
+## Adds `seconds` of focus on a project, with a pet, in a place, to day `day`.
+func log_focus(day: int, project_id: String, pet_id: String, place_id: String, seconds: int) -> void:
 	if seconds <= 0:
 		return
 	if not days.has(day):
-		days[day] = {"projects": {}, "places": {}}
+		days[day] = {"projects": {}, "pets": {}, "places": {}}
 	var d: Dictionary = days[day]
-	d["projects"][project_id] = int(d["projects"].get(project_id, 0)) + seconds
-	d["places"][place_id] = int(d["places"].get(place_id, 0)) + seconds
+	for part in [["projects", project_id], ["pets", pet_id], ["places", place_id]]:
+		d[part[0]][part[1]] = int(d[part[0]].get(part[1], 0)) + seconds
 
 
 func total_seconds() -> int:
@@ -109,6 +125,14 @@ func project_seconds(id: String) -> int:
 	var total := 0
 	for d in days.values():
 		total += int(d["projects"].get(id, 0))
+	return total
+
+
+## Seconds walked with a pet, ever.
+func pet_seconds(id: String) -> int:
+	var total := 0
+	for d in days.values():
+		total += int(d["pets"].get(id, 0))
 	return total
 
 

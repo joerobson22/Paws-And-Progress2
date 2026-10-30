@@ -236,17 +236,59 @@ func complete_project(id: String) -> void:
 		_changed()
 
 
-## Where a project's walks go: the place last picked for it, else its
-## animal's home.
-func project_place(p: ProjectData) -> String:
+## Back to ongoing; its grade stays, hidden until it's completed again.
+func reopen_project(id: String) -> void:
+	var p := state.project(id)
+	if p and p.is_complete():
+		p.completed_unix = 0
+		_changed()
+
+
+# --- Pets --------------------------------------------------------------------
+
+func add_pet(p: PetData) -> void:
+	if p.id == "":
+		p.id = "pet%d_%04x" % [now(), rng.randi() & 0xffff]
+	if p.adopted_unix == 0:
+		p.adopted_unix = now()
+	state.pets.append(p)
+	_changed()
+
+
+## The pet leaves your pets for good, but still shows on the projects it
+## walked for.
+func rehome_pet(id: String) -> void:
+	var p := state.pet(id)
+	if p and not p.is_rehomed():
+		p.rehomed_unix = now()
+		_changed()
+
+
+## A name for a new pet of this animal that no pet of yours has yet:
+## "Dog 1", then "Dog 1 (2)", "Dog 1 (3)"...
+func free_pet_name(animal_id: String) -> String:
+	var base := str(Content.animal(animal_id).get("name", ""))
+	var taken := {}
+	for p in state.pets:
+		taken[p.name.to_lower()] = true
+	var pick := base
+	var n := 2
+	while taken.has(pick.to_lower()):
+		pick = "%s (%d)" % [base, n]
+		n += 1
+	return pick
+
+
+## Where a pet walks: the place last picked for it, else its animal's home.
+func pet_place(p: PetData) -> String:
 	if p.place != "":
 		return p.place
 	return str(Content.animal(p.animal_id).get("home", "lake"))
 
 
-## The place a project's walks go from now on.
-func set_project_place(id: String, place_id: String) -> void:
-	var p := state.project(id)
+## The place a pet walks from now on.
+func set_pet_place(id: String, place_id: String) -> void:
+	var p := state.pet(id)
 	if p and p.place != place_id:
 		p.place = place_id
 		_changed()
@@ -372,13 +414,15 @@ func set_look(look: Dictionary) -> void:
 
 # --- Walks -------------------------------------------------------------------
 
-func start_walk(project_id: String, goal_seconds: int = -1, biome_id: String = "") -> void:
+func start_walk(project_id: String, pet_id: String, goal_seconds: int = -1, biome_id: String = "") -> void:
 	if goal_seconds < 0:
 		goal_seconds = int(state.settings.get("walk_goal_seconds", 0))
 	if biome_id == "":
-		var p := state.project(project_id)
-		biome_id = project_place(p) if p else "lake"
-	state.active = SessionClock.begin(project_id, now(), goal_seconds, biome_id)
+		var p := state.pet(pet_id)
+		biome_id = pet_place(p) if p else "lake"
+	state.settings["last_project"] = project_id
+	state.settings["last_pet"] = pet_id
+	state.active = SessionClock.begin(project_id, pet_id, now(), goal_seconds, biome_id)
 	_changed()
 
 
@@ -403,8 +447,8 @@ func finish_walk() -> Dictionary:
 		return {}
 	var t := now()
 	var seconds := clock.elapsed(t)
-	var project := state.project(clock.project_id)
-	var animal_id := project.animal_id if project else ""
+	var pet := state.pet(clock.pet_id)
+	var animal_id := pet.animal_id if pet else ""
 
 	var before := unlocked_keys()
 	var pity := int(state.profile.get("walks_since_epic", 0))
@@ -440,15 +484,17 @@ func _end_left_walk() -> Dictionary:
 	return {"session": s, "biome": clock.biome_id}
 
 
-## Logs a walk that ended at `end_unix`: its time goes on the day it
-## started (by project and by place), its XP onto the total and its gift
-## onto the project. Walks under a minute (mis-taps) aren't worth keeping.
-## Returns the walk either way.
+## Logs a walk that ended at `end_unix`: its time goes on the days it
+## fell on (by project, pet and place) and onto the project (by pet and
+## place), its XP onto the total and its gift onto the project. Walks under
+## a minute (mis-taps) aren't worth keeping. Returns the walk either way.
 func _log_walk(clock: SessionClock, end_unix: int, gift_id: String) -> FocusSession:
 	var project := state.project(clock.project_id)
+	var pet := state.pet(clock.pet_id)
 	var s := FocusSession.new()
 	s.project_id = clock.project_id
-	s.animal_id = project.animal_id if project else ""
+	s.pet_id = clock.pet_id
+	s.animal_id = pet.animal_id if pet else ""
 	s.place_id = clock.biome_id
 	s.start_unix = clock.start_unix
 	s.end_unix = end_unix
@@ -456,7 +502,13 @@ func _log_walk(clock: SessionClock, end_unix: int, gift_id: String) -> FocusSess
 	s.gift_id = gift_id
 	if s.focus_seconds >= 60:
 		for day in Stats.split_by_day(s.start_unix, s.focus_seconds, tz_bias()):
-			state.log_focus(day[0], s.project_id, s.place_id, day[1])
+			state.log_focus(day[0], s.project_id, s.pet_id, s.place_id, day[1])
+		if project:
+			project.pets[s.pet_id] = int(project.pets.get(s.pet_id, 0)) + s.focus_seconds
+			project.places[s.place_id] = int(project.places.get(s.place_id, 0)) + s.focus_seconds
+			project.last_walked_unix = end_unix
+		if pet:
+			pet.last_walked_unix = end_unix
 		state.xp += Levels.walk_xp(s.focus_seconds, Content.gift_rarity(gift_id) if gift_id != "" else "", Content.levels)
 		state.profile["walks"] = int(state.profile.get("walks", 0)) + 1
 		if project and gift_id != "":

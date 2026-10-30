@@ -18,6 +18,8 @@ var prefix := ""
 var current := ""
 var reversed := false
 var sortable := true
+## The menu opens above the pill (for one at the bottom of the screen).
+var opens_up := false
 var _options: Array = []  # [[id, label], ...]
 var _menu: Control
 var _flipping := false
@@ -45,9 +47,15 @@ func _init(options: Array, selected: String, is_reversed: bool = false, label_pr
 ## its own list from `chosen` rather than rebuilding everything.
 ## See-through with white words, for over the scenery, as tall as the round
 ## buttons beside it.
-func on_dark() -> Dropdown:
+func on_dark(height: int = 40) -> Dropdown:
 	_style(UI.GLASS, Color.WHITE)
-	custom_minimum_size.y = 40
+	custom_minimum_size.y = height
+	if height > 44:
+		add_theme_font_size_override("font_size", 15)
+		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+			var sb: StyleBoxFlat = get_theme_stylebox(state)
+			sb.content_margin_left = 20
+			sb.content_margin_right = 18
 	return self
 
 
@@ -136,9 +144,9 @@ func _open() -> void:
 		list.add_child(b)
 	card.size = card.get_combined_minimum_size()
 	var at := get_global_rect()
-	# Under the pill, or above it when there's no room underneath.
+	# Under the pill, or above it when asked or there's no room underneath.
 	var y := at.end.y + 6.0
-	if y + card.size.y > _menu.size.y - 8.0:
+	if opens_up or y + card.size.y > _menu.size.y - 8.0:
 		y = at.position.y - 6.0 - card.size.y
 	# Always on the screen, even if the pill itself is partly off it.
 	y = clampf(y, 8.0, maxf(8.0, _menu.size.y - card.size.y - 8.0))
@@ -147,7 +155,8 @@ func _open() -> void:
 	var t := Motion.tween(card, "menu")
 	t.set_parallel(true)
 	t.tween_property(card, "modulate:a", 1.0, Motion.time(Motion.FAST))
-	t.tween_property(card, "position:y", card.position.y + 4.0, Motion.time(Motion.FAST)).from(card.position.y - 4.0)
+	var rise := -4.0 if y < at.position.y else 4.0
+	t.tween_property(card, "position:y", card.position.y + rise, Motion.time(Motion.FAST)).from(card.position.y - rise)
 
 
 func _choose(id: String, arrow: TextureRect) -> void:

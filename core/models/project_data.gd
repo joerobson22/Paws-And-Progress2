@@ -1,17 +1,13 @@
 class_name ProjectData
 extends Resource
-## A project or education module. Each one has its own animal, recoloured per part.
+## A project or education module. Any of your pets can walk for it; it
+## keeps how long each pet walked for it, and where.
 
 const KIND_PROJECT := "project"
 const KIND_MODULE := "module"
 
 @export var id: String = ""
 @export var name: String = ""
-## The pet's own name ("Biscuit"); "" if it hasn't been given one.
-@export var pet_name: String = ""
-@export var animal_id: String = ""
-## One colour per recolourable part of the animal, in the order the animal lists its parts.
-@export var colours: Array[Color] = []
 @export var kind: String = KIND_PROJECT
 @export var created_unix: int = 0
 ## 0 while the project is still active.
@@ -19,9 +15,12 @@ const KIND_MODULE := "module"
 @export var due_unix: int = 0
 @export var tags: PackedStringArray = PackedStringArray()
 @export var grade: String = ""
-## Where its walks go, picked on the choose focus screen; "" until one is
-## picked (then it starts in the animal's home, see App.project_place).
-@export var place: String = ""
+## When a walk for it last finished; 0 if none has.
+@export var last_walked_unix: int = 0
+## pet id -> seconds walked with that pet for this project.
+@export var pets: Dictionary = {}
+## place id -> seconds walked there for this project.
+@export var places: Dictionary = {}
 ## gift id -> how many of its walks brought that gift.
 @export var gifts: Dictionary = {}
 
@@ -31,22 +30,18 @@ func is_complete() -> bool:
 
 
 func to_dict() -> Dictionary:
-	var cols: Array = []
-	for c in colours:
-		cols.append(c.to_html(false))
 	return {
 		"id": id,
 		"name": name,
-		"pet_name": pet_name,
-		"animal_id": animal_id,
-		"colours": cols,
 		"kind": kind,
 		"created_unix": created_unix,
 		"completed_unix": completed_unix,
 		"due_unix": due_unix,
 		"tags": Array(tags),
 		"grade": grade,
-		"place": place,
+		"last_walked_unix": last_walked_unix,
+		"pets": pets,
+		"places": places,
 		"gifts": gifts,
 	}
 
@@ -55,19 +50,17 @@ static func from_dict(d: Dictionary) -> ProjectData:
 	var p := ProjectData.new()
 	p.id = str(d.get("id", ""))
 	p.name = str(d.get("name", ""))
-	p.pet_name = str(d.get("pet_name", ""))
-	p.animal_id = str(d.get("animal_id", ""))
-	for c in d.get("colours", []):
-		p.colours.append(Color.from_string(str(c), Color.WHITE))
 	p.kind = str(d.get("kind", KIND_PROJECT))
 	p.created_unix = int(d.get("created_unix", 0))
 	p.completed_unix = int(d.get("completed_unix", 0))
 	p.due_unix = int(d.get("due_unix", 0))
 	p.tags = PackedStringArray(d.get("tags", []))
 	p.grade = str(d.get("grade", ""))
-	p.place = str(d.get("place", ""))
-	var got = d.get("gifts", {})
-	if got is Dictionary:
-		for id in got:
-			p.gifts[str(id)] = int(got[id])
+	p.last_walked_unix = int(d.get("last_walked_unix", 0))
+	for key in ["pets", "places", "gifts"]:
+		var got = d.get(key, {})
+		if got is Dictionary:
+			var out: Dictionary = p.get(key)
+			for id in got:
+				out[str(id)] = int(got[id])
 	return p

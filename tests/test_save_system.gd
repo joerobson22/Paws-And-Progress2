@@ -15,17 +15,24 @@ func _sample() -> GameState:
 	var p := ProjectData.new()
 	p.id = "p1"
 	p.name = "Dissertation"
-	p.pet_name = "Biscuit"
-	p.animal_id = "dog1"
-	p.colours = [Color("#112233"), Color("#445566"), Color("#778899")]
-	p.place = "jungle"
+	p.pets = {"pet1": 1300}
+	p.places = {"jungle": 1234, "lake": 66}
 	p.gifts = {"dog_common": 2}
 	s.projects.append(p)
-	s.log_focus(20380, "p1", "jungle", 1234)
-	s.log_focus(20381, "p1", "lake", 66)
+	var pet := PetData.new()
+	pet.id = "pet1"
+	pet.name = "Biscuit"
+	pet.animal_id = "dog1"
+	pet.colours = [Color("#112233"), Color("#445566"), Color("#778899")]
+	pet.place = "jungle"
+	pet.adopted_unix = 400
+	pet.rehomed_unix = 900
+	s.pets.append(pet)
+	s.log_focus(20380, "p1", "pet1", "jungle", 1234)
+	s.log_focus(20381, "p1", "pet1", "lake", 66)
 	s.xp = 321
 	s.inventory["dog_common"] = 2
-	s.active = SessionClock.begin("p1", 500)
+	s.active = SessionClock.begin("p1", "pet1", 500)
 	return s
 
 
@@ -36,15 +43,21 @@ func test_round_trip() -> void:
 	check(back != null)
 	eq(back.profile["username"], "joe")
 	eq(back.projects[0].name, "Dissertation")
-	eq(back.projects[0].pet_name, "Biscuit")
-	eq(back.projects[0].colours[1].to_html(false), "445566")
-	eq(back.projects[0].place, "jungle")
+	eq(back.projects[0].pets, {"pet1": 1300})
+	eq(back.projects[0].places, {"jungle": 1234, "lake": 66})
+	eq(back.pets[0].name, "Biscuit")
+	eq(back.pets[0].colours[1].to_html(false), "445566")
+	eq(back.pets[0].place, "jungle")
+	eq(back.pets[0].adopted_unix, 400)
+	check(back.pets[0].is_rehomed(), "a rehomed pet stays rehomed")
+	eq(back.pet_seconds("pet1"), 1300)
 	eq(back.project_gifts("p1"), {"dog_common": 2})
 	eq(back.days[20380]["places"], {"jungle": 1234}, "days come back keyed by number")
 	eq(back.project_seconds("p1"), 1300)
 	eq(back.xp, 321)
 	eq(back.inventory["dog_common"], 2)
 	eq(back.active.start_unix, 500)
+	eq(back.active.pet_id, "pet1")
 	_cleanup()
 
 
@@ -53,8 +66,8 @@ func test_round_trip() -> void:
 func test_save_stays_small() -> void:
 	var s := _sample()
 	for day in 365:
-		s.log_focus(20000 + day, "p1", "lake", 3600)
-		s.log_focus(20000 + day, "p1", "jungle", 1800)
+		s.log_focus(20000 + day, "p1", "pet1", "lake", 3600)
+		s.log_focus(20000 + day, "p1", "pet1", "jungle", 1800)
 	var text := JSON.stringify(SaveSystem.to_dict(s))
 	check(text.length() < 40000, "a year of walks is %d characters" % text.length())
 	check(not text.contains("\n\t"), "written compactly")

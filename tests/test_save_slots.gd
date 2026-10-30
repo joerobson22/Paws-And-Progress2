@@ -72,8 +72,8 @@ func test_remove_deletes_the_save_but_never_the_current_slot() -> void:
 func test_summary() -> void:
 	var s := GameState.new()
 	s.profile["username"] = "Joe"
-	s.log_focus(100, "a", "lake", 3000)
-	s.log_focus(101, "b", "forest", 600)
+	s.log_focus(100, "a", "pet", "lake", 3000)
+	s.log_focus(101, "b", "pet", "forest", 600)
 	var rows := [{"earned": true}, {"earned": false}, {"earned": false}]
 	var out := SaveSlots.summary(s, rows)
 	eq(out["name"], "Joe")
