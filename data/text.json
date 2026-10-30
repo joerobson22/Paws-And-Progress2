@@ -432,11 +432,28 @@
 		"last_week": "Last week",
 		"week_span": "{from} – {to}",
 		"week_of": "Week of {day}",
-		"no_focus": "No focus this week yet.",
 		"deleted_project": "Deleted project",
 		"chip": "{project}  {time}",
 		"time_this_week": "{time} this week",
-		"time_on_day": "{time} on {day}"
+		"time_on_day": "{time} on {day}",
+		"tab_week": "Week",
+		"tab_month": "Month",
+		"tab_year": "Year",
+		"this_month": "This month",
+		"last_month": "Last month",
+		"this_year": "This year",
+		"last_year": "Last year",
+		"month_name": "{month} {year}",
+		"no_focus_week": "No focus this week yet.",
+		"no_focus_month": "No focus this month yet.",
+		"no_focus_year": "No focus this year yet.",
+		"time_this_month": "{time} this month",
+		"time_this_year": "{time} this year",
+		"time_in": "{time} in {period}",
+		"split_by": "Split the bars by",
+		"by_projects": "Projects",
+		"by_pets": "Pets",
+		"by_places": "Places"
 	},
 	"leaderboard": {
 		"title": "Friends leaderboard",
@@ -493,6 +510,20 @@
 			"Friday",
 			"Saturday",
 			"Sunday"
+		],
+		"months_long": [
+			"January",
+			"February",
+			"March",
+			"April",
+			"May",
+			"June",
+			"July",
+			"August",
+			"September",
+			"October",
+			"November",
+			"December"
 		]
 	},
 	"debug": {
@@ -529,5 +560,11 @@
 	},
 	"podium": {
 		"rehomed": "{time} · rehomed"
+	},
+	"pet_card": {
+		"adopted": "Adopted {date}",
+		"kind_rehomed": "{kind} · rehomed",
+		"top_projects": "Top projects",
+		"top_pets": "Top pets"
 	}
 }

@@ -678,7 +678,7 @@ func _run() -> void:
 		await _shot("stats_strip_dragged")
 		legend_strip.scroll_horizontal = 0
 		await _wait(5)
-	main._panes[Vector2i(0, 1)]._show_project(app.state.projects[0].id, 0)
+	main._panes[Vector2i(0, 1)]._show_piece(app.state.projects[0].id, 0)
 	await _wait(25)
 	await _shot("stats_popup")
 	var project_popup: Node = modal_class.top()
@@ -697,7 +697,8 @@ func _run() -> void:
 	if modal_class.is_open():
 		_close_modal()
 	await _stats_and_friends(main)
-	main._panes[Vector2i(0, 1)]._select_week(main._panes[Vector2i(0, 1)]._week - 7)
+	await _stats_periods(main)
+	main._panes[Vector2i(0, 1)]._select(main._panes[Vector2i(0, 1)]._start - 7)
 	await _wait(10)
 
 	# A small wheel turn moves between screens, once per turn.
@@ -1307,6 +1308,7 @@ func _fill_sample_data() -> void:
 			p.places[places[k]] = int(p.places.get(places[k], 0)) + seconds
 			p.last_walked_unix = maxi(p.last_walked_unix, start + seconds)
 			pet.last_walked_unix = maxi(pet.last_walked_unix, start + seconds)
+			pet.places[places[k]] = int(pet.places.get(places[k], 0)) + seconds
 			app.state.xp += _levels().walk_xp(seconds, rarity, content.levels)
 			p.gifts[gift] = int(p.gifts.get(gift, 0)) + 1
 	app.complete_project(app.state.projects[5].id)
@@ -1321,6 +1323,65 @@ func _fill_sample_data() -> void:
 	app.state.place_on_shelf("bird_epic", 2)
 	app.friends = _class("res://core/friends.gd").sample()
 	app.state_changed.emit()
+
+
+## The chart's tabs switch between a week, a month and a year; its menu
+## splits the bars by project, pet or place, and tapping a pet or a place
+## shows its own card.
+func _stats_periods(main: Node) -> void:
+	var app := _app()
+	var modal_class := _class("res://ui/modal.gd")
+	var stats_pane: Control = main._panes[Vector2i(0, 1)]
+	var tabs: Dictionary = stats_pane._tabs
+	check(tabs.size() == 3 and tabs["week"].text == "Week", "Week · Month · Year tabs")
+	check(stats_pane._chart_title.text == "This week", "this week first")
+	var bold := func(tab: Button) -> bool: return tab.get_theme_color("font_color") == _class("res://ui/ui.gd").INK
+	check(bold.call(tabs["week"]) and not bold.call(tabs["month"]), "the chosen tab is in ink, the rest muted")
+	tabs["month"].pressed.emit()
+	await _wait(30)
+	tabs = stats_pane._tabs
+	check(stats_pane._chart_title.text == "This month" and stats_pane._chart.bars.size() >= 28, "a month has a bar a day (%d)" % stats_pane._chart.bars.size())
+	check(stats_pane._chart.labels.filter(func(l): return l != "") == ["1", "8", "15", "22", "29"] or stats_pane._chart.bars.size() < 29, "dates every seventh day")
+	await _shot("stats_month")
+	tabs["year"].pressed.emit()
+	await _wait(30)
+	tabs = stats_pane._tabs
+	check(stats_pane._chart_title.text == "This year" and stats_pane._chart.bars.size() == 12, "a year has a bar a month")
+	var month_total := 0
+	for b in stats_pane._chart.bars:
+		for v in b.values():
+			month_total += int(v)
+	check(month_total == app.state.total_seconds() or month_total > 0, "the year's bars hold the focus")
+	await _shot("stats_year")
+	# Split by pet: the strip names pets, and tapping one shows its card.
+	var split: Node = _find(stats_pane, func(n): return _is(n, "dropdown.gd"))
+	check(split != null and split.get_global_rect().position.y < stats_pane._chart_title.get_global_rect().position.y, "the split menu is in the chart's header")
+	await _tap_menu(split, "Pets")
+	await _wait(30)
+	var chips: Array = _all(stats_pane._legend, func(n): return n is Button)
+	var pet_names: Array = app.state.pets.map(func(p): return p.name.left(10))
+	check(not chips.is_empty() and chips.all(func(b): return pet_names.any(func(n): return b.text.begins_with(n.strip_edges()))), "split by pet, the strip names pets")
+	await _shot("stats_by_pet")
+	stats_pane._show_piece(app.state.pets[0].id, -1)
+	await _wait(25)
+	check(modal_class.is_open() and _find(modal_class.top(), func(n): return _is(n, "podium.gd")) != null, "a pet's card has its top projects")
+	check(_find(modal_class.top(), func(n): return n is Label and n.text.begins_with("Adopted")) != null, "and when it was adopted")
+	await _shot("pet_card")
+	_close_modal()
+	await _wait(15)
+	split = _find(stats_pane, func(n): return _is(n, "dropdown.gd"))
+	await _tap_menu(split, "Places")
+	await _wait(30)
+	stats_pane._show_piece("lake", -1)
+	await _wait(25)
+	check(modal_class.is_open() and _find(modal_class.top(), func(n): return _is(n, "podium.gd")) != null, "a place's card has its top pets")
+	await _shot("place_card")
+	_close_modal()
+	await _wait(15)
+	# Back to how the rest of the run expects it.
+	app.state.settings["stats_split"] = "projects"
+	stats_pane._tabs["week"].pressed.emit()
+	await _wait(30)
 
 
 ## Stats fits the screen, with the friends leaderboard under the chart;
@@ -1506,7 +1567,7 @@ func _accounts(main: Node) -> void:
 		check(_find(board, func(n): return n is Label and n.text == "No friends yet!" and n.is_visible_in_tree()) != null, "and says so")
 		check(_find(board, func(n): return n.has_meta("press")) == null and _find(board, func(n): return n is Button) == null, "not even your own row")
 		var stats_pane: Control = main._panes[Vector2i(0, 1)]
-		check(stats_pane._weeks.is_empty() and _find(stats_pane, func(n): return n is Button and _find(n, func(l): return l is Label and l.text == "This week") != null) == null,
+		check(stats_pane._periods.is_empty() and _find(stats_pane, func(n): return n is Button and _find(n, func(l): return l is Label and l.text == "This week") != null) == null,
 			"with only this week there are no weeks to pick between")
 	await _shot("leaderboard_empty")
 

@@ -555,13 +555,20 @@ static func ignore_mouse(node: Node) -> void:
 		ignore_mouse(c)
 
 
-## The colour a project is drawn in on charts.
-static func series_colour(project_id: String) -> Color:
-	var projects: Array = App.state.projects
-	for i in projects.size():
-		if projects[i].id == project_id:
-			return SERIES[i % SERIES.size()]
-	return INK_FAINT
+## The colour a project (or with `kind` "pets" a pet, "places" a place) is
+## drawn in on charts: the palette in order of when it was made (adopted,
+## or its order in biomes.json).
+static func series_colour(id: String, kind: String = "projects") -> Color:
+	var list: Array
+	match kind:
+		"pets":
+			list = App.state.pets.map(func(p): return p.id)
+		"places":
+			list = Content.biomes.map(func(b): return b["id"])
+		_:
+			list = App.state.projects.map(func(p): return p.id)
+	var i := list.find(id)
+	return SERIES[i % SERIES.size()] if i >= 0 else INK_FAINT
 
 
 # --- Pictures ----------------------------------------------------------------

@@ -15,6 +15,8 @@ extends Resource
 @export var place: String = ""
 ## When it last finished a walk; 0 if it never has.
 @export var last_walked_unix: int = 0
+## place id -> seconds it has walked there.
+@export var places: Dictionary = {}
 ## When it was rehomed: it leaves your pets but still shows on the projects
 ## it walked for. 0 while it's yours.
 @export var rehomed_unix: int = 0
@@ -37,6 +39,7 @@ func to_dict() -> Dictionary:
 		"place": place,
 		"last_walked_unix": last_walked_unix,
 		"rehomed_unix": rehomed_unix,
+		"places": places,
 	}
 
 
@@ -51,4 +54,8 @@ static func from_dict(d: Dictionary) -> PetData:
 	p.place = str(d.get("place", ""))
 	p.last_walked_unix = int(d.get("last_walked_unix", 0))
 	p.rehomed_unix = int(d.get("rehomed_unix", 0))
+	var got = d.get("places", {})
+	if got is Dictionary:
+		for id in got:
+			p.places[str(id)] = int(got[id])
 	return p
