@@ -100,6 +100,123 @@ static func best_week_total(days: Dictionary) -> int:
 	return best
 
 
+# --- Weeks, months and years ------------------------------------------------
+# A period is "week", "month" or "year", named by its first day. A week's
+# bars are its days, a month's its days too, and a year's its months.
+
+## {year, month, day} for a local day number.
+static func day_date(day: int) -> Dictionary:
+	return Time.get_datetime_dict_from_unix_time(day * SECONDS_PER_DAY)
+
+
+## The local day number of a date. Months past 12 roll into the next year.
+static func date_day(year: int, month: int, day: int) -> int:
+	year += floori((month - 1) / 12.0)
+	month = posmod(month - 1, 12) + 1
+	@warning_ignore("integer_division")
+	return int(Time.get_unix_time_from_datetime_dict({"year": year, "month": month, "day": day})) / SECONDS_PER_DAY
+
+
+static func month_start(day: int) -> int:
+	var d := day_date(day)
+	return date_day(d["year"], d["month"], 1)
+
+
+static func year_start(day: int) -> int:
+	return date_day(day_date(day)["year"], 1, 1)
+
+
+## The first day of the period `day` falls in.
+static func period_start(day: int, period: String) -> int:
+	match period:
+		"month":
+			return month_start(day)
+		"year":
+			return year_start(day)
+		_:
+			return week_start(day)
+
+
+## The first day of the period after the one starting on `start`.
+static func period_next(start: int, period: String) -> int:
+	var d := day_date(start)
+	match period:
+		"month":
+			return date_day(d["year"], d["month"] + 1, 1)
+		"year":
+			return date_day(d["year"] + 1, 1, 1)
+		_:
+			return start + 7
+
+
+## The first day of the period before the one starting on `start`.
+static func period_before(start: int, period: String) -> int:
+	return period_start(start - 1, period)
+
+
+## The period's bars: one {id: seconds} per day (week, month) or per month
+## (year), from the days' `part` ("projects", "pets" or "places").
+static func period_buckets(days: Dictionary, start: int, period: String, part: String = "projects") -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var end := period_next(start, period)
+	if period == "year":
+		for i in 12:
+			out.append({})
+	else:
+		for i in end - start:
+			out.append({})
+	for day in days:
+		var d := int(day)
+		if d < start or d >= end:
+			continue
+		var i: int = int(day_date(d)["month"]) - 1 if period == "year" else d - start
+		var totals: Dictionary = days[day].get(part, {})
+		for id in totals:
+			out[i][id] = int(out[i].get(id, 0)) + int(totals[id])
+	return out
+
+
+## {id: seconds} over the whole period.
+static func period_totals(days: Dictionary, start: int, period: String, part: String = "projects") -> Dictionary:
+	var out := {}
+	for bucket in period_buckets(days, start, period, part):
+		for id in bucket:
+			out[id] = int(out.get(id, 0)) + int(bucket[id])
+	return out
+
+
+static func period_total(days: Dictionary, start: int, period: String) -> int:
+	var total := 0
+	for s in period_totals(days, start, period).values():
+		total += int(s)
+	return total
+
+
+## {period start: seconds} for every period with any focus.
+static func period_sums(days: Dictionary, period: String) -> Dictionary:
+	var out := {}
+	for day in days:
+		var start := period_start(int(day), period)
+		out[start] = int(out.get(start, 0)) + _day_total(days, int(day))
+	return out
+
+
+## Period starts from the current one back to the first with any focus (or
+## `since_day`'s, whichever is earlier), newest first, at most `limit`.
+static func period_history(days: Dictionary, today: int, period: String, since_day: int = 0, limit: int = 104) -> Array[int]:
+	var first := period_start(today, period)
+	for start in period_sums(days, period):
+		first = mini(first, start)
+	if since_day > 0:
+		first = mini(first, period_start(since_day, period))
+	var out: Array[int] = []
+	var start := period_start(today, period)
+	while start >= first and out.size() < limit:
+		out.append(start)
+		start = period_before(start, period)
+	return out
+
+
 ## {project_id: seconds} for the week beginning `week_start_day`.
 static func project_totals_in_week(days: Dictionary, week_start_day: int) -> Dictionary:
 	var out := {}

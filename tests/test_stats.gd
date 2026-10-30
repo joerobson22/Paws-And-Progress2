@@ -141,3 +141,45 @@ func test_format_duration() -> void:
 func test_ranked_puts_the_most_first_and_drops_zeros() -> void:
 	eq(Stats.ranked({"a": 5, "b": 20, "c": 0, "d": 5}), [["b", 20], ["a", 5], ["d", 5]])
 	eq(Stats.ranked({}), [])
+
+
+func test_periods_start_on_their_first_day() -> void:
+	var monday := Stats.local_day(MONDAY, 0)
+	var d := Stats.day_date(Stats.month_start(monday + 3))
+	eq([d["year"], d["month"], d["day"]], [2026, 10, 1])
+	d = Stats.day_date(Stats.year_start(monday))
+	eq([d["year"], d["month"], d["day"]], [2026, 1, 1])
+	eq(Stats.period_start(monday + 3, "week"), monday)
+	d = Stats.day_date(Stats.period_next(Stats.month_start(monday), "month"))
+	eq([d["month"], d["day"]], [11, 1])
+	d = Stats.day_date(Stats.period_next(Stats.date_day(2026, 12, 1), "month"))
+	eq([d["year"], d["month"]], [2027, 1], "December rolls into January")
+	d = Stats.day_date(Stats.period_before(Stats.date_day(2026, 1, 1), "month"))
+	eq([d["year"], d["month"]], [2025, 12])
+
+
+func test_period_buckets() -> void:
+	var monday := Stats.local_day(MONDAY, 0)
+	var days := _days([[0, 600, "a"], [2, 300, "b"], [-30, 100, "a"]])
+	var month := Stats.period_buckets(days, Stats.month_start(monday), "month")
+	eq(month.size(), 31, "October has 31 days")
+	eq(month[18], {"a": 600}, "the 19th")
+	eq(month[20], {"b": 300})
+	var year := Stats.period_buckets(days, Stats.year_start(monday), "year")
+	eq(year.size(), 12)
+	eq(year[9], {"a": 600, "b": 300}, "October's bar")
+	eq(year[8], {"a": 100}, "September's bar")
+	eq(Stats.period_totals(days, Stats.year_start(monday), "year"), {"a": 700, "b": 300})
+	eq(Stats.period_buckets(days, monday, "week", "pets")[0], {"pet": 600})
+	eq(Stats.period_total(days, Stats.month_start(monday), "month"), 900)
+
+
+func test_period_history_counts_back() -> void:
+	var monday := Stats.local_day(MONDAY, 0)
+	var days := _days([[0, 600], [-62, 100]])
+	var months := Stats.period_history(days, monday, "month")
+	eq(months.size(), 3, "October back to August")
+	eq(months[0], Stats.month_start(monday))
+	var d := Stats.day_date(months[2])
+	eq([d["month"], d["day"]], [8, 1])
+	eq(Stats.period_history(days, monday, "year").size(), 1)

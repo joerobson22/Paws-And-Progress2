@@ -27,6 +27,7 @@ func _sample() -> GameState:
 	pet.place = "jungle"
 	pet.adopted_unix = 400
 	pet.rehomed_unix = 900
+	pet.places = {"jungle": 1234, "lake": 66}
 	s.pets.append(pet)
 	s.log_focus(20380, "p1", "pet1", "jungle", 1234)
 	s.log_focus(20381, "p1", "pet1", "lake", 66)
@@ -49,6 +50,7 @@ func test_round_trip() -> void:
 	eq(back.pets[0].colours[1].to_html(false), "445566")
 	eq(back.pets[0].place, "jungle")
 	eq(back.pets[0].adopted_unix, 400)
+	eq(back.pets[0].places, {"jungle": 1234, "lake": 66})
 	check(back.pets[0].is_rehomed(), "a rehomed pet stays rehomed")
 	eq(back.pet_seconds("pet1"), 1300)
 	eq(back.project_gifts("p1"), {"dog_common": 2})

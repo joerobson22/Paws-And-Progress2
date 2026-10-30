@@ -517,6 +517,7 @@ func _log_walk(clock: SessionClock, end_unix: int, gift_id: String) -> FocusSess
 			project.last_walked_unix = end_unix
 		if pet:
 			pet.last_walked_unix = end_unix
+			pet.places[s.place_id] = int(pet.places.get(s.place_id, 0)) + s.focus_seconds
 		state.xp += Levels.walk_xp(s.focus_seconds, Content.gift_rarity(gift_id) if gift_id != "" else "", Content.levels)
 		state.profile["walks"] = int(state.profile.get("walks", 0)) + 1
 		if project and gift_id != "":
