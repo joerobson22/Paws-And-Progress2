@@ -521,7 +521,6 @@ func _make_project_pill() -> Button:
 	b.add_theme_constant_override("h_separation", 8)
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	b.pressed.connect(_open_projects)
 	return b
 
@@ -543,10 +542,14 @@ func _refresh_project_pill() -> void:
 func _fit_project_pill() -> void:
 	if not is_instance_valid(_project_pill) or size.x <= 0.0:
 		return
+	# Measured at full length: a button that trims its words to fit asks
+	# for no room for them at all.
+	_project_pill.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	_project_pill.clip_text = false
 	_project_pill.custom_minimum_size.x = 0.0
 	var room := minf(460.0, size.x - 48.0)
 	if _project_pill.get_combined_minimum_size().x > room:
+		_project_pill.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		_project_pill.clip_text = true
 		_project_pill.custom_minimum_size.x = room
 
