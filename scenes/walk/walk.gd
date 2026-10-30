@@ -20,6 +20,7 @@ var _walker: CharacterView
 var _animal: AnimalView
 var _bush: _Bush
 var _project: ProjectData
+var _pet: PetData
 var _hud: Control
 var _timer: Label
 var _pause: Button
@@ -39,7 +40,8 @@ var _result := {}
 func _ready() -> void:
 	var clock := App.state.active
 	_project = App.state.project(clock.project_id) if clock else null
-	if _project == null:
+	_pet = App.state.pet(clock.pet_id) if clock else null
+	if _project == null or _pet == null:
 		# The project was deleted mid-walk, or there's no walk: nothing to show.
 		App.cancel_walk()
 		App.go.call_deferred("home", {})
@@ -57,8 +59,8 @@ func _ready() -> void:
 	_walker = CharacterView.new()
 	_actors.add_child(_walker)
 	_animal = AnimalView.new()
-	_animal.animal_id = _project.animal_id
-	_animal.colours = _project.colours
+	_animal.animal_id = _pet.animal_id
+	_animal.colours = _pet.colours
 	_actors.add_child(_animal)
 	# The jungle's leaves and vines pass in front of you both.
 	_scenery.front_into(self)
@@ -227,7 +229,7 @@ func _process(delta: float) -> void:
 	if _scenery == null:
 		return
 	if clock == null or not clock.is_paused():
-		var walk_speed := float(Content.animal(_project.animal_id).get("walk_speed", 1.0))
+		var walk_speed := float(Content.animal(_pet.animal_id).get("walk_speed", 1.0))
 		var motion := 0.35 if App.state.settings.get("reduce_motion", false) else 1.0
 		_scenery.scroll += delta * BASE_SPEED * walk_speed * motion * _unit() * _pace
 	_actors.queue_redraw()
@@ -289,7 +291,7 @@ func _apply_paused(paused: bool) -> void:
 	_pause.accessibility_name = Text.t("walk.carry_on" if paused else "walk.pause")
 	_walker.walking = not paused
 	_animal.walking = not paused
-	var walk_speed := float(Content.animal(_project.animal_id).get("walk_speed", 1.0))
+	var walk_speed := float(Content.animal(_pet.animal_id).get("walk_speed", 1.0))
 	_walker.speed = clampf(walk_speed, 0.3, 1.2)
 	Motion.fade(_timer, 0.55 if paused else 1.0)
 
@@ -304,7 +306,7 @@ func _on_gift_pressed() -> void:
 		var left := int(Content.drop_table.get("min_seconds", 600)) - seconds
 		var minutes := ceili(left / 60.0)
 		Modal.confirm(Text.t("walk.end_title"),
-			Text.t("walk.end_body", {"pet": Content.pet_called(_project, true), "time": Text.count("walk.minutes", minutes)}),
+			Text.t("walk.end_body", {"pet": Content.pet_called(_pet, true), "time": Text.count("walk.minutes", minutes)}),
 			Text.t("walk.end"), "danger", Text.t("walk.keep_walking")).closed.connect(func(ok):
 				if ok:
 					_end())
@@ -337,7 +339,7 @@ func _end() -> void:
 ## the gift. How it gets there comes from its "dive" in data/animals.json.
 func _dive(gift_id: String) -> void:
 	var s := _unit()
-	var dive: Dictionary = Content.animal(_project.animal_id).get("dive", {})
+	var dive: Dictionary = Content.animal(_pet.animal_id).get("dive", {})
 	var hops := int(dive.get("hops", 1))
 	var height := float(dive.get("height", 80)) * s
 	var seconds := float(dive.get("seconds", 0.9))
@@ -378,7 +380,7 @@ func _dive(gift_id: String) -> void:
 	_animal.held_gift = gift_id
 	_animal.scale.x = -absf(_animal.scale.x)
 	_animal.walking = hops == 0
-	Audio.play(str(Content.animal(_project.animal_id).get("sound", "")), 1.0, -4.0)
+	Audio.play(str(Content.animal(_pet.animal_id).get("sound", "")), 1.0, -4.0)
 	var out := start + Vector2(30.0 * s, 0)
 	t = Motion.tween(self, "dive")
 	t.tween_property(_animal, "modulate:a", 1.0, Motion.time(0.15))

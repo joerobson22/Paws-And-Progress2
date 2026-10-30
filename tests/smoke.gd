@@ -647,8 +647,8 @@ func _run() -> void:
 	await _wait(40)
 	await _shot("choose_focus")
 	var chooser: Node = main._flows.back().get_child(0)
-	# Places in the data file's order; the project, then the pet, then a hint,
-	# with its kind and time under the pet.
+	# Places in the data file's order; the project pill, then the pet, then
+	# a hint, with its kind, time and adoption date under the pet.
 	var order: Array = chooser._places.keys()
 	check(order == _content().biomes.map(func(b): return b["id"]), "places in biomes.json order")
 	var grid: GridContainer = chooser._place_grid
@@ -660,20 +660,46 @@ func _run() -> void:
 		var button: Button = chooser._places[id]
 		var lock: bool = button.get_node("Lock").visible
 		check(lock != app.is_unlocked("place", id), "%s has a padlock only while locked" % id)
-	check(chooser._words.get_child(0) == chooser._title and chooser._title.text != "", "project title first")
+	check(chooser._words.get_child(0) == chooser._project_pill and chooser._project_pill.text == app.state.projects[0].name, "the last project walked for is in the pill first (%s)" % chooser._project_pill.text)
+	var pill_rect: Rect2 = chooser._project_pill.get_global_rect()
+	check(absf(pill_rect.get_center().x - main.size.x * 0.5) < 2.0 and pill_rect.position.x >= 16.0, "the pill sits centred, clear of the edges")
+	check(chooser._pet_line.text == chooser._current_pet().name, "then the pet's name")
 	if main.size.y >= 600.0:
 		check(chooser._words.get_rect().end.y < chooser._scenery.path_y() - chooser.PET_HEIGHT * 0.86, "words above the pets")
-	check(chooser._under.text.contains("focused") and chooser._under.position.y > chooser._scenery.path_y(), "kind and time under the pet")
+	check(chooser._under.text.contains("walked") and chooser._under.text.contains("adopted") and chooser._under.position.y > chooser._scenery.path_y(), "kind, time and adoption under the pet")
+	# The sort menu sits bottom right, level with the bin, and opens upwards.
+	var sort_rect: Rect2 = chooser._sort.get_global_rect()
+	var bin_rect: Rect2 = chooser._left.get_global_rect()
+	check(absf(sort_rect.get_center().y - bin_rect.get_center().y) < 1.0 and sort_rect.end.x <= main.size.x - 15.0, "the sort menu is level with the bin, on the right")
+	chooser._sort._open()
+	await _wait(20)
+	var sort_card: Control = chooser._sort._menu.get_child(0)
+	check(sort_card.get_global_rect().end.y <= sort_rect.position.y, "it opens upwards")
+	await _shot("choose_sort")
+	await _tap_menu(chooser._sort, "Pet type")
+	await _wait(20)
+	var kinds: Array = chooser._pet_list.map(func(p): return p.animal_id)
+	var cast: Array = _content().animals.map(func(a): return a["id"]).filter(func(id): return id in kinds)
+	check(kinds == cast, "sorting by type follows the cast (%s)" % [kinds])
+	chooser._sort.select("focus")
+	app.state.settings["pet_sort"] = "focus"
+	chooser._build_pick()
+	await _wait(20)
+	var times: Array = chooser._pet_list.map(func(p): return app.state.pet_seconds(p.id))
+	var sorted_times := times.duplicate()
+	sorted_times.sort()
+	sorted_times.reverse()
+	check(times == sorted_times, "sorting by focus time puts the most walked first")
 	var level: int = app.level()
 	check(level > 1 and level < 15, "sample player is part way up (level %d)" % level)
-	var first_pet: Resource = chooser._current_project()
+	var first_pet: Resource = chooser._current_pet()
 	chooser._pick_place("beach")
 	await _wait(50)
 	check(first_pet.place == "beach" and chooser._scenery.biome["id"] == "beach", "picking an unlocked place sends this pet there")
 	chooser._pets.go_to(1)
 	await _wait(50)
-	var second_pet: Resource = chooser._current_project()
-	check(chooser._scenery.biome["id"] == app.project_place(second_pet), "the next pet stands in its own place (%s)" % chooser._scenery.biome["id"])
+	var second_pet: Resource = chooser._current_pet()
+	check(chooser._scenery.biome["id"] == app.pet_place(second_pet), "the next pet stands in its own place (%s)" % chooser._scenery.biome["id"])
 	chooser._pets.go_to(0)
 	await _wait(50)
 	check(chooser._scenery.biome["id"] == "beach", "and the first is still at the beach")
@@ -700,21 +726,45 @@ func _run() -> void:
 	await _shot("place_locked")
 	_close_modal()
 	await _wait(10)
+	# The pill lists ongoing projects, newest walked first, with a way to
+	# start a new one; picking one puts it in the pill.
+	chooser._open_projects()
+	await _wait(30)
+	await _shot("choose_project")
+	var rows: Array = _all(modal_class.top().body, func(n): return n is Button and n.accessibility_name in app.state.active_projects().map(func(p): return p.name))
+	check(rows.size() == app.state.active_projects().size(), "every ongoing project is listed (%d)" % rows.size())
+	check(_find(modal_class.top().body, func(n): return n is Button and n.text == "New project") != null, "with New project at the bottom")
+	rows[1].pressed.emit()
+	await _wait(20)
+	check(chooser._project_pill.text == rows[1].accessibility_name, "picking a project puts it in the pill")
+	chooser._open_projects()
+	await _wait(20)
+	var add: Button = _find(modal_class.top().body, func(n): return n is Button and n.text == "New project")
+	add.pressed.emit()
+	await _wait(20)
+	var project_edit: LineEdit = _find(modal_class.top().body, func(n): return n is LineEdit)
+	project_edit.text = "Chemistry"
+	await _shot("new_project")
+	var project_count: int = app.state.projects.size()
+	project_edit.text_submitted.emit("Chemistry")
+	await _wait(30)
+	check(app.state.projects.size() == project_count + 1 and chooser._project_pill.text == "Chemistry", "a new project goes in the pill")
 	chooser._pets.go_to(2)
 	await _wait(25)
-	chooser._on_right()
+	chooser._on_left()
 	await _wait(25)
-	await _shot("complete_confirm")
+	await _shot("rehome_confirm")
 	_close_modal(false)
 	await _wait(10)
-	# The + starts adopting: the bottom buttons go, the + becomes a tick and
-	# the × cancels back to the pets.
+	# The paw starts adopting: the bottom buttons go, the paw becomes a tick
+	# and the × cancels back to the pets.
 	chooser._on_new()
 	await _wait(30)
-	check(chooser._adopting and chooser._bottom.modulate.a < 0.05 and chooser._new._tick > 0.95, "adopting hides the bottom buttons and shows a tick")
+	check(chooser._adopting and chooser._bottom.modulate.a < 0.05, "adopting hides the bottom buttons")
+	check(chooser._pet_edit.text == app.free_pet_name(chooser._draft.animal_id), "the name is filled in with its kind (%s)" % chooser._pet_edit.text)
 	chooser._on_close()
 	await _wait(30)
-	check(not chooser._adopting and chooser._bottom.modulate.a > 0.95 and chooser._new._tick < 0.05 and main._flows.size() == 1, "the × cancels adopting")
+	check(not chooser._adopting and chooser._bottom.modulate.a > 0.95 and main._flows.size() == 1, "the × cancels adopting")
 	chooser._on_new()
 	await _wait(30)
 	await _shot("new_pet")
@@ -739,21 +789,32 @@ func _run() -> void:
 	chooser._animals.go_to(1)
 	await _wait(25)
 	check(chooser._swatch_row.modulate.a > 0.95, "an open animal shows them again")
-	chooser._name_edit.text = "Chemistry"
 	chooser._pet_edit.text = "Bramble"
+	chooser._pet_edit.text_changed.emit("Bramble")
+	chooser._animals.go_to(0)
+	await _wait(25)
+	check(chooser._pet_edit.text == "Bramble", "a name you typed stays when the animal changes")
 	await _shot("new_pet_named")
 	chooser._pick_colour(0)
 	await _wait(20)
 	await _shot("colour_picker")
 	_close_modal()
-	var count: int = app.state.projects.size()
+	var count: int = app.state.pets.size()
 	chooser._on_new()
 	await _wait(30)
-	check(app.state.projects.size() == count + 1, "adopting adds a project")
-	check(app.state.projects.back().pet_name == "Bramble", "adopting keeps the pet's name")
+	check(app.state.pets.size() == count + 1, "adopting adds a pet")
+	check(app.state.pets.back().name == "Bramble", "adopting keeps the pet's name")
+	check(chooser._current_pet() == app.state.pets.back(), "and the new pet is in the middle")
 	await _wait(150 if _shots_dir != "" else 10)
+	# Rehoming takes the pet out of the list but keeps it on its projects.
+	var leaving: PetData = chooser._current_pet()
+	chooser._on_left()
+	await _wait(20)
+	_close_modal(true)
+	await _wait(20)
+	check(leaving.is_rehomed() and not chooser._pet_list.has(leaving) and app.state.pet(leaving.id) != null, "rehoming hides the pet but keeps its record")
 
-	app.start_walk(app.state.projects[1].id)
+	app.start_walk(app.state.projects[1].id, app.state.pets[1].id)
 	app.go("walk", {"from": main.size * 0.5})
 	await _wait(60)
 	var walk: Node = main._flows.back().get_child(0)
@@ -884,7 +945,7 @@ func _run() -> void:
 
 	# Closing the app mid-walk ends the walk: the next launch logs it up to
 	# when the app was last open, with no gift, and shows focus ended.
-	app.start_walk(app.state.projects[0].id, -1, "forest")
+	app.start_walk(app.state.projects[0].id, app.state.pets[0].id, -1, "forest")
 	app.state.active.start_unix -= 25 * 60
 	app.state.active.last_seen_unix = app.now() - 2 * 60
 	var logged: int = app.state.total_seconds()
@@ -904,7 +965,7 @@ func _run() -> void:
 	check(main._flows.is_empty(), "home from focus ended")
 
 	# In the jungle the leaves pass in front of you and your pet.
-	app.start_walk(app.state.projects[0].id, -1, "jungle")
+	app.start_walk(app.state.projects[0].id, app.state.pets[0].id, -1, "jungle")
 	app.go("walk", {"from": main.size * 0.5})
 	await _wait(60)
 	var jungle_walk: Node = main._flows.back().get_child(0)
@@ -1138,13 +1199,18 @@ func _fill_sample_data() -> void:
 	var animals := ["dog1", "cat1", "snail", "bird", "bear", "rabbit"]
 	var places := ["lake", "forest", "lake", "beach", "farm", "lake"]
 	var names := ["Dissertation", "Spanish", "Portfolio", "Statistics", "Guitar", "Reading"]
-	var pets := ["Biscuit", "Mochi", "", "Pip", "Bruno", ""]
+	var pet_names := ["Biscuit", "Mochi", "Snail", "Pip", "Bruno", "Rabbit"]
 	for i in animals.size():
+		var pet := PetData.new()
+		pet.name = pet_names[i]
+		pet.animal_id = animals[i]
+		pet.colours = content.animal_default_colours(animals[i])
+		pet.adopted_unix = now - (34 - i) * 86400
+		pet.place = places[i]
+		app.add_pet(pet)
+	for i in names.size():
 		var p := ProjectData.new()
 		p.name = names[i]
-		p.pet_name = pets[i]
-		p.animal_id = animals[i]
-		p.colours = content.animal_default_colours(animals[i])
 		p.created_unix = now - 30 * 86400
 		app.add_project(p)
 		for d in 16:
@@ -1152,10 +1218,19 @@ func _fill_sample_data() -> void:
 			# chart whichever day of the week the test runs on.
 			if d > 0 and (d + i) % 3 == 0:
 				continue
+			# Mostly the project's own pet, with others now and then, so the
+			# podiums have more than one pet and place on them.
+			var k := i if d % 4 != 1 else (i + d) % animals.size()
+			var pet: PetData = app.state.pets[k]
 			var seconds := 600 + 300 * ((i + d) % 4)
 			var rarity: String = ["common", "common", "rare", "epic"][(i + d) % 4]
-			var gift := "%s_%s" % [content.table_of(animals[i]), rarity]
-			app.state.log_focus(_class("res://core/stats.gd").local_day(now - d * 86400 - i * 3600, app.tz_bias()), p.id, places[i], seconds)
+			var gift := "%s_%s" % [content.table_of(pet.animal_id), rarity]
+			var start: int = now - d * 86400 - i * 3600
+			app.state.log_focus(_class("res://core/stats.gd").local_day(start, app.tz_bias()), p.id, pet.id, places[k], seconds)
+			p.pets[pet.id] = int(p.pets.get(pet.id, 0)) + seconds
+			p.places[places[k]] = int(p.places.get(places[k], 0)) + seconds
+			p.last_walked_unix = maxi(p.last_walked_unix, start + seconds)
+			pet.last_walked_unix = maxi(pet.last_walked_unix, start + seconds)
 			app.state.xp += _levels().walk_xp(seconds, rarity, content.levels)
 			p.gifts[gift] = int(p.gifts.get(gift, 0)) + 1
 	app.complete_project(app.state.projects[5].id)

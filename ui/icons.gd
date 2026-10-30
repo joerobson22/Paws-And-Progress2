@@ -4,6 +4,7 @@ extends RefCounted
 ## at the size and colour asked for, so they stay crisp at any UI scale.
 
 ## 24x24 viewBox paths. "fill:" marks a filled icon; the rest are 2px strokes.
+## "svg:" is raw SVG, with {c} for the colour and {w} for the stroke width.
 ## Pass `stroke` to texture() for a bolder or lighter line.
 const PATHS := {
 	"back": "M15 5l-7 7 7 7",
@@ -15,6 +16,8 @@ const PATHS := {
 	"clock": "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM12 7v5l3.5 2.5",
 	"trophy": "M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3.2 4M16 6h3a3 3 0 0 1-3.2 4M12 13v4M8.5 20h7M10 17h4v3h-4z",
 	"paw": "fill:M6.5 6.8a2.2 2.2 0 1 0 0 4.4a2.2 2.2 0 1 0 0-4.4zM12 3.6a2.2 2.2 0 1 0 0 4.4a2.2 2.2 0 1 0 0-4.4zM17.5 6.8a2.2 2.2 0 1 0 0 4.4a2.2 2.2 0 1 0 0-4.4zM7.5 17.5c0-3.2 2.2-5.5 4.5-5.5s4.5 2.3 4.5 5.5c0 2-2 3-4.5 3s-4.5-1-4.5-3z",
+	# A smaller paw low on the left with a plus over its top right: "adopt".
+	"paw_add": "svg:<g transform=\"translate(-1.4 2.6) scale(0.84)\"><path d=\"M6.5 6.8a2.2 2.2 0 1 0 0 4.4a2.2 2.2 0 1 0 0-4.4zM12 3.6a2.2 2.2 0 1 0 0 4.4a2.2 2.2 0 1 0 0-4.4zM17.5 6.8a2.2 2.2 0 1 0 0 4.4a2.2 2.2 0 1 0 0-4.4zM7.5 17.5c0-3.2 2.2-5.5 4.5-5.5s4.5 2.3 4.5 5.5c0 2-2 3-4.5 3s-4.5-1-4.5-3z\" fill=\"{c}\"/></g><path d=\"M19.2 2.2v6.2M16.1 5.3h6.2\" fill=\"none\" stroke=\"{c}\" stroke-width=\"{w}\" stroke-linecap=\"round\"/>",
 	"flame": "M12 3c1 4 6 6 6 11a6 6 0 0 1-12 0c0-3 2-4 2-7 2 1 3 2 3 4 1-2 1-5 1-8z",
 	"sound": "M4 9v6h4l5 4V5L8 9zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12",
 	"mute": "M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6",
@@ -72,7 +75,9 @@ static func texture(name: String, px: int, colour: Color, stroke: float = 2.2) -
 	var hex := "#" + colour.to_html(false)
 	var opacity := ' opacity="%.3f"' % colour.a if colour.a < 1.0 else ""
 	var body: String
-	if path.begins_with("fill:"):
+	if path.begins_with("svg:"):
+		body = path.trim_prefix("svg:").replace("{c}", hex).replace("{w}", "%.2f" % stroke)
+	elif path.begins_with("fill:"):
 		body = '<path d="%s" fill="%s"/>' % [path.trim_prefix("fill:"), hex]
 	else:
 		body = '<path d="%s" fill="none" stroke="%s" stroke-width="%.2f" stroke-linecap="round" stroke-linejoin="round"/>' % [path, hex, stroke]

@@ -5,6 +5,7 @@ extends RefCounted
 ## to the running total.
 
 var project_id: String = ""
+var pet_id: String = ""
 var animal_id: String = ""
 ## The place it was walked in.
 var place_id: String = ""

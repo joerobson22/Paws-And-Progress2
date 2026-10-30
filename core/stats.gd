@@ -158,6 +158,17 @@ static func _run_ending(work: Dictionary, day: int) -> int:
 	return run
 
 
+## {id: seconds} as [[id, seconds], ...], most first (ties by id, so the
+## order never flickers), leaving out anything at zero.
+static func ranked(totals: Dictionary) -> Array:
+	var out: Array = []
+	for id in totals:
+		if int(totals[id]) > 0:
+			out.append([str(id), int(totals[id])])
+	out.sort_custom(func(a, b): return a[1] > b[1] if a[1] != b[1] else a[0] < b[0])
+	return out
+
+
 ## Longer stretches in the biggest units that fit, leaving out any at
 ## zero: "1yr 2mo 3d 4h", "1wk 6d 40m", "0m" for nothing. A month is 30
 ## days and a year 365.

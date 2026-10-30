@@ -36,7 +36,7 @@ var _words: Array[Control] = []
 var _bar: LevelBar
 var _xp_label: Label
 var _home: Button
-var _project: ProjectData
+var _pet: PetData
 var _gift_id := ""
 var _unit := 1.0
 var _rest := Vector2.ZERO  # where the animal stands, in stage space
@@ -63,7 +63,7 @@ var _unlocked: Array = []
 func _ready() -> void:
 	var session: FocusSession = params.get("session")
 	var roll: Dictionary = params.get("gift", {})
-	_project = App.state.project(session.project_id) if session else null
+	_pet = App.state.pet(session.pet_id) if session else null
 	_gift_id = str(roll.get("gift_id", ""))
 	_unlocked = params.get("unlocked", [])
 	var scene: Dictionary = params.get("scene", {})
@@ -94,10 +94,10 @@ func _ready() -> void:
 	# Only a gift glows: with nothing found, nothing lights up.
 	_glow.visible = _gift_id != ""
 	_scenery.add_child(_glow)
-	if _project:
+	if _pet:
 		_animal = AnimalView.new()
-		_animal.animal_id = _project.animal_id
-		_animal.colours = _project.colours
+		_animal.animal_id = _pet.animal_id
+		_animal.colours = _pet.colours
 		_animal.held_gift = _gift_id
 		_animal.water_colour = _scenery.water_colour()
 		_rest = scene.get("animal", Vector2(size.x * 0.38 + 170.0 * _unit, feet + 4.0 * _unit))
@@ -162,7 +162,7 @@ func _build_words(session: FocusSession, roll: Dictionary) -> void:
 		found.add_child(_word(UI.para(why, 15, UI.ON_DARK_SOFT)))
 	else:
 		var g := Content.gift(_gift_id)
-		var finder := Content.pet_called(_project, true) if _project else Text.t("pet.fallback_start")
+		var finder := Content.pet_called(_pet, true)
 		found.add_child(_word(UI.label(Text.t("finish.found", {"pet": finder, "a_rarity": UI.a(Content.rarity_name(roll["rarity"]).to_lower())}), 16, colour.lightened(0.4), false, 800)))
 		found.add_child(_word(UI.label(g.get("name", "?"), 30, UI.ON_DARK, true, 600)))
 		var desc := _word(UI.para(g.get("description", ""), 15, UI.ON_DARK_SOFT))

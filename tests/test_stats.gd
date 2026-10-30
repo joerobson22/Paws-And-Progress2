@@ -10,7 +10,7 @@ func _days(entries: Array) -> Dictionary:
 	var s := GameState.new()
 	var monday := Stats.local_day(MONDAY, 0)
 	for e in entries:
-		s.log_focus(monday + int(e[0]), e[2] if e.size() > 2 else "p", e[3] if e.size() > 3 else "lake", int(e[1]))
+		s.log_focus(monday + int(e[0]), e[2] if e.size() > 2 else "p", "pet", e[3] if e.size() > 3 else "lake", int(e[1]))
 	return s.days
 
 
@@ -100,14 +100,16 @@ func test_project_totals_in_week() -> void:
 	eq(t.get("b", 0), 300)
 
 
-func test_totals_by_project_and_place() -> void:
+func test_totals_by_project_pet_and_place() -> void:
 	var s := GameState.new()
-	s.log_focus(10, "a", "lake", 10)
-	s.log_focus(10, "b", "jungle", 5)
-	s.log_focus(11, "a", "jungle", 7)
-	s.log_focus(11, "a", "jungle", 0)
+	s.log_focus(10, "a", "dog", "lake", 10)
+	s.log_focus(10, "b", "cat", "jungle", 5)
+	s.log_focus(11, "a", "cat", "jungle", 7)
+	s.log_focus(11, "a", "dog", "jungle", 0)
 	eq(s.project_seconds("a"), 17)
 	eq(s.project_seconds("b"), 5)
+	eq(s.pet_seconds("dog"), 10)
+	eq(s.pet_seconds("cat"), 12)
 	eq(s.total_seconds(), 22)
 	eq(s.place_seconds(), {"lake": 10, "jungle": 12})
 	eq(s.days.size(), 2, "nothing logged for a zero-length walk")
@@ -134,3 +136,8 @@ func test_format_long() -> void:
 func test_format_duration() -> void:
 	eq(Stats.format_duration(59), "0m")
 	eq(Stats.format_duration(3600 * 11 + 23 * 60), "11h 23m")
+
+
+func test_ranked_puts_the_most_first_and_drops_zeros() -> void:
+	eq(Stats.ranked({"a": 5, "b": 20, "c": 0, "d": 5}), [["b", 20], ["a", 5], ["d", 5]])
+	eq(Stats.ranked({}), [])

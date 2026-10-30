@@ -29,7 +29,9 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 	add_child(row)
 
 	var left := UI.vbox(6)
-	left.add_child(UI.animal_portrait(p.animal_id, p.colours, Vector2(84, 72)))
+	var top_pet := _top_pet(p)
+	if top_pet:
+		left.add_child(UI.animal_portrait(top_pet.animal_id, top_pet.colours, Vector2(84, 72)))
 	var time := UI.label(Stats.format_duration(App.state.project_seconds(p.id)), 15, UI.INK, true, 600)
 	time.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	left.add_child(time)
@@ -42,7 +44,8 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 	var names := UI.vbox(0)
 	names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	names.add_child(UI.trimmed(p.name, 21, UI.INK, true, 600))
-	names.add_child(UI.trimmed(Content.pet_label(p), 13, UI.INK_SOFT, false, 700))
+	if top_pet:
+		names.add_child(UI.trimmed(top_pet.name, 13, UI.INK_SOFT, false, 700))
 	top.add_child(names)
 	var graded := p.grade != "" and not Content.grade(p.grade).is_empty()
 	var grade_button: _GradeButton = null
@@ -158,3 +161,12 @@ class _GradeButton extends Button:
 			var r := minf(size.x, size.y) * 0.5
 			var disc := UI.box(Color(0, 0, 0, 0.12 * _shade), Color.TRANSPARENT, int(r))
 			_cover.draw_style_box(disc, Rect2(Vector2.ZERO, size))
+
+
+## The pet that walked most for the project, or null before any walks.
+static func _top_pet(p: ProjectData) -> PetData:
+	for row in Stats.ranked(p.pets):
+		var pet := App.state.pet(row[0])
+		if pet:
+			return pet
+	return null

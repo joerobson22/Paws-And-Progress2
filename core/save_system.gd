@@ -2,14 +2,14 @@ class_name SaveSystem
 extends RefCounted
 ## The save: a small JSON file with atomic writes and a backup copy. It keeps
 ## only what can't be worked out again: your profile and settings, your
-## projects, focus time per day (by project and by place), your XP total,
+## projects and pets, focus time per day (by project, pet and place), your XP total,
 ## your gifts and any walk in progress. Everything else (levels, stats,
 ## achievements, what's unlocked) is worked out from these and the data
 ## files, so the data files can change freely.
 ## A save from another version isn't loaded: the app starts afresh and keeps
 ## the old file beside it as .old (see App).
 
-const CURRENT_VERSION := 3
+const CURRENT_VERSION := 4
 const SAVE_PATH := "user://save.json"
 
 
@@ -19,6 +19,9 @@ static func to_dict(state: GameState) -> Dictionary:
 	var projects: Array = []
 	for p in state.projects:
 		projects.append(p.to_dict())
+	var pets: Array = []
+	for p in state.pets:
+		pets.append(p.to_dict())
 	# JSON keys are strings; days are kept in order so the file reads well.
 	var days := {}
 	var order := state.days.keys()
@@ -30,6 +33,7 @@ static func to_dict(state: GameState) -> Dictionary:
 		"profile": state.profile,
 		"xp": state.xp,
 		"projects": projects,
+		"pets": pets,
 		"days": days,
 		"inventory": state.inventory,
 		"active": _active_dict(state.active),
@@ -62,13 +66,15 @@ static func from_dict(d: Dictionary) -> GameState:
 	state.xp = int(d.get("xp", 0))
 	for p in d.get("projects", []):
 		state.projects.append(ProjectData.from_dict(p))
+	for p in d.get("pets", []):
+		state.pets.append(PetData.from_dict(p))
 	var days = d.get("days", {})
 	if days is Dictionary:
 		for key in days:
 			var entry = days[key]
 			if not str(key).is_valid_int() or not entry is Dictionary:
 				continue
-			var tidy := {"projects": {}, "places": {}}
+			var tidy := {"projects": {}, "pets": {}, "places": {}}
 			for part in tidy:
 				var totals = entry.get(part, {})
 				if totals is Dictionary:

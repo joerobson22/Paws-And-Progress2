@@ -5,6 +5,7 @@ extends RefCounted
 ## Every method takes `now` (unix seconds) so it can be tested deterministically.
 
 var project_id: String = ""
+var pet_id: String = ""
 var start_unix: int = 0
 var paused_total: int = 0
 ## 0 while running.
@@ -17,9 +18,10 @@ var biome_id: String = "lake"
 var last_seen_unix: int = 0
 
 
-static func begin(p_project_id: String, now: int, p_goal_seconds: int = 0, p_biome_id: String = "lake") -> SessionClock:
+static func begin(p_project_id: String, p_pet_id: String, now: int, p_goal_seconds: int = 0, p_biome_id: String = "lake") -> SessionClock:
 	var c := SessionClock.new()
 	c.project_id = p_project_id
+	c.pet_id = p_pet_id
 	c.start_unix = now
 	c.goal_seconds = p_goal_seconds
 	c.biome_id = p_biome_id
@@ -60,6 +62,7 @@ func left_at(saved_unix: int, now: int) -> int:
 func to_dict() -> Dictionary:
 	return {
 		"project_id": project_id,
+		"pet_id": pet_id,
 		"start_unix": start_unix,
 		"paused_total": paused_total,
 		"pause_started_unix": pause_started_unix,
@@ -72,6 +75,7 @@ func to_dict() -> Dictionary:
 static func from_dict(d: Dictionary) -> SessionClock:
 	var c := SessionClock.new()
 	c.project_id = str(d.get("project_id", ""))
+	c.pet_id = str(d.get("pet_id", ""))
 	c.start_unix = int(d.get("start_unix", 0))
 	c.paused_total = int(d.get("paused_total", 0))
 	c.pause_started_unix = int(d.get("pause_started_unix", 0))

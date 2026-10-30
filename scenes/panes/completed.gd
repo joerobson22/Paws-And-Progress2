@@ -152,7 +152,9 @@ static func sort_projects(projects: Array, by: String, reversed: bool) -> Array:
 			"grade":
 				first = Content.grade_rank(p.grade)
 			"pet":
-				first = [order.get(p.animal_id, 99)]
+				var top := Stats.ranked(p.pets)
+				var pet := App.state.pet(top[0][0]) if not top.is_empty() else null
+				first = [order.get(pet.animal_id, 99) if pet else 99]
 			_:
 				first = [p.name.to_lower()]
 		return first + [-p.completed_unix, p.name.to_lower()]

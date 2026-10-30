@@ -72,19 +72,16 @@ func animal(id: String) -> Dictionary:
 	return _animals_by_id.get(id, animals[0] if not animals.is_empty() else {})
 
 
-## A project's pet as you'd say it in a sentence: its name ("Biscuit"), or
-## "your rabbit" if it hasn't got one ("Your rabbit" to start a sentence).
-func pet_called(p: ProjectData, start_of_sentence: bool = false) -> String:
-	if p.pet_name != "":
-		return p.pet_name
+## A pet as you'd say it in a sentence: its name ("Biscuit"), or "your
+## rabbit" if it hasn't got one ("Your rabbit" to start a sentence), or
+## "your pet" with no pet at all.
+func pet_called(p: PetData, start_of_sentence: bool = false) -> String:
+	if p == null:
+		return Text.t("pet.fallback_start" if start_of_sentence else "pet.fallback")
+	if p.name != "":
+		return p.name
 	return Text.t("pet.your_kind_start" if start_of_sentence else "pet.your_kind",
 		{"kind": str(animal(p.animal_id).get("name", "pet")).to_lower()})
-
-
-## "Biscuit · Rabbit", or just "Rabbit" for a pet without a name.
-func pet_label(p: ProjectData) -> String:
-	var kind := str(animal(p.animal_id).get("name", ""))
-	return kind if p.pet_name == "" else Text.t("pet.name_and_kind", {"name": p.pet_name, "kind": kind})
 
 
 func animal_default_colours(id: String) -> Array[Color]:
