@@ -43,8 +43,8 @@ func build() -> void:
 		App.set_setting(FILTER_KEY, option))
 	head.add_child(filter)
 	col.add_child(head)
-	var shown := shown_projects()
-	if shown.is_empty():
+	var listed := shown_projects()
+	if listed.is_empty():
 		var empty := UI.card(UI.SURFACE, 24)
 		var v := UI.vbox(6)
 		v.add_child(UI.label(Text.t({"ongoing": "projects.empty_title_ongoing", "completed": "projects.empty_title_completed", "all": "projects.empty_title_all"}[_filter()]), 20, UI.INK, true, 600))
@@ -52,7 +52,7 @@ func build() -> void:
 		empty.add_child(v)
 		col.add_child(empty)
 		return
-	var stats := _stats(shown, col.custom_minimum_size.x)
+	var stats := _stats(listed, col.custom_minimum_size.x)
 	col.add_child(stats)
 
 	var list_head := UI.hbox(8)
@@ -118,7 +118,7 @@ func _make_room(holder: Control, stats: Control, inner: VBoxContainer) -> void:
 
 ## The four headline numbers for the projects shown. Side by side on a wide
 ## screen, two by two on a phone so the times have room.
-func _stats(shown: Array[ProjectData], width: float) -> Control:
+func _stats(listed: Array[ProjectData], width: float) -> Control:
 	var panel := StatPanel.new(4 if width >= 520.0 else 2)
 	var total := 0
 	var graded := 0
@@ -127,7 +127,7 @@ func _stats(shown: Array[ProjectData], width: float) -> Control:
 	var biggest_s := -1
 	var longest: ProjectData = null
 	var longest_s := -1
-	for p in shown:
+	for p in listed:
 		var s := App.state.project_seconds(p.id)
 		total += s
 		if p.is_complete():
@@ -142,14 +142,14 @@ func _stats(shown: Array[ProjectData], width: float) -> Control:
 			longest_s = span(p)
 	match _filter():
 		"all":
-			var ring := ProgressRing.new(done / float(maxi(shown.size(), 1)), UI.SUCCESS, 52)
-			panel.add(ring, Text.t("projects.complete"), Text.t("projects.x_of_y", {"x": done, "y": shown.size()}))
+			var ring := ProgressRing.new(done / float(maxi(listed.size(), 1)), UI.SUCCESS, 52)
+			panel.add(ring, Text.t("projects.complete"), Text.t("projects.x_of_y", {"x": done, "y": listed.size()}))
 		"completed":
 			panel.add(StatPanel.badge("check", UI.SUCCESS), Text.t("projects.completed"),
-				Text.t("projects.graded", {"n": graded}), str(shown.size()))
+				Text.t("projects.graded", {"n": graded}), str(listed.size()))
 		_:
 			panel.add(StatPanel.badge("hourglass", UI.SERIES[1]), Text.t("projects.ongoing"),
-				"", str(shown.size()))
+				"", str(listed.size()))
 	panel.add(StatPanel.badge("clock", Content.rarity_colour("rare")), Text.t("projects.focus_time"),
 		Text.t("projects.focus_time_note"), Stats.format_duration(total))
 	panel.add(StatPanel.badge("trophy", Content.rarity_colour("epic")), Text.t("projects.biggest"),
