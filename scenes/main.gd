@@ -131,6 +131,9 @@ func _ready() -> void:
 	if not App.ended_walk.is_empty():
 		_open_flow("ended", App.ended_walk, true)
 		App.ended_walk = {}
+	if App.save_reset:
+		App.save_reset = false
+		Toast.show_text.call_deferred(Text.t("save.reset"), "gear")
 	else:
 		_maybe_ask_location()
 

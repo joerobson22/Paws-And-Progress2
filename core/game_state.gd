@@ -10,7 +10,13 @@ const SHELF_SIZE := 3
 
 var profile: Dictionary = default_profile()
 var projects: Array[ProjectData] = []
-var sessions: Array[FocusSession] = []
+## Focus time by local day (Stats.local_day): {day: {"projects": {project id:
+## seconds}, "places": {place id: seconds}}}. Every stat is worked out from
+## these; walks aren't kept one by one.
+var days: Dictionary = {}
+## Every XP point earned. Levels are worked out from it (Levels.level_for),
+## so changing the level thresholds moves everyone's level at once.
+var xp: int = 0
 ## gift_id -> how many the player has. A gift stays listed at 0 once traded
 ## away, so it still shows as found.
 var inventory: Dictionary = {}
@@ -34,10 +40,8 @@ static func default_profile() -> Dictionary:
 		# Favourite gifts on the gift shelf, left to right ("" = empty spot).
 		"shelf": empty_shelf(),
 		"walks_since_epic": 0,
-		# Totals carried over from a v1 save, which kept no session history.
-		"legacy_total_seconds": 0,
-		"legacy_longest_seconds": 0,
-		"legacy_best_week_seconds": 0,
+		# Walks finished, so the home screen can pick a new line after each.
+		"walks": 0,
 		# A new save slot asks for a name and where you study first.
 		"setup_pending": false,
 	}
@@ -82,24 +86,45 @@ func completed_projects() -> Array[ProjectData]:
 	return out
 
 
+## Adds `seconds` of focus on a project, in a place, to day `day`.
+func log_focus(day: int, project_id: String, place_id: String, seconds: int) -> void:
+	if seconds <= 0:
+		return
+	if not days.has(day):
+		days[day] = {"projects": {}, "places": {}}
+	var d: Dictionary = days[day]
+	d["projects"][project_id] = int(d["projects"].get(project_id, 0)) + seconds
+	d["places"][place_id] = int(d["places"].get(place_id, 0)) + seconds
+
+
+func total_seconds() -> int:
+	var total := 0
+	for d in days.values():
+		for s in d["projects"].values():
+			total += int(s)
+	return total
+
+
 func project_seconds(id: String) -> int:
 	var total := 0
-	var p := project(id)
-	if p:
-		total += p.legacy_seconds
-	for s in sessions:
-		if s.project_id == id:
-			total += s.focus_seconds
+	for d in days.values():
+		total += int(d["projects"].get(id, 0))
 	return total
+
+
+## {place id: seconds} focused in each place, ever.
+func place_seconds() -> Dictionary:
+	var out := {}
+	for d in days.values():
+		for id in d["places"]:
+			out[id] = int(out.get(id, 0)) + int(d["places"][id])
+	return out
 
 
 ## gift_id -> how many walks on this project brought that gift.
 func project_gifts(id: String) -> Dictionary:
-	var out := {}
-	for s in sessions:
-		if s.project_id == id and s.gift_id != "":
-			out[s.gift_id] = int(out.get(s.gift_id, 0)) + 1
-	return out
+	var p := project(id)
+	return p.gifts if p else {}
 
 
 func gift_count(gift_id: String) -> int:

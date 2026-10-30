@@ -8,6 +8,7 @@ art/
   animal_colours.gdshader     maps red/green/blue paint to an animal's colours
   animals/<animal id>/animal.tscn   an animal's rig (and its limb images beside it)
   gifts/<gift id>.png          a gift's picture (.svg and .webp work too)
+  places/<place id>.png        a place's icon on its button, white on transparent
   character/character.tscn     the player's character rig
   cosmetics/<item id>/         an item's pieces, one image per limb it covers
   scenery/...                  tile scenes for biomes.json layers
@@ -17,7 +18,7 @@ art/
 ## Animals
 
 1. Copy `templates/animal/` to `art/animals/<id>/` (the id is in
-   `data/animals.json`, e.g. `art/animals/staffy/`). `sprite_dir` there
+   `data/animals.json`, e.g. `art/animals/dog1/`). `sprite_dir` there
    already points at that folder.
 2. Open `animal.tscn` in Godot. Replace each limb's image with your own.
    Each limb is its own `Sprite2D` (body, head, tail, four legs). Move a
@@ -74,8 +75,15 @@ sleeves swing with the arms and a hat sits on the head as it bobs.
 ## Gifts
 
 Save a square image (e.g. 256 × 256) as `art/gifts/<gift id>.png`, e.g.
-`art/gifts/staffy_common.png`. Ids are in `data/gifts.json`. It shows
+`art/gifts/dog_common.png`. Ids are in `data/gifts.json`. It shows
 everywhere the gift appears, on its rarity-coloured disc.
+
+## Place icons
+
+Save a square, white-on-transparent image as `art/places/<place id>.png`,
+e.g. `art/places/jungle.png`. Ids are in `data/biomes.json`. The app tints
+it (green on the chosen place's button, faded on a locked one) and sizes it
+to fit, so draw it big (128 × 128 or more).
 
 ## Scenery
 

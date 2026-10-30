@@ -55,6 +55,9 @@ var _last_time := 0
 var _fly: GiftArt
 var _fly_state := {}  # from, to (x, z), h, vh, t, time
 var _ripple: _Ripple
+## What this walk unlocked: [{type, id}]. Those a level brings are named as
+## the bar passes that level; the rest once the XP has poured in.
+var _unlocked: Array = []
 
 
 func _ready() -> void:
@@ -62,6 +65,7 @@ func _ready() -> void:
 	var roll: Dictionary = params.get("gift", {})
 	_project = App.state.project(session.project_id) if session else null
 	_gift_id = str(roll.get("gift_id", ""))
+	_unlocked = params.get("unlocked", [])
 	var scene: Dictionary = params.get("scene", {})
 	_unit = float(scene.get("unit", minf(size.x, size.y) / 720.0))
 	Audio.ambience("")
@@ -236,6 +240,9 @@ func _play() -> void:
 	await get_tree().create_timer(Motion.time(0.5)).timeout
 	await _bar.animate_to(_xp_to)
 	Motion.fade(_xp_label, 0.0)
+	var others := _unlocked.filter(func(r): return Unlocks.level_of(Content.unlock_rule(r["type"], r["id"])) == 0)
+	if not others.is_empty():
+		Toast.show_text(Text.t("finish.unlocked", {"unlocked": ", ".join(others.map(_reward_name))}), "lock")
 	_home.mouse_filter = Control.MOUSE_FILTER_STOP
 	Motion.fade(_home, 1.0, Motion.SLOW)
 
@@ -255,9 +262,13 @@ func _zoom_target() -> Dictionary:
 
 
 func _on_level_up(level: int) -> void:
-	var unlocked: Array = Levels.rewards(Content.levels).filter(func(r): return int(r["level"]) == level)
-	var names := unlocked.map(func(r): return Content.biome(r["id"]).get("name", "") if r["type"] == "place" else Content.animal(r["id"]).get("name", ""))
+	var unlocked: Array = Unlocks.level_rewards().filter(func(r): return int(r["level"]) == level)
+	var names := unlocked.map(_reward_name)
 	Toast.show_text(Text.t("finish.level_up", {"level": level}) if names.is_empty() else Text.t("finish.level_up_unlocks", {"level": level, "unlocked": ", ".join(names)}), "star")
+
+
+static func _reward_name(r: Dictionary) -> String:
+	return str(Content.biome(r["id"]).get("name", "") if r["type"] == "place" else Content.animal(r["id"]).get("name", ""))
 
 
 func _place_glow() -> void:

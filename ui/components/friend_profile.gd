@@ -40,7 +40,7 @@ static func open(f: Dictionary) -> void:
 	body.add_child(side)
 	m.body.add_child(body)
 
-	var rows := Achievements.progress(Achievements.list(Content.achievements, Content.animals, Content.gifts),
+	var rows := Achievements.progress(Achievements.list(Content.achievements, Content.tables, Content.gifts),
 		int(f.get("focused_seconds", 0)), f.get("gifts", []), Content.gifts)
 	var section := UI.vbox(8)
 	section.add_child(ProfileCard.achievements_head(rows))

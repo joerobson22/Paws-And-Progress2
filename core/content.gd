@@ -4,6 +4,8 @@ extends Node
 
 var animals: Array = []
 var gifts: Array = []
+## Gift tables: [{id, name, animal}]. Animals of a kind share one (gifts.json).
+var tables: Array = []
 var rarities: Array = []
 var drop_table: Dictionary = {}
 var biomes: Array = []
@@ -25,6 +27,7 @@ var hair_tones: Array[Color] = []
 
 var _animals_by_id: Dictionary = {}
 var _gifts_by_id: Dictionary = {}
+var _tables_by_id: Dictionary = {}
 var _rarities_by_id: Dictionary = {}
 var _items_by_id: Dictionary = {}
 
@@ -34,6 +37,7 @@ func _init() -> void:
 	animals = a.get("animals", [])
 	var g := _load("res://data/gifts.json")
 	gifts = g.get("gifts", [])
+	tables = g.get("tables", [])
 	rarities = g.get("rarities", [])
 	drop_table = _load("res://data/drop_table.json")
 	var b := _load("res://data/biomes.json")
@@ -56,6 +60,8 @@ func _init() -> void:
 		_animals_by_id[x["id"]] = x
 	for x in gifts:
 		_gifts_by_id[x["id"]] = x
+	for x in tables:
+		_tables_by_id[x["id"]] = x
 	for x in rarities:
 		_rarities_by_id[x["id"]] = x
 	for x in cosmetic_items:
@@ -67,7 +73,7 @@ func animal(id: String) -> Dictionary:
 
 
 ## A project's pet as you'd say it in a sentence: its name ("Biscuit"), or
-## "your staffy" if it hasn't got one ("Your staffy" to start a sentence).
+## "your rabbit" if it hasn't got one ("Your rabbit" to start a sentence).
 func pet_called(p: ProjectData, start_of_sentence: bool = false) -> String:
 	if p.pet_name != "":
 		return p.pet_name
@@ -75,7 +81,7 @@ func pet_called(p: ProjectData, start_of_sentence: bool = false) -> String:
 		{"kind": str(animal(p.animal_id).get("name", "pet")).to_lower()})
 
 
-## "Biscuit · Staffy", or just "Staffy" for a pet without a name.
+## "Biscuit · Rabbit", or just "Rabbit" for a pet without a name.
 func pet_label(p: ProjectData) -> String:
 	var kind := str(animal(p.animal_id).get("name", ""))
 	return kind if p.pet_name == "" else Text.t("pet.name_and_kind", {"name": p.pet_name, "kind": kind})
@@ -90,6 +96,31 @@ func animal_default_colours(id: String) -> Array[Color]:
 
 func gift(id: String) -> Dictionary:
 	return _gifts_by_id.get(id, {})
+
+
+## A gift table by id: {id, name, animal (the one shown for it)}.
+func table(id: String) -> Dictionary:
+	return _tables_by_id.get(id, {})
+
+
+## The gift table an animal brings gifts from.
+func table_of(animal_id: String) -> String:
+	return str(animal(animal_id).get("table", animal_id))
+
+
+## Every gift in a table, commonest first.
+func table_gifts(table_id: String) -> Array:
+	return gifts.filter(func(g): return g["table"] == table_id)
+
+
+## What it takes to unlock an animal or place ("animal" / "place"): its
+## "unlock" rule from the data, {} for from the start (see Unlocks).
+func unlock_rule(type: String, id: String) -> Dictionary:
+	var thing := animal(id) if type == "animal" else biome(id)
+	if thing.get("id", "") != id:
+		return {}
+	var rule = thing.get("unlock", {})
+	return rule if rule is Dictionary else {}
 
 
 func rarity_colour(rarity_id: String) -> Color:

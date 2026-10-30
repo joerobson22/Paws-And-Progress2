@@ -34,6 +34,9 @@ const STORM_EVERY := 7.0
 ## Layers that grow up from the bottom of the screen (or hang from the top),
 ## so stand nearer than anyone on the path.
 const NEAREST := ["reeds", "fronds", "drifts", "undergrowth", "stalks", "vines"]
+## Layers with lights that come on after dark (lit windows, street lamps):
+## they're drawn again as night falls and as day breaks.
+const LIGHTS := ["buildings", "lamps"]
 
 ## Ground-layer pixels walked so far; every layer scrolls by this × its parallax.
 var scroll: float = 0.0
@@ -51,6 +54,8 @@ var weather := "":
 		_update_light()
 
 var _time: float = 0.0
+## Whether the lights (LIGHTS) were last drawn on.
+var _lights_on := false
 ## DayCycle.at() for the hour shown, with the weather's cloud cover, plus
 ## "glow": how much of the sun or moon shows through it.
 var _light: Dictionary = {}
@@ -200,6 +205,13 @@ func _update_light() -> void:
 			_light[key] = c.lerp(Color(grey * 0.96, grey, grey * 1.04), o * 0.85).darkened(o * 0.2)
 		_light["tint"] = (_light["tint"] as Color).lerp((_light["tint"] as Color) * Color(0.8, 0.82, 0.86), o)
 	_light["glow"] = 1.0 - clampf(o * 1.15, 0.0, 1.0)
+	var lit := darkness() > 0.3
+	if lit != _lights_on:
+		_lights_on = lit
+		for layer in _layers:
+			if LIGHTS.has(str(layer["data"]["kind"])):
+				for chunk in layer["chunks"].values():
+					chunk.queue_redraw()
 	_update_shade()
 	if _sky:
 		_sky.queue_redraw()
@@ -460,6 +472,20 @@ class _Chunk extends Node2D:
 				_slots(x0, spacing, sd, float(layer.get("skip", 0.3)), func(x, r, _i): _vine(x, y, h * (0.4 + 0.7 * r), colour, r))
 			"stalks":
 				_slots(x0, spacing, sd, float(layer.get("skip", 0.4)), func(x, r, i): _stalk(x, y, h * (0.7 + 0.4 * r), colour.darkened(0.1 * Scenery._hash(i + 6, sd)), r))
+			"fields":
+				_fields(x0, y, h, float(layer.get("wavelength", 400)), sd, colour, size)
+			"barns":
+				_slots(x0, spacing, sd, 0.25, func(x, r, i): _barn(x, y, h * (0.75 + 0.35 * r), colour, i))
+			"fences":
+				_fence(x0, y, h, spacing, colour)
+			"buildings":
+				_slots(x0, spacing, sd, 0.0, func(x, r, i): _building(x, y, h * (0.35 + 0.65 * r), spacing * (0.7 + 0.25 * Scenery._hash(i + 9, sd)), colour.darkened(0.12 * Scenery._hash(i + 2, sd)), i, sd))
+			"lamps":
+				_slots(x0, spacing, sd, 0.0, func(x, _r, _i): _lamp(x, y, h, colour))
+			"acacias":
+				_slots(x0, spacing, sd, 0.3, func(x, r, _i): _acacia(x, y, h * (0.7 + 0.4 * r), colour, r))
+			"blossoms":
+				_slots(x0, spacing, sd, 0.15, func(x, r, i): _blossom(x, y, h * (0.7 + 0.4 * r), colour.darkened(0.1 * Scenery._hash(i + 5, sd)), i, sd))
 
 	## Calls `item(x, r, i)` for each slot starting in this chunk, skipping
 	## a share `skip` of them; `r` is the slot's random 0..1. An item belongs
@@ -643,6 +669,104 @@ class _Chunk extends Node2D:
 		draw_rect(Rect2(x - w * 1.5, arm_y - w * 0.35, w * 1.2, w * 0.6), colour)
 		draw_style_box(body, Rect2(x + w * 0.8, arm_y - th * 0.15, w * 0.7, th * 0.25))
 		draw_rect(Rect2(x + w * 0.3, arm_y + th * 0.02, w * 1.2, w * 0.6), colour)
+
+	## Rolling farmland: hills striped with rows of crops, a shade either side.
+	func _fields(x0: float, y: float, h: float, wavelength: float, sd: float, colour: Color, size: Vector2) -> void:
+		_hills(x0, y, h, wavelength, sd, colour, size)
+		var stripe := colour.darkened(0.12)
+		var x := -fposmod(x0, 28.0)
+		while x < CHUNK:
+			var top := y - h * (0.5 + 0.5 * Scenery._noise((x0 + x) / wavelength, sd))
+			draw_line(Vector2(x, top + 3.0), Vector2(x - 40.0, size.y), stripe, 5.0, true)
+			x += 28.0
+
+	## A red barn with a white-trimmed door, and now and then a silo beside it.
+	func _barn(x: float, y: float, th: float, colour: Color, i: int) -> void:
+		var w := th * 1.1
+		var trim := Color("#f4efe2")
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(x - w * 0.5, y + 2.0), Vector2(x - w * 0.5, y - th * 0.6), Vector2(x, y - th),
+			Vector2(x + w * 0.5, y - th * 0.6), Vector2(x + w * 0.5, y + 2.0)]), colour)
+		draw_polyline(PackedVector2Array([Vector2(x - w * 0.55, y - th * 0.58), Vector2(x, y - th - 2.0), Vector2(x + w * 0.55, y - th * 0.58)]), colour.darkened(0.35), maxf(2.0, th * 0.06), true)
+		var door := Rect2(x - w * 0.16, y - th * 0.42, w * 0.32, th * 0.42)
+		draw_rect(door, colour.darkened(0.25))
+		draw_rect(door, trim, false, 2.0)
+		draw_line(door.position, door.end, trim, 2.0, true)
+		draw_line(Vector2(door.position.x, door.end.y), Vector2(door.end.x, door.position.y), trim, 2.0, true)
+		if i % 2 == 0:
+			var silo := UI.box(Color("#b9b4a8"), Color.TRANSPARENT, int(w * 0.12))
+			draw_style_box(silo, Rect2(x + w * 0.56, y - th * 1.1, w * 0.26, th * 1.1 + 2.0))
+			draw_circle(Vector2(x + w * 0.69, y - th * 1.08), w * 0.13, Color("#8e8a80"), true, -1.0, true)
+
+	## A post-and-rail fence along the far side of the path.
+	func _fence(x0: float, y: float, h: float, spacing: float, colour: Color) -> void:
+		var top := y - h
+		for k in 2:
+			var ry := top + h * (0.2 + 0.4 * k)
+			draw_line(Vector2(-1.0, ry), Vector2(CHUNK + 1.0, ry), colour, maxf(2.0, h * 0.16), true)
+		var x := -fposmod(x0, spacing)
+		while x <= CHUNK:
+			draw_rect(Rect2(x - h * 0.09, top - h * 0.1, h * 0.18, h * 1.1), colour.darkened(0.15))
+			x += spacing
+
+	## A block of flats or an office: flat roof, rows of windows, and the
+	## windows lit warm after dark.
+	func _building(x: float, y: float, th: float, w: float, colour: Color, i: int, sd: float) -> void:
+		draw_rect(Rect2(x - w * 0.5, y - th, w, th + 2.0), colour)
+		draw_rect(Rect2(x - w * 0.5, y - th, w, maxf(2.0, th * 0.03)), colour.lightened(0.12))
+		var cols := maxi(2, floori(w / 14.0))
+		var rows := maxi(2, floori(th / 18.0))
+		var cell := Vector2(w / cols, th / rows)
+		for r in rows - 1:
+			for c in cols:
+				var lit := Scenery._hash(i * 97 + r * 13 + c, sd + 3.0)
+				var glass := colour.lightened(0.22)
+				if scenery._lights_on and lit > 0.45:
+					glass = Color("#f5d77a")
+				draw_rect(Rect2(x - w * 0.5 + c * cell.x + cell.x * 0.28, y - th + (r + 0.6) * cell.y, cell.x * 0.44, cell.y * 0.45), glass)
+
+	## A street lamp: a thin post with a lantern that glows after dark.
+	func _lamp(x: float, y: float, h: float, colour: Color) -> void:
+		draw_line(Vector2(x, y + 2.0), Vector2(x, y - h), colour, maxf(2.0, h * 0.04), true)
+		draw_line(Vector2(x, y - h), Vector2(x + h * 0.12, y - h - h * 0.04), colour, maxf(2.0, h * 0.035), true)
+		var lantern := Vector2(x + h * 0.14, y - h + h * 0.02)
+		if scenery._lights_on:
+			draw_circle(lantern, h * 0.16, Color(1.0, 0.9, 0.55, 0.2), true, -1.0, true)
+		draw_circle(lantern, h * 0.045, Color("#f5d77a") if scenery._lights_on else colour.lightened(0.3), true, -1.0, true)
+
+	## A flat-topped savanna tree on a thin, forking trunk.
+	func _acacia(x: float, y: float, th: float, colour: Color, r: float) -> void:
+		var trunk := colour.darkened(0.45)
+		var top := Vector2(x + (r - 0.5) * th * 0.2, y - th * 0.78)
+		draw_line(Vector2(x, y + 2.0), top, trunk, maxf(2.0, th * 0.05), true)
+		draw_line(top.lerp(Vector2(x, y), 0.35), top + Vector2(-th * 0.25, -th * 0.04), trunk, maxf(1.5, th * 0.03), true)
+		draw_line(top.lerp(Vector2(x, y), 0.25), top + Vector2(th * 0.28, 0), trunk, maxf(1.5, th * 0.03), true)
+		var w := th * 0.75
+		for k in 5:
+			var t := k / 4.0
+			draw_circle(top + Vector2((t - 0.5) * w, -th * 0.05 - sin(t * PI) * th * 0.06), th * 0.12, colour.darkened(0.06 * (k % 2)), true, -1.0, true)
+		_ellipse_flat(top + Vector2(0, -th * 0.06), Vector2(w * 0.56, th * 0.08), colour)
+
+	## A cherry tree: a dark crooked trunk under a pink cloud of blossom.
+	func _blossom(x: float, y: float, th: float, colour: Color, i: int, sd: float) -> void:
+		var bark := Color("#5a3b35")
+		var lean := (Scenery._hash(i, sd + 8.0) - 0.5) * th * 0.18
+		var fork := Vector2(x + lean, y - th * 0.5)
+		draw_line(Vector2(x, y + 2.0), fork, bark, maxf(2.0, th * 0.06), true)
+		draw_line(fork, fork + Vector2(-th * 0.16, -th * 0.18), bark, maxf(1.5, th * 0.035), true)
+		draw_line(fork, fork + Vector2(th * 0.18, -th * 0.16), bark, maxf(1.5, th * 0.035), true)
+		for k in 6:
+			var a := TAU * k / 6.0 + Scenery._hash(i, sd) * 2.0
+			var c := fork + Vector2(0, -th * 0.22) + Vector2(cos(a) * th * 0.2, sin(a) * th * 0.11)
+			draw_circle(c, th * (0.13 + 0.04 * Scenery._hash(i + k, sd)), colour.darkened(0.05 * (k % 3)), true, -1.0, true)
+		draw_circle(fork + Vector2(0, -th * 0.3), th * 0.15, colour.lightened(0.12), true, -1.0, true)
+
+	func _ellipse_flat(c: Vector2, radius: Vector2, colour: Color) -> void:
+		var pts := PackedVector2Array()
+		for k in 20:
+			var a := TAU * k / 20.0
+			pts.append(c + Vector2(cos(a) * radius.x, sin(a) * radius.y))
+		draw_colored_polygon(pts, colour)
 
 	## A low mound along the bottom edge (snow drifts, moon dust).
 	## Whether something at `x` (this chunk's space), `reach` wide either
@@ -870,6 +994,16 @@ class _Fx extends Node2D:
 				var glow := (0.4 + 0.6 * absf(sin(t * 1.3 + i * 2.1))) * flies
 				draw_circle(base + drift, 6.0, Color(1.0, 0.92, 0.5, 0.15 * glow))
 				draw_circle(base + drift, 2.2, Color(1.0, 0.95, 0.6, glow))
+		# Cherry blossom petals drifting down and across.
+		if fx.has("petals"):
+			var petal := Color("#f6c6d4") * Color(scenery.tint(), 1.0)
+			for i in 40:
+				var fall := fposmod(Scenery._hash(i, 21.0) * size.y + t * (24.0 + 20.0 * Scenery._hash(i, 22.0)), size.y + 20.0) - 10.0
+				var x := fposmod(Scenery._hash(i, 23.0) * size.x - t * 30.0 + sin(t * 1.2 + i) * 16.0, size.x + 20.0) - 10.0
+				var spin := t * 2.0 + i
+				draw_set_transform(Vector2(x, fall), spin, Vector2(1.0, 0.55 + 0.45 * absf(sin(spin))))
+				draw_circle(Vector2.ZERO, 3.2, petal, true, -1.0, true)
+			draw_set_transform(Vector2.ZERO)
 		var gust := 0.6 + 0.4 * sin(t * 0.45)
 		var area := clampf(size.x * size.y / (720.0 * 720.0), 0.5, 3.0)
 		var unit := minf(size.x, size.y) / 720.0

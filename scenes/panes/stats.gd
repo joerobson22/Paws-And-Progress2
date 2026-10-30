@@ -86,7 +86,7 @@ func build() -> void:
 		col.add_child(chart_card)
 		col.add_child(history)
 
-	var mine := Stats.week_total(App.state.sessions, Stats.week_start(today), App.tz_bias())
+	var mine := Stats.week_total(App.state.days, Stats.week_start(today))
 	var board := Leaderboard.new(Friends.ranked(App.friends, mine, App.state.active != null))
 	# At least a row and yours: a friend above you, then your pinned row.
 	board.custom_minimum_size.y = 180 if _columns else 128
@@ -97,9 +97,8 @@ func build() -> void:
 ## Your streak: the flame with how many days, and a see-through blue
 ## shield over the flame's corner when you've earned a day off.
 func _streak() -> Control:
-	var sessions := App.state.sessions
-	var days := Stats.current_streak(sessions, App.today(), App.tz_bias())
-	var rest_ready := Stats.rest_day_ready(sessions, App.today(), App.tz_bias())
+	var days := Stats.current_streak(App.state.days, App.today())
+	var rest_ready := Stats.rest_day_ready(App.state.days, App.today())
 	var row := UI.hbox(8)
 	row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.accessibility_name = Text.count("stats.streak_rest" if rest_ready else "stats.streak", days)
@@ -126,10 +125,10 @@ func _streak() -> Control:
 ## there's a week before this one.
 func _history(today: int) -> Control:
 	_weeks.clear()
-	var totals := Stats.weekly_totals(App.state.sessions, App.tz_bias())
+	var totals := Stats.weekly_totals(App.state.days)
 	# Past weeks with no focus at all are left out; this week always shows.
 	var this_week := Stats.week_start(today)
-	var weeks := Stats.week_history(App.state.sessions, today, App.tz_bias(), Stats.local_day(int(App.state.profile.get("created_unix", 0)), App.tz_bias())) \
+	var weeks := Stats.week_history(App.state.days, today, Stats.local_day(int(App.state.profile.get("created_unix", 0)), App.tz_bias())) \
 		.filter(func(w): return w == this_week or int(totals.get(w, 0)) > 0)
 	var best := 1
 	for w in weeks:
@@ -184,12 +183,12 @@ func _select_week(w: int, animate: bool = true) -> void:
 	var today := App.today()
 	var this_week := Stats.week_start(today)
 	_chart_title.text = Text.t("stats.this_week") if w == this_week else Text.t("stats.week_of", {"day": Stats.format_day(w)})
-	_chart_total.text = Stats.format_duration(Stats.week_total(App.state.sessions, w, App.tz_bias()))
-	_chart.set_days(Stats.daily_project_totals(App.state.sessions, w, App.tz_bias()), Stats.weekday(today) if w == this_week else -1, animate)
+	_chart_total.text = Stats.format_duration(Stats.week_total(App.state.days, w))
+	_chart.set_days(Stats.daily_project_totals(App.state.days, w), Stats.weekday(today) if w == this_week else -1, animate)
 
 	for child in _legend.get_children():
 		child.queue_free()
-	var by_project := Stats.project_totals_in_week(App.state.sessions, w, App.tz_bias())
+	var by_project := Stats.project_totals_in_week(App.state.days, w)
 	var ids := by_project.keys()
 	ids.sort_custom(func(a, b): return by_project[a] > by_project[b])
 	if ids.is_empty():
@@ -226,10 +225,10 @@ func _show_project(project_id: String, day: int) -> void:
 	var p := App.state.project(project_id)
 	if p == null:
 		return
-	var week := Stats.project_totals_in_week(App.state.sessions, _week, App.tz_bias())
+	var week := Stats.project_totals_in_week(App.state.days, _week)
 	var extra := Text.t("stats.time_this_week", {"time": Stats.format_duration(int(week.get(project_id, 0)))})
 	if day >= 0:
-		var days := Stats.daily_project_totals(App.state.sessions, _week, App.tz_bias())
+		var days := Stats.daily_project_totals(App.state.days, _week)
 		extra = Text.t("stats.time_on_day", {"time": Stats.format_duration(int(days[day].get(project_id, 0))), "day": Text.list("dates.days_long")[day]})
 	# The popup is the project's panel itself, with a close button in its corner.
 	var m := Modal.open(560, true, 0)

@@ -234,11 +234,12 @@ core/            game logic, no UI
   audio.gd         autoload "Audio": sounds and ambience
   synth.gd         placeholder sounds made in code (bong, pops, rain, thunder)
   game_state.gd    everything that's saved
-  save_system.gd   versioned JSON save, migrations, backup, v1 import
+  save_system.gd   small versioned JSON save with a backup
   session_clock.gd timestamp-based focus timer
   gift_roller.gd   gift odds, guaranteed rarities, pity timer, trade-ins
-  levels.gd        XP from the walk log, levels, and what each one unlocks
-  stats.gd         weekly totals, records, streaks (from the session log)
+  levels.gd        XP per walk, and levels from the XP total
+  unlocks.gd       what unlocks each animal and place, and how far along you are
+  stats.gd         weekly totals, records, streaks (from the focus time per day)
   achievements.gd  achievements and how far along each one is
   friends.gd       the leaderboard order, and sample friends for debug builds
   collection.gd    the gifts screen's rings: discovered, gift tables, cosmetics
@@ -318,18 +319,22 @@ gets a list. The unit tests check that every key the code uses is in the file.
 
 ## Adding content (no code needed)
 
-- **Animal:** add an entry to `data/animals.json` (with its `dive`) and its four
-  gifts to `data/gifts.json` (one per rarity; epic and legendary need a `slot`
-  and `style`).
+- **Animal:** add an entry to `data/animals.json` (with its `dive`, `home`
+  place, gift `table` and `unlock` rule). A new kind of animal also needs a
+  table in `data/gifts.json` with its four gifts (one per rarity; epic and
+  legendary need a `slot` and `style`); animals of a kind share one.
+- **Unlocks:** each animal and place has an `unlock` rule: a level, hours
+  in all, hours in one place, finishing a gift table, or finishing them all.
+  The rules are explained at the top of `data/animals.json`.
 - **Gift odds and guarantees:** edit `data/drop_table.json`.
 - **Trade-in rates:** `trade_in` on each rarity in `data/gifts.json`.
 - **Clothes:** `data/cosmetics.json`.
 - **Grades:** `data/grades.json`.
 - **Achievements:** `data/achievements.json` (hour goals; the gift sets come
   from the animals and gifts).
-- **Place:** add a stack of layers to `data/biomes.json` (and an icon), and
-  give it a level in `data/levels.json`.
-- **Level rewards and XP:** `data/levels.json`.
+- **Place:** add a stack of layers to `data/biomes.json`, with an icon and an
+  `unlock` rule. A white `art/places/<id>.png` replaces the drawn icon.
+- **XP and level thresholds:** `data/levels.json`.
 
 ## Art and sound status
 
@@ -341,7 +346,7 @@ its placeholder:
 
 - Animals: `ui/components/animal_view.gd` draws each animal from its
   recolourable parts. A rig at `animal.sprite_dir`
-  (e.g. `res://art/animals/staffy/animal.tscn`) replaces the drawing.
+  (e.g. `res://art/animals/dog1/animal.tscn`) replaces the drawing.
 - Character: `ui/components/character_view.gd`, one look per cosmetic `style`; a rig in `art/character/` with per-item pieces in `art/cosmetics/<id>/` replaces it.
 - Gifts: `ui/components/gift_art.gd` (every screen showing a gift uses it).
 - Scenery: `scenes/walk/scenery.gd` draws each place's layers in chunks,
@@ -359,8 +364,12 @@ its placeholder:
   timestamps, so backgrounding or sleep can't corrupt it. While you walk, the
   app notes every 30 seconds that it's still open; if it's closed or killed
   mid-walk, the walk ends at the last of those (and never runs past 12 hours).
-- **Stats from the log.** Every finished walk is stored; weekly totals, best
-  week and streaks are computed from it, never kept as running counters.
+- **Small saves.** The save keeps only what can't be worked out again: your
+  profile, projects, focus time per day (by project and by place), XP total,
+  gifts and settings. Levels, stats, achievements and unlocks are worked out
+  from those and the data files each time, so the data files can change
+  freely. A save from another version isn't loaded: the app starts afresh
+  and keeps the old file as `.old`.
 - **Saves** are written to a temp file and swapped in, with the previous save
   kept as `.bak` and used if the main file is ever damaged.
 - **Light on battery.** Panes are built once and only redrawn when something

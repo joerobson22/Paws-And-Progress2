@@ -10,8 +10,9 @@ signal state_changed
 
 var state: GameState
 var rng := RandomNumberGenerator.new()
-## Set when this launch imported a v1 save, so the app can say so.
-var imported_from_v1 := false
+## Set when this launch found a save from another version: it was put aside
+## (as .old) and a fresh one started, and the app says so.
+var save_reset := false
 ## Set when this launch found a walk still running from before the app was
 ## closed: {session, biome}. The shell shows the focus ended screen for it.
 var ended_walk := {}
@@ -23,8 +24,11 @@ var friends: Array = []
 ## The save slot in use (see SaveSlots).
 var slot := SaveSlots.FIRST
 
-var _xp := 0
-var _xp_key := ""
+## What's been done so far, for the unlock rules (Unlocks); worked out again
+## after each change.
+var _facts := {}
+var _facts_key := ""
+var _changes := 0
 
 
 ## How often a running walk notes that the app is still open, in seconds.
@@ -35,6 +39,9 @@ func _ready() -> void:
 	rng.randomize()
 	slot = SaveSlots.read_index()["current"]
 	friends = _friends_for(slot)
+	if SaveSystem.out_of_date(SaveSlots.file(slot)):
+		SaveSystem.set_aside(SaveSlots.file(slot))
+		save_reset = true
 	state = SaveSystem.read(SaveSlots.file(slot))
 	if state == null:
 		state = _first_launch_state()
@@ -123,6 +130,8 @@ func switch_slot(id: String) -> void:
 	if id == slot or not (index["slots"] as Array).has(id):
 		return
 	save()
+	if SaveSystem.out_of_date(SaveSlots.file(id)):
+		SaveSystem.set_aside(SaveSlots.file(id))
 	var next := SaveSystem.read(SaveSlots.file(id))
 	if next == null:
 		next = GameState.new()
@@ -177,7 +186,7 @@ func _enter_slot(id: String, next: GameState, index: Dictionary) -> void:
 	SaveSlots.write_index(index)
 	state = next
 	friends = _friends_for(id)
-	imported_from_v1 = false
+	save_reset = false
 	ended_walk = {}
 	# Only the slot in use can have a walk running, but just in case.
 	if state.active:
@@ -192,13 +201,12 @@ func _friends_for(id: String) -> Array:
 # --- Achievements ------------------------------------------------------------
 
 ## Every achievement with how far along `s` (this slot's save if null) is,
-## in order: the hours focused, then every gift, then each animal's set.
+## in order: the hours focused, then every gift, then each table's set.
 func achievement_rows(s: GameState = null) -> Array:
 	if s == null:
 		s = state
-	var focused := Stats.total_seconds(s.sessions) + int(s.profile.get("legacy_total_seconds", 0))
-	return Achievements.progress(Achievements.list(Content.achievements, Content.animals, Content.gifts),
-		focused, s.inventory.keys(), Content.gifts)
+	return Achievements.progress(Achievements.list(Content.achievements, Content.tables, Content.gifts),
+		s.total_seconds(), s.inventory.keys(), Content.gifts)
 
 
 # --- Projects ----------------------------------------------------------------
@@ -228,6 +236,22 @@ func complete_project(id: String) -> void:
 		_changed()
 
 
+## Where a project's walks go: the place last picked for it, else its
+## animal's home.
+func project_place(p: ProjectData) -> String:
+	if p.place != "":
+		return p.place
+	return str(Content.animal(p.animal_id).get("home", "lake"))
+
+
+## The place a project's walks go from now on.
+func set_project_place(id: String, place_id: String) -> void:
+	var p := state.project(id)
+	if p and p.place != place_id:
+		p.place = place_id
+		_changed()
+
+
 ## `grade_ref` is "<scale>/<grade>" from data/grades.json, or "" for none.
 func set_grade(id: String, grade_ref: String) -> void:
 	var p := state.project(id)
@@ -239,12 +263,7 @@ func set_grade(id: String, grade_ref: String) -> void:
 # --- Levels ------------------------------------------------------------------
 
 func xp() -> int:
-	# Summed from the walk log, so cached until the log changes.
-	var key := "%d:%d:%d" % [state.get_instance_id(), state.sessions.size(), int(state.profile.get("legacy_total_seconds", 0))]
-	if key != _xp_key:
-		_xp_key = key
-		_xp = Levels.total_xp(state.sessions, int(state.profile.get("legacy_total_seconds", 0)), Content.levels, Content.gift_rarity)
-	return _xp
+	return state.xp
 
 
 func level() -> int:
@@ -255,7 +274,38 @@ func level() -> int:
 func is_unlocked(type: String, id: String) -> bool:
 	if debug_unlock_all():
 		return true
-	return level() >= Levels.unlock_level(type, id, Content.levels)
+	return unlock_progress(type, id)["done"]
+
+
+## How far along unlocking an animal or place is (Unlocks.progress), with
+## its "rule" added.
+func unlock_progress(type: String, id: String) -> Dictionary:
+	var rule := Content.unlock_rule(type, id)
+	var p := Unlocks.progress(rule, facts(), Content.gifts)
+	p["rule"] = rule
+	return p
+
+
+## Every animal and place unlocked now, as "type:id" keys.
+func unlocked_keys() -> Dictionary:
+	var out := {}
+	for type in ["place", "animal"]:
+		for thing in Content.biomes if type == "place" else Content.animals:
+			if is_unlocked(type, thing["id"]):
+				out["%s:%s" % [type, thing["id"]]] = true
+	return out
+
+
+## What's been done so far, for the unlock rules (see Unlocks).
+func facts() -> Dictionary:
+	var key := "%d:%d" % [state.get_instance_id(), _changes]
+	if key != _facts_key:
+		_facts_key = key
+		var found := {}
+		for id in state.inventory:
+			found[id] = true
+		_facts = {"level": level(), "total_seconds": state.total_seconds(), "place_seconds": state.place_seconds(), "found": found}
+	return _facts
 
 
 ## The debug-only "unlock everything" switch on the focus screen. Ignored
@@ -326,7 +376,8 @@ func start_walk(project_id: String, goal_seconds: int = -1, biome_id: String = "
 	if goal_seconds < 0:
 		goal_seconds = int(state.settings.get("walk_goal_seconds", 0))
 	if biome_id == "":
-		biome_id = str(state.settings.get("walk_biome", "lake"))
+		var p := state.project(project_id)
+		biome_id = project_place(p) if p else "lake"
 	state.active = SessionClock.begin(project_id, now(), goal_seconds, biome_id)
 	_changed()
 
@@ -344,7 +395,8 @@ func resume_walk() -> void:
 
 
 ## Ends the walk, logs it, rolls the gift and returns a summary for the
-## focus complete screen: {session: FocusSession, gift: Dictionary}.
+## focus complete screen: {session: FocusSession, gift: Dictionary,
+## unlocked: [{type, id}] for anything the walk unlocked}.
 func finish_walk() -> Dictionary:
 	var clock := state.active
 	if clock == null:
@@ -354,8 +406,9 @@ func finish_walk() -> Dictionary:
 	var project := state.project(clock.project_id)
 	var animal_id := project.animal_id if project else ""
 
+	var before := unlocked_keys()
 	var pity := int(state.profile.get("walks_since_epic", 0))
-	var gift := GiftRoller.roll(seconds, animal_id, pity, Content.drop_table, Content.gifts, rng)
+	var gift := GiftRoller.roll(seconds, Content.table_of(animal_id), pity, Content.drop_table, Content.gifts, rng)
 	state.profile["walks_since_epic"] = GiftRoller.next_pity_count(pity, seconds, gift.get("rarity", ""), Content.drop_table)
 
 	var s := _log_walk(clock, t, gift.get("gift_id", ""))
@@ -363,7 +416,12 @@ func finish_walk() -> Dictionary:
 		state.inventory[s.gift_id] = int(state.inventory.get(s.gift_id, 0)) + 1
 	state.active = null
 	_changed()
-	return {"session": s, "gift": gift}
+	var unlocked: Array = []
+	for key in unlocked_keys():
+		if not before.has(key):
+			var bits: PackedStringArray = key.split(":")
+			unlocked.append({"type": bits[0], "id": bits[1]})
+	return {"session": s, "gift": gift, "unlocked": unlocked}
 
 
 func cancel_walk() -> void:
@@ -378,39 +436,42 @@ func _end_left_walk() -> Dictionary:
 	var clock := state.active
 	var s := _log_walk(clock, clock.left_at(SaveSystem.saved_unix(), now()), "")
 	state.active = null
+	_changes += 1
 	return {"session": s, "biome": clock.biome_id}
 
 
-## Logs a walk that ended at `end_unix` (walks under a minute, mis-taps,
-## aren't worth keeping) and returns it either way.
+## Logs a walk that ended at `end_unix`: its time goes on the day it
+## started (by project and by place), its XP onto the total and its gift
+## onto the project. Walks under a minute (mis-taps) aren't worth keeping.
+## Returns the walk either way.
 func _log_walk(clock: SessionClock, end_unix: int, gift_id: String) -> FocusSession:
 	var project := state.project(clock.project_id)
 	var s := FocusSession.new()
-	s.id = "s%d_%04x" % [end_unix, rng.randi() & 0xffff]
 	s.project_id = clock.project_id
 	s.animal_id = project.animal_id if project else ""
+	s.place_id = clock.biome_id
 	s.start_unix = clock.start_unix
 	s.end_unix = end_unix
 	s.focus_seconds = clock.elapsed(end_unix)
 	s.gift_id = gift_id
 	if s.focus_seconds >= 60:
-		state.sessions.append(s)
+		state.log_focus(Stats.local_day(s.start_unix, tz_bias()), s.project_id, s.place_id, s.focus_seconds)
+		state.xp += Levels.walk_xp(s.focus_seconds, Content.gift_rarity(gift_id) if gift_id != "" else "", Content.levels)
+		state.profile["walks"] = int(state.profile.get("walks", 0)) + 1
+		if project and gift_id != "":
+			project.gifts[gift_id] = int(project.gifts.get(gift_id, 0)) + 1
 	return s
 
 
 # --- Internals ---------------------------------------------------------------
 
 func _changed() -> void:
+	_changes += 1
 	save()
 	state_changed.emit()
 
 
 func _first_launch_state() -> GameState:
-	var v1_path := SaveSystem.v1_save_path()
-	if FileAccess.file_exists(v1_path):
-		var imported := SaveSystem.import_v1(FileAccess.get_file_as_string(v1_path), now())
-		imported_from_v1 = true
-		return imported
 	var s := GameState.new()
 	s.profile["created_unix"] = now()
 	return s

@@ -42,6 +42,10 @@ const PATHS := {
 	"place_tundra": "M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5M4 10.5l3.4.9-.9 3.4M20 13.5l-3.4-.9.9-3.4",
 	"place_desert": "M10 21V5a2 2 0 0 1 4 0v16M10 13H7a2 2 0 0 1-2-2V8M14 11h3a2 2 0 0 0 2-2V6M4 21h16",
 	"place_beach": "M3 20h18M12 20l-2-9M5 11c1-4 4-6 7-6s6 2 7 6c-2-1.5-4.5-1.5-7 0-2.5-1.5-5-1.5-7 0zM17 3.5a1.5 1.5 0 1 0 0 .01",
+	"place_farm": "M3 20h18M5 20v-8l5-4 5 4v8M8.5 20v-4h3v4M15 12h4v8M17 12V7a2 2 0 0 1 4 0v13",
+	"place_city": "M3 21h18M5 21V9h5v12M10 21V4h6v17M16 21v-9h3v9M7 12h1M7 15h1M12.5 7h1M12.5 10h1M12.5 13h1M12.5 16h1",
+	"place_safari": "M3 20h18M12 20v-7M12 13c-4 0-7-1-8-3 3-1 6-1 8 0 2-1 5-1 8 0-1 2-4 3-8 3zM7 13l-1 3M17 13l1 3",
+	"place_blossom": "M12 21v-8M12 13l-3-3M12 15l3-3M12 3.5a2 2 0 0 1 2 2 2 2 0 0 1 2.6 2.6 2 2 0 0 1-1 3.6 2 2 0 0 1-3.6 1 2 2 0 0 1-3.6-1 2 2 0 0 1-1-3.6A2 2 0 0 1 10 5.5a2 2 0 0 1 2-2z",
 	"place_moon": "M19.5 14.6A8 8 0 1 1 9.4 4.5a6.3 6.3 0 0 0 10.1 10.1zM9 11a1 1 0 1 0 0 .01M12.5 16a1.5 1.5 0 1 0 0 .01",
 	"sort_down": "M6 9l6 6 6-6",
 	"sort_up": "M6 15l6-6 6 6",
@@ -79,3 +83,24 @@ static func texture(name: String, px: int, colour: Color, stroke: float = 2.2) -
 	tex.set_size_override(Vector2i(px, px))
 	_cache[key] = tex
 	return tex
+
+
+## A place's icon at `px`, in white for a button to tint: Joe's own
+## art/places/<id>.png (white on transparent) when there is one, else the
+## drawn icon the place names in biomes.json.
+static func place(biome: Dictionary, px: int) -> Texture2D:
+	var id := str(biome.get("id", ""))
+	var path := "res://art/places/%s.png" % id
+	if id != "" and ResourceLoader.exists(path):
+		var key := "art:%s_%d" % [id, px]
+		if not _cache.has(key):
+			var img := (load(path) as Texture2D).get_image()
+			if img.is_compressed():
+				img.decompress()
+			var side := maxi(px * 2, 1)
+			img.resize(side, side, Image.INTERPOLATE_LANCZOS)
+			var tex := ImageTexture.create_from_image(img)
+			tex.set_size_override(Vector2i(px, px))
+			_cache[key] = tex
+		return _cache[key]
+	return texture(str(biome.get("icon", "place_lake")), px, Color.WHITE, 2.0)

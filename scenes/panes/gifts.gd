@@ -16,7 +16,7 @@ func build() -> void:
 	_grid = null
 	var col := frame(760, 16)
 	col.add_child(title_row(Text.t("gifts.title")))
-	var counts := Collection.progress(App.state.inventory, Content.gifts, Content.animals)
+	var counts := Collection.progress(App.state.inventory, Content.gifts)
 	col.add_child(_progress(counts))
 
 	var section := UI.vbox(8)
@@ -70,7 +70,7 @@ func _progress(counts: Dictionary) -> Control:
 	var diameter := clampf(size.y * 0.12, 64.0, 104.0)
 	var stats := [
 		[Text.t("gifts.discovered"), Text.t("gifts.discovered_note", {"have": counts["found"], "total": counts["gifts"]}), counts["found"], counts["gifts"], "common"],
-		[Text.t("gifts.pet_tables"), Text.t("gifts.pet_tables_note", {"have": counts["tables"], "total": counts["animals"]}), counts["tables"], counts["animals"], "rare"],
+		[Text.t("gifts.pet_tables"), Text.t("gifts.pet_tables_note", {"have": counts["tables"], "total": counts["total_tables"]}), counts["tables"], counts["total_tables"], "rare"],
 		[Text.t("gifts.cosmetics"), Text.t("gifts.cosmetics_note", {"have": counts["cosmetics"], "total": counts["wearables"]}), counts["cosmetics"], counts["wearables"], "epic"],
 	]
 	for s in stats:

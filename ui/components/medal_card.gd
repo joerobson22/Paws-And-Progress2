@@ -161,7 +161,7 @@ class Disc extends Control:
 			var fill := UI.ACCENT
 			if info["kind"] == "all_gifts":
 				fill = Content.rarity_colour("legendary")
-			elif info["kind"] == "animal":
+			elif info["kind"] == "table":
 				fill = Content.rarity_colour("rare").lerp(Color.WHITE, 0.55)
 			draw_circle(c, r, fill, true, -1.0, true)
 			draw_arc(c, r - 3.0, 0, TAU, 40, Color(1, 1, 1, 0.6), 2.0, true)

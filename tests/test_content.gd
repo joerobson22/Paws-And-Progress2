@@ -1,20 +1,39 @@
 extends TestCase
 
 
-func test_cast_is_eleven_animals() -> void:
+func test_the_cast() -> void:
 	var animals: Array = load_json("res://data/animals.json")["animals"]
-	eq(animals.size(), 11)
-	var families := {}
+	var ids: Array = animals.map(func(a): return a["id"])
+	for id in ["dog1", "dog2", "dog3", "cat1", "cat2", "snail", "bird", "sheep", "pig", "rabbit", "bear", "tortoise"]:
+		check(ids.has(id), "%s is in the core cast" % id)
+	for id in ["elephant", "lion", "gorilla", "hyrax", "lizard", "spider", "snake", "eagle", "parakeet", "fox", "leopard", "tiger", "monkey", "giraffe", "red_panda", "rhino", "frog"]:
+		check(ids.has(id), "%s is unlockable" % id)
+	eq(ids.size(), 29)
 	for a in animals:
-		families[a["family"]] = int(families.get(a["family"], 0)) + 1
 		eq(a["parts"].size(), a["default_colours"].size(), "%s colours per part" % a["id"])
-	eq(families, {"dog": 5, "cat": 2, "rabbit": 1, "snail": 1, "bird": 1, "bear": 1})
 
 
-func test_v1_mapping_points_at_real_animals() -> void:
-	var ids: Array = load_json("res://data/animals.json")["animals"].map(func(a): return a["id"])
-	for v in SaveSystem.V1_TO_V2.values():
-		check(ids.has(v), "%s missing" % v)
+## Unlock rules and homes point at things that exist, or an animal could
+## never unlock.
+func test_unlock_rules_are_real() -> void:
+	var places: Array = load_json("res://data/biomes.json")["biomes"].map(func(b): return b["id"])
+	var tables: Array = load_json("res://data/gifts.json")["tables"].map(func(t): return t["id"])
+	var things: Array = []
+	for a in load_json("res://data/animals.json")["animals"]:
+		check(places.has(a["home"]), "%s's home %s" % [a["id"], a["home"]])
+		things.append([a["id"], a.get("unlock", {})])
+	for b in load_json("res://data/biomes.json")["biomes"]:
+		check(str(b.get("where", "")) != "", "%s says where it is" % b["id"])
+		things.append([b["id"], b.get("unlock", {})])
+	for t in things:
+		var rule: Dictionary = t[1]
+		check(rule.is_empty() or Unlocks.kind_of(rule) != "start", "%s has a rule the app knows" % t[0])
+		if rule.has("place"):
+			check(places.has(rule["place"]), "%s's rule names a real place" % t[0])
+		if rule.has("table"):
+			check(tables.has(rule["table"]), "%s's rule names a real table" % t[0])
+	eq(places, ["lake", "farm", "forest", "beach", "city", "desert", "jungle", "tundra", "blossom", "safari", "moon"], "the places in picker order")
+	eq(load_json("res://data/biomes.json")["biomes"][-1]["unlock"], {"all_tables": true}, "the Moon is the final reward")
 
 
 func test_drop_tiers_ascend() -> void:
