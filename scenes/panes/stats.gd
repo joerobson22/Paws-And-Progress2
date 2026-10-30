@@ -466,6 +466,9 @@ class _Chart extends Control:
 		var bar := minf(col * (0.58 if n <= 12 else 0.7), 38.0)
 		# Thin bars get a smaller gap between their pieces and squarer corners.
 		var gap := 2.0 if bar >= 8.0 else 1.0
+		# In a month, today's column has a soft band behind it.
+		if n > 12 and now_index >= 0:
+			draw_style_box(UI.box(Color(UI.ACCENT, 0.1), Color.TRANSPARENT, 4), Rect2(area.position.x + col * now_index, area.position.y, col, area.size.y))
 		for i in n:
 			var x := area.position.x + col * (i + 0.5) - bar * 0.5
 			var y := area.end.y
@@ -482,11 +485,12 @@ class _Chart extends Control:
 				y -= seg + gap
 			if i < labels.size() and str(labels[i]) != "":
 				var colour := UI.ACCENT if i == now_index else UI.INK_SOFT
+				var word := str(labels[i])
+				# Month names shrink to their first letter where three won't fit.
+				if n == 12 and col < 26.0:
+					word = word.left(1)
 				# A week's or year's word fills its own column; a month's
 				# dates are centred under their bar with room either side.
 				var w := col if n <= 12 else col * 3.0
 				var lx := area.position.x + col * i if n <= 12 else area.position.x + col * (i + 0.5) - w * 0.5
-				draw_string(font, Vector2(lx, size.y - 6), str(labels[i]), HORIZONTAL_ALIGNMENT_CENTER, w, 12, colour)
-			elif i == now_index and n > 12:
-				# Today, in a month, gets a small dot under its bar.
-				draw_circle(Vector2(area.position.x + col * (i + 0.5), size.y - 11), 2.5, UI.ACCENT)
+				draw_string(font, Vector2(lx, size.y - 6), word, HORIZONTAL_ALIGNMENT_CENTER, w, 12, colour)
