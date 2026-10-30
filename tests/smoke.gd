@@ -1567,7 +1567,7 @@ func _accounts(main: Node) -> void:
 		check(_find(board, func(n): return n is Label and n.text == "No friends yet!" and n.is_visible_in_tree()) != null, "and says so")
 		check(_find(board, func(n): return n.has_meta("press")) == null and _find(board, func(n): return n is Button) == null, "not even your own row")
 		var stats_pane: Control = main._panes[Vector2i(0, 1)]
-		check(stats_pane._weeks.is_empty() and _find(stats_pane, func(n): return n is Button and _find(n, func(l): return l is Label and l.text == "This week") != null) == null,
+		check(stats_pane._periods.is_empty() and _find(stats_pane, func(n): return n is Button and _find(n, func(l): return l is Label and l.text == "This week") != null) == null,
 			"with only this week there are no weeks to pick between")
 	await _shot("leaderboard_empty")
 
