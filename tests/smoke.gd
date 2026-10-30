@@ -383,8 +383,10 @@ func _run() -> void:
 	var ask: Control = _find(ungraded_panel, func(n): return n is Button) if ungraded_panel else null
 	check(ask != null and ask.get_child_count() == 1, "an ungraded project shows a \"?\"")
 	if ask:
-		# The list scrolls on its own: bring the panel into view first.
-		projects_pane.scroll.ensure_control_visible(ungraded_panel)
+		# The list scrolls on its own: bring the panel's top into view first
+		# (a whole panel can be taller than a small window).
+		var list_scroll: ScrollContainer = projects_pane.scroll
+		list_scroll.scroll_vertical += int(ungraded_panel.get_global_rect().position.y - list_scroll.get_global_rect().position.y) - 4
 		await _wait(5)
 		# On its name, top left (the middle can be under the minimap).
 		var on_panel: Vector2 = ungraded_panel.get_global_rect().position + Vector2(70, 26)
