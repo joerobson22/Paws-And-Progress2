@@ -452,7 +452,9 @@ class _Chart extends Control:
 				total += int(s)
 			most = maxi(most, total)
 		var hours := maxi(1, ceili(most / 3600.0))
-		var step := 1 if hours <= 6 else ceili(hours / 6.0)
+		# At most four steps up, and the top line sits at the top of the chart.
+		var step := ceili(hours / 4.0)
+		hours = ceili(hours / float(step)) * step
 		var h := 0
 		while h <= hours:
 			var y := area.end.y - area.size.y * h / float(hours)
@@ -471,18 +473,19 @@ class _Chart extends Control:
 			draw_style_box(UI.box(Color(UI.ACCENT, 0.1), Color.TRANSPARENT, 4), Rect2(area.position.x + col * now_index, area.position.y, col, area.size.y))
 		for i in n:
 			var x := area.position.x + col * (i + 0.5) - bar * 0.5
-			var y := area.end.y
+			# Each piece leaves a gap above it, so the stack still ends at its total.
+			var y := area.end.y + gap
 			var ids := bars[i].keys()
 			ids.sort_custom(func(a, b): return UI.SERIES.find(UI.series_colour(a, split)) < UI.SERIES.find(UI.series_colour(b, split)) if UI.series_colour(a, split) != UI.series_colour(b, split) else str(a) < str(b))
 			for id in ids:
 				var seg := area.size.y * float(bars[i][id]) / (hours * 3600.0) * _grow
 				if seg < 0.5:
 					continue
-				var r := Rect2(x, y - seg, bar, seg)
+				var r := Rect2(x, y - seg, bar, maxf(seg - gap, 1.0))
 				var sb := UI.box(UI.series_colour(id, split), Color.TRANSPARENT, 2 if bar >= 8.0 else 1)
 				draw_style_box(sb, r)
 				_pieces.append([r, id, i])
-				y -= seg + gap
+				y -= seg
 			if i < labels.size() and str(labels[i]) != "":
 				var colour := UI.ACCENT if i == now_index else UI.INK_SOFT
 				var word := str(labels[i])
