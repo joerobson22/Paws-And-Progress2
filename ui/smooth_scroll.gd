@@ -71,6 +71,8 @@ func _input(e: InputEvent) -> void:
 		return
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		if e.pressed:
+			# Before the press reaches what's under it, which may set it.
+			Gestures.lifts = false
 			_pressed = not _drags_itself(get_viewport().gui_get_hovered_control())
 			_press_at = e.position
 			_drag_bar = null
@@ -83,7 +85,7 @@ func _input(e: InputEvent) -> void:
 		if _drag_bar:
 			get_viewport().set_input_as_handled()
 			_drag_to(e.position)
-		elif not Gestures.claimed and e.position.distance_to(_press_at) > DRAG_START:
+		elif not Gestures.claimed and not Gestures.lifts and e.position.distance_to(_press_at) > DRAG_START:
 			_try_drag(e.position)
 
 
