@@ -370,11 +370,15 @@ func debug_phone_view() -> bool:
 	return OS.is_debug_build() and bool(state.settings.get("debug_phone_view", false))
 
 
-## True on phones and tablets, and in the debug phone view: swiping and a
-## tap-to-open map rather than edge arrows and a map that opens under the
-## pointer.
+## Set by main.gd while a computer's window is tall and narrow, like a phone.
+var narrow_window := false
+
+
+## True on phones and tablets, in the debug phone view and in a narrow
+## window: swiping and a tap-to-open map rather than edge arrows and a map
+## that opens under the pointer.
 func phone_layout() -> bool:
-	return OS.has_feature("mobile") or debug_phone_view()
+	return OS.has_feature("mobile") or debug_phone_view() or narrow_window
 
 
 ## The walk's debug time buttons: the walk started `minutes` earlier.

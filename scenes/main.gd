@@ -30,6 +30,9 @@ const PHONE_MIN_SHORT_SIDE := 360.0
 ## Computers: the window's short side in design units, whatever its size.
 const DESKTOP_SHORT_SIDE := 600.0
 const MIN_DESKTOP_SCALE := 0.75
+## Computers: a window narrower than this share of its height is laid out
+## as a phone.
+const NARROW_WINDOW := 0.75
 ## The minimap's gap from the bottom (and the left, on computers).
 const MAP_INSET := 18.0
 ## A drag becomes a swipe once it moves this far...
@@ -155,7 +158,8 @@ func _ready() -> void:
 ## stays its intended size; the debug phone view does the same with a
 ## phone's width. On computers everything scales with the window: its short
 ## side is always DESKTOP_SHORT_SIDE design units, so a bigger window draws
-## everything bigger (never below MIN_DESKTOP_SCALE).
+## everything bigger (never below MIN_DESKTOP_SCALE). A tall, narrow window
+## is laid out as a phone instead (see NARROW_WINDOW).
 func _fit_design_size() -> void:
 	var window := get_window()
 	var side: float
@@ -165,12 +169,30 @@ func _fit_design_size() -> void:
 		var points := Vector2(DisplayServer.window_get_size()) / Display.screen_scale()
 		side = clampf(minf(points.x, points.y), PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
 	else:
-		var window_size := Vector2(DisplayServer.window_get_size())
-		var short := maxf(1.0, minf(window_size.x, window_size.y))
-		side = maxf(short / maxf(short / DESKTOP_SHORT_SIDE, MIN_DESKTOP_SCALE), PHONE_MIN_SHORT_SIDE)
+		var window_size := Vector2(DisplayServer.window_get_size()).max(Vector2.ONE)
+		var short := minf(window_size.x, window_size.y)
+		if window_size.x < window_size.y * NARROW_WINDOW:
+			# As tall as a phone in design units, so it's as wide as one.
+			side = clampf(window_size.x * Display.PHONE.y / window_size.y, PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
+		else:
+			side = maxf(short / maxf(short / DESKTOP_SHORT_SIDE, MIN_DESKTOP_SCALE), PHONE_MIN_SHORT_SIDE)
+	_set_narrow(not OS.has_feature("mobile") and not App.debug_phone_view() \
+		and DisplayServer.window_get_size().x < DisplayServer.window_get_size().y * NARROW_WINDOW)
 	var target := Vector2i(roundi(side), roundi(side))
 	if window.content_scale_size != target:
 		window.content_scale_size = target
+
+
+## Switches to or from the phone layout as the window narrows or widens.
+func _set_narrow(narrow: bool) -> void:
+	if narrow == App.narrow_window:
+		return
+	App.narrow_window = narrow
+	if _minimap:
+		_minimap.hover_grow = not App.phone_layout()
+		_layout()
+	# Every screen lays itself out again for its new shape.
+	App.state_changed.emit()
 
 
 ## Puts the window settings (and the debug phone view) in place, if they
