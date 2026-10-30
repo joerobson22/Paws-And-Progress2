@@ -95,11 +95,14 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 	pair.add_theme_constant_override("separation", 16)
 	pair.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pair.add_child(Podium.new(Text.t("project.pets"), Podium.pet_rows(p.pets), Text.t("project.no_walks")))
+	var rule := _Rule.new()
+	pair.add_child(rule)
 	pair.add_child(Podium.new(Text.t("project.places"), Podium.place_rows(p.places), Text.t("project.no_walks")))
 	pair.resized.connect(func():
 		var stack := pair.size.x < PODIUMS_SIDE_BY_SIDE
 		if pair.vertical != stack:
-			pair.vertical = stack)
+			pair.vertical = stack
+			rule.queue_redraw())
 	col.add_child(pair)
 
 	var bias := App.tz_bias()
@@ -199,3 +202,23 @@ class _GradeButton extends Button:
 			var disc := UI.box(Color(0, 0, 0, 0.12 * _shade), Color.TRANSPARENT, int(r))
 			_cover.draw_style_box(disc, Rect2(Vector2.ZERO, size))
 
+
+## A short line between the two podiums: upright while they sit side by
+## side, flat while they stack.
+class _Rule extends Control:
+	const SHARE := 0.6
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(1, 1)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var c := size * 0.5
+		if size.y > size.x:
+			draw_line(Vector2(c.x, c.y - size.y * SHARE * 0.5), Vector2(c.x, c.y + size.y * SHARE * 0.5), UI.LINE, 1.0)
+		else:
+			draw_line(Vector2(c.x - size.x * SHARE * 0.5, c.y), Vector2(c.x + size.x * SHARE * 0.5, c.y), UI.LINE, 1.0)
+
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_RESIZED:
+			queue_redraw()
