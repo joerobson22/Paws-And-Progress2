@@ -18,9 +18,12 @@ func _init(title: String, rows: Array, empty_text: String) -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cap := UI.caption(title)
+	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(cap)
 	if rows.is_empty():
-		add_child(UI.label(empty_text, 13, UI.INK_FAINT, false, 700))
+		var empty := UI.label(empty_text, 13, UI.INK_FAINT, false, 700)
+		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		add_child(empty)
 		return
 	var first := _spot(rows[0], 0, BIG)
 	# As wide as the podium, so a long name has room before it's cut short.
