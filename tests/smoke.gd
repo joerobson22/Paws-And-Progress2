@@ -730,7 +730,30 @@ func _run() -> void:
 	check(not app.state.settings.get("sound") and not app.state.settings.get("ambience"), "the sound button mutes everything")
 	walk._toggle_sound()
 	check(app.state.settings.get("sound") and app.state.settings.get("ambience"), "and turns it all back on")
-	check(_find(walk, func(n): return _is(n, "dropdown.gd")) != null, "the debug weather picker is on the walk")
+	# The weather picker in the top left: what you pick shows and is kept.
+	var weather_pick: Node = _find(walk, func(n): return _is(n, "dropdown.gd"))
+	check(weather_pick != null, "the weather picker is on the walk")
+	check(weather_pick.get_global_rect().position.x < main.size.x * 0.3, "in the top left")
+	check(weather_pick.get_global_rect().end.x < walk._sound.get_global_rect().position.x - 8.0, "clear of the sound button")
+	weather_pick._open()
+	await _wait(20)
+	await _shot("walk_weather_menu")
+	weather_pick._choose("rainy", null)
+	await _wait(20)
+	check(app.state.settings.get("weather") == "rainy", "the weather picked is saved")
+	check(walk._scenery.weather_kind() in ["rainy", "snowy", "sunny"], "and the place shows it its own way")
+	await _shot("walk_rain")
+	weather_pick._choose(weather_pick._options[0][0], null)
+	await _wait(10)
+	check(str(app.state.settings.get("weather")) in ["", "sunny"], "back to the first choice")
+
+	# The End focus pill: its words, with the pie inside on the right.
+	var pill: Button = walk._gift
+	check(pill.text == "End focus", "the pill says End focus")
+	check(pill.get_global_rect().end.x <= main.size.x and pill.get_global_rect().end.y <= main.size.y, "the pill is on screen")
+	var text_w: float = pill.get_theme_font("font").get_string_size(pill.text, HORIZONTAL_ALIGNMENT_LEFT, -1, pill.get_theme_font_size("font_size")).x
+	check(22.0 + text_w + 8.0 < pill.size.x - pill.PIE_INSET - pill.PIE, "the words don't run into the pie")
+
 
 	# The debug time buttons move the walk on; the gift button's pie follows.
 	var steps: Array = _find(walk, func(n): return n is Button and n.text == "+5").get_parent().get_children()
@@ -754,6 +777,15 @@ func _run() -> void:
 	await _shot("walk_50min")
 	check(walk._gift.level() == 1, "50 minutes guarantees a rare gift")
 	check(walk._gift.shown()["common"] < 0.01, "and common drops out of the pie")
+
+	# Past a day the clock shows days, smaller so it still fits.
+	app.state.active.start_unix -= 86400
+	await _wait(70)
+	check(walk._timer.text.begins_with("1d "), "a day on, the clock shows days (%s)" % walk._timer.text)
+	check(walk._timer.get_minimum_size().x <= main.size.x - 20.0, "and still fits across")
+	await _shot("walk_day")
+	app.state.active.start_unix += 86400
+	await _wait(70)
 	walk._on_gift_pressed()
 	await _wait(80)
 	await _shot("walk_dive")

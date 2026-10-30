@@ -4,8 +4,7 @@ extends VBoxContainer
 ## screen, small, beside the home icon in the top left: a switch that
 ## unlocks every animal and place, and one that gives the window a phone's
 ## shape and lays the app out as on a phone (off: the window as it was).
-## The walk uses the other two pieces here: a picker to preview each kind
-## of weather instead of the real one, and buttons that move the walk on.
+## The walk also shows the buttons here that move it on.
 
 ## How far the walk's time buttons move it on, in minutes.
 const STEPS := [5, 10, 30, 60]
@@ -41,16 +40,6 @@ func _switch(grid: GridContainer, title: String, tip: String, on: bool, setting:
 	var words := UI.label(title, 13, UI.INK_SOFT, false, 800)
 	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	grid.add_child(words)
-
-
-## A picker for the weather the places show: the real one, or any kind.
-static func weather_picker() -> Dropdown:
-	var options := [["live", Text.t("debug.live_weather")]]
-	for kind in Weather.KINDS:
-		options.append([kind, Weather.look(kind, Content.weathers)["name"]])
-	var pick := Dropdown.new(options, Outdoors.override if Outdoors.override != "" else "live", false, Text.t("debug.weather"), false)
-	pick.chosen.connect(func(option: String, _reversed: bool): Outdoors.override = "" if option == "live" else option)
-	return pick
 
 
 ## Small see-through buttons that add 5, 10, 30 or 60 minutes to the walk.

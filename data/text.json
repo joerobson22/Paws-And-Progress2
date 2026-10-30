@@ -191,6 +191,8 @@
 		"sound": "Sound",
 		"sound_on": "Sound on",
 		"sound_off": "Sound off",
+		"weather": "Weather",
+		"weather_real": "Real weather",
 		"end_title": "End your walk?",
 		"end_body": "{pet} hasn't found a gift yet. {time} more and it will.",
 		"minutes": {
@@ -198,6 +200,7 @@
 			"other": "{n} minutes"
 		},
 		"end": "End walk",
+		"end_focus": "End focus",
 		"keep_walking": "Keep walking"
 	},
 	"finish": {
@@ -459,8 +462,6 @@
 		"unlock_all_note": "Unlock every animal and place (debug builds only)",
 		"phone_size": "Phone size",
 		"phone_size_note": "Show the app at a phone's proportions (debug builds only)",
-		"weather": "Weather",
-		"live_weather": "Live",
 		"add_minutes": "+{minutes}"
 	},
 	"setup": {

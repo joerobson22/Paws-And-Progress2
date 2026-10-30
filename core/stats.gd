@@ -17,6 +17,23 @@ static func local_day(unix: int, bias_minutes: int) -> int:
 	return floori(float(unix + bias_minutes * 60) / SECONDS_PER_DAY)
 
 
+## A walk's focus time shared out over the local days it fell on, from its
+## start, as [[day, seconds], ...]. Pauses are taken as at the end, so a walk
+## over midnight counts the right time each side unless it paused a lot.
+static func split_by_day(start_unix: int, seconds: int, bias_minutes: int) -> Array:
+	var out: Array = []
+	var at := start_unix
+	var left := seconds
+	while left > 0:
+		var day := local_day(at, bias_minutes)
+		var midnight := (day + 1) * SECONDS_PER_DAY - bias_minutes * 60
+		var part := mini(left, midnight - at)
+		out.append([day, part])
+		left -= part
+		at += part
+	return out
+
+
 ## 0 = Monday ... 6 = Sunday. Day 0 (1970-01-01) was a Thursday.
 static func weekday(day: int) -> int:
 	return posmod(day + 3, 7)

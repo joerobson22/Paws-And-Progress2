@@ -113,6 +113,16 @@ func test_totals_by_project_and_place() -> void:
 	eq(s.days.size(), 2, "nothing logged for a zero-length walk")
 
 
+func test_walk_split_over_midnight() -> void:
+	var monday := Stats.local_day(MONDAY, 0)
+	eq(Stats.split_by_day(MONDAY + 3600, 1800, 0), [[monday, 1800]], "all in one day")
+	eq(Stats.split_by_day(MONDAY - 600, 1800, 0), [[monday - 1, 600], [monday, 1200]], "over midnight")
+	eq(Stats.split_by_day(MONDAY - 600, 1800, 60), [[monday, 1800]], "UTC+1: already Monday")
+	var long := Stats.split_by_day(MONDAY + 12 * 3600, 30 * 3600, 0)
+	eq(long, [[monday, 12 * 3600], [monday + 1, 18 * 3600]], "a 30 hour walk")
+	eq(Stats.split_by_day(MONDAY, 0, 0), [], "nothing to share")
+
+
 func test_format_duration() -> void:
 	eq(Stats.format_duration(59), "0m")
 	eq(Stats.format_duration(3600 * 11 + 23 * 60), "11h 23m")

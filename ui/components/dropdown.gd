@@ -29,13 +29,7 @@ func _init(options: Array, selected: String, is_reversed: bool = false, label_pr
 	reversed = is_reversed and can_reverse
 	prefix = label_prefix
 	sortable = can_reverse
-	UI.style_button(self, UI.SURFACE_SOFT, UI.INK, 999)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
-		var sb: StyleBoxFlat = get_theme_stylebox(state)
-		sb.content_margin_left = 14
-		sb.content_margin_right = 12
-		sb.content_margin_top = 4
-		sb.content_margin_bottom = 4
+	_style(UI.SURFACE_SOFT, UI.INK)
 	add_theme_font_size_override("font_size", 13)
 	add_theme_constant_override("h_separation", 6)
 	icon_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -49,6 +43,24 @@ func _init(options: Array, selected: String, is_reversed: bool = false, label_pr
 ## the option and `key`_reversed the direction. Saving tells the whole app
 ## the state changed; with `quiet` it only saves, for a screen that re-sorts
 ## its own list from `chosen` rather than rebuilding everything.
+## See-through with white words, for over the scenery, as tall as the round
+## buttons beside it.
+func on_dark() -> Dropdown:
+	_style(UI.GLASS, Color.WHITE)
+	custom_minimum_size.y = 40
+	return self
+
+
+func _style(fill: Color, ink: Color) -> void:
+	UI.style_button(self, fill, ink, 999)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		var sb: StyleBoxFlat = get_theme_stylebox(state)
+		sb.content_margin_left = 14
+		sb.content_margin_right = 12
+		sb.content_margin_top = 4
+		sb.content_margin_bottom = 4
+
+
 static func for_setting(options: Array, key: String, fallback: String, quiet: bool = false) -> Dropdown:
 	var d := Dropdown.new(options, str(App.state.settings.get(key, fallback)), bool(App.state.settings.get(key + "_reversed", false)), Text.t("common.sort_by"))
 	d.chosen.connect(func(option: String, is_reversed: bool):
