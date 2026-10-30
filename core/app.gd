@@ -2,7 +2,7 @@ extends Node
 ## Autoload "App": owns the GameState, saves it, runs the walk lifecycle and
 ## asks the app shell to move between screens.
 
-## Screens: the five panes ("focus", "gifts", "completed", "profile",
+## Screens: the five panes ("focus", "gifts", "projects", "profile",
 ## "stats"), the full-screen flows ("choose_focus", "walk", "finish",
 ## "ended"), and "home", which closes any flow and returns to the focus pane.
 signal navigate(screen: String, params: Dictionary)
@@ -234,6 +234,14 @@ func complete_project(id: String) -> void:
 	if p and not p.is_complete():
 		p.completed_unix = now()
 		_changed()
+
+
+## Puts a deleted project back where it was in the list (undo).
+func restore_project(p: ProjectData, index: int) -> void:
+	if state.project(p.id) != null:
+		return
+	state.projects.insert(clampi(index, 0, state.projects.size()), p)
+	_changed()
 
 
 ## Back to ongoing; its grade stays, hidden until it's completed again.

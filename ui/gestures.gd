@@ -14,3 +14,7 @@ static var claimed := false
 ## dragged (a gift, with a mouse), so the drag isn't taken for a scroll.
 ## Cleared by each new press.
 static var lifts := false
+## Set when a press lands on something that swipes sideways itself (a
+## project on the projects screen), so a sideways drag isn't taken for a
+## swipe between screens. Cleared by each new press.
+static var sideways := false

@@ -1,6 +1,6 @@
 extends Control
 ## App shell. Five panes are laid out like a plus sign with the focus screen
-## in the middle: gifts to the left, completed projects to the right, your
+## in the middle: gifts to the left, projects to the right, your
 ## profile above and stats below. Swipe between them, use the arrow keys
 ## (Esc comes back to the middle), click the big faint arrows at the edges
 ## (computers), or open the minimap (bottom left on computers, bottom middle
@@ -13,7 +13,7 @@ extends Control
 const PANES := {
 	"focus": [Vector2i(0, 0), "res://scenes/panes/focus.gd"],
 	"gifts": [Vector2i(-1, 0), "res://scenes/panes/gifts.gd"],
-	"completed": [Vector2i(1, 0), "res://scenes/panes/completed.gd"],
+	"projects": [Vector2i(1, 0), "res://scenes/panes/projects.gd"],
 	"profile": [Vector2i(0, -1), "res://scenes/panes/profile.gd"],
 	"stats": [Vector2i(0, 1), "res://scenes/panes/stats.gd"],
 }
@@ -519,6 +519,7 @@ func _input(e: InputEvent) -> void:
 			_press_pos = e.position
 			_press_time = Time.get_ticks_usec()
 			Gestures.claimed = false
+			Gestures.sideways = false
 		else:
 			if _swiping:
 				get_viewport().set_input_as_handled()
@@ -559,7 +560,7 @@ func _try_swipe(pos: Vector2) -> void:
 	# The finger drags the screen: moving right brings in the pane on the left.
 	var step := Vector2i(-signi(roundi(along)), 0) if horizontal else Vector2i(0, -signi(roundi(along)))
 	var target := _at + step
-	if not _can_go(target) or _scroll_blocks(pos, horizontal, along):
+	if not _can_go(target) or _scroll_blocks(pos, horizontal, along) or (horizontal and Gestures.sideways):
 		# Not a swipe: leave this drag to whatever's under the finger.
 		_press = false
 		return

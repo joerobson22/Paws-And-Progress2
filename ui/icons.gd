@@ -53,6 +53,8 @@ const PATHS := {
 	"sort_down": "M6 9l6 6 6-6",
 	"sort_up": "M6 15l6-6 6 6",
 	"dot": "fill:M12 5.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13z",
+	"hourglass": "M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9",
+	"clipboard": "M8 4H6v17h12V4h-2M9 2.5h6v3.5H9zM9 11h6M9 15h6",
 	"calendar": "M4 6h16v14H4zM4 10h16M8 3v5M16 3v5",
 	"shield": "fill:M12 2.5l8 3.2v5.6c0 5-3.4 9.2-8 10.9-4.6-1.7-8-5.9-8-10.9V5.7z",
 	"shelf": "M3 15h18M5 15v4M19 15v4M7 15V9h4v6M13 15v-4h4v4",
