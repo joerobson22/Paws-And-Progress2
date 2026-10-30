@@ -1783,6 +1783,9 @@ func _key(code: Key) -> void:
 
 ## Taps the option labelled `text` in an open dropdown's menu.
 func _tap_menu(dropdown: Node, text: String) -> void:
+	if not is_instance_valid(dropdown._menu):
+		dropdown._open()
+		await _wait(15)
 	var b: Button = _find(dropdown._menu, func(n): return n is Button and n.text == text)
 	if b == null:
 		check(false, "the menu has %s" % text)
