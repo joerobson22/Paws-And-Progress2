@@ -363,7 +363,9 @@ its placeholder:
 - **Honest time.** Walk length is always `now - start - paused`, from saved
   timestamps, so backgrounding or sleep can't corrupt it. While you walk, the
   app notes every 30 seconds that it's still open; if it's closed or killed
-  mid-walk, the walk ends at the last of those (and never runs past 12 hours).
+  mid-walk, the walk ends at the last of those. Walks can run past a day:
+  the clock then shows `1d 02:13:05`, and the time is split across the days
+  it fell on.
 - **Small saves.** The save keeps only what can't be worked out again: your
   profile, projects, focus time per day (by project and by place), XP total,
   gifts and settings. Levels, stats, achievements and unlocks are worked out

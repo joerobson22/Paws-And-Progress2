@@ -455,7 +455,8 @@ func _log_walk(clock: SessionClock, end_unix: int, gift_id: String) -> FocusSess
 	s.focus_seconds = clock.elapsed(end_unix)
 	s.gift_id = gift_id
 	if s.focus_seconds >= 60:
-		state.log_focus(Stats.local_day(s.start_unix, tz_bias()), s.project_id, s.place_id, s.focus_seconds)
+		for day in Stats.split_by_day(s.start_unix, s.focus_seconds, tz_bias()):
+			state.log_focus(day[0], s.project_id, s.place_id, day[1])
 		state.xp += Levels.walk_xp(s.focus_seconds, Content.gift_rarity(gift_id) if gift_id != "" else "", Content.levels)
 		state.profile["walks"] = int(state.profile.get("walks", 0)) + 1
 		if project and gift_id != "":

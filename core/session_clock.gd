@@ -4,9 +4,6 @@ extends RefCounted
 ## timestamps, so backgrounding, sleep or the app being killed can't corrupt it.
 ## Every method takes `now` (unix seconds) so it can be tested deterministically.
 
-## A walk left running (e.g. the app was killed overnight) is capped at this.
-const MAX_SESSION_SECONDS := 12 * 60 * 60
-
 var project_id: String = ""
 var start_unix: int = 0
 var paused_total: int = 0
@@ -47,7 +44,7 @@ func resume(now: int) -> void:
 func elapsed(now: int) -> int:
 	var end := pause_started_unix if is_paused() else now
 	# Clamp so a clock that jumps backwards never produces negative time.
-	return clampi(end - start_unix - paused_total, 0, MAX_SESSION_SECONDS)
+	return maxi(0, end - start_unix - paused_total)
 
 
 ## When a walk found still running at launch really stopped: the last time
@@ -84,6 +81,10 @@ static func from_dict(d: Dictionary) -> SessionClock:
 	return c
 
 
+## "01:02:05", and from a day on "1d 02:13:05".
 static func format(seconds: int) -> String:
 	@warning_ignore("integer_division")
-	return "%02d:%02d:%02d" % [seconds / 3600, (seconds / 60) % 60, seconds % 60]
+	var days := seconds / 86400
+	@warning_ignore("integer_division")
+	var clock := "%02d:%02d:%02d" % [(seconds / 3600) % 24, (seconds / 60) % 60, seconds % 60]
+	return "%dd %s" % [days, clock] if days > 0 else clock

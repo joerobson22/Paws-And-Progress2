@@ -1,8 +1,9 @@
 extends Control
 ## The focus walk. Text is kept to the time, what you're working on and a
-## quiet line of encouragement. The button in the bottom right ends the walk
-## and shows what gift is waiting (see GiftButton); when there is one, your
-## pet dives into a bush and comes back out carrying it.
+## quiet line of encouragement. The "End focus" pill in the bottom right
+## ends the walk with a bong, and its small pie shows what gift is waiting
+## (see GiftButton); when there is one, your pet dives into a bush and comes
+## back out carrying it. The weather can be picked in the top left.
 ## Time on screen always comes from the session's timestamps (SessionClock),
 ## never from counting frames, so it stays right after the app is
 ## backgrounded, the laptop sleeps, or the app is killed and reopened.
@@ -101,6 +102,8 @@ func _build_hud(clock: SessionClock) -> void:
 	_hud.add_child(col)
 
 	_timer = _shadowed(UI.label("00:00:00", 84 if wide else 64, UI.ON_DARK, true, 500))
+	# Kept this tall when it shrinks past a day, so nothing under it moves.
+	_timer.custom_minimum_size.y = _timer.get_combined_minimum_size().y
 	col.add_child(_timer)
 	var title := _shadowed(UI.label(_project.name, 22, UI.ON_DARK, true, 500))
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -133,7 +136,7 @@ func _build_hud(clock: SessionClock) -> void:
 	bottom.add_child(_gift)
 	col.add_child(bottom)
 
-	# Along the top: the debug weather picker on the left, sound on the right.
+	# Along the top: the weather picker on the left, sound on the right.
 	var top := MarginContainer.new()
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	top.add_theme_constant_override("margin_left", 14 + int(insets["left"]))
@@ -144,14 +147,29 @@ func _build_hud(clock: SessionClock) -> void:
 	var row := UI.hbox()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top.add_child(row)
-	if OS.is_debug_build():
-		var weather := DebugBar.weather_picker()
-		weather.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		row.add_child(weather)
+	row.add_child(_weather_picker())
 	row.add_child(UI.spacer())
 	_sound = UI.round_button("sound", Text.t("walk.sound"), _toggle_sound, UI.GLASS, Color.WHITE, 40, false)
 	row.add_child(_sound)
 	_show_sound()
+
+
+## The weather to walk in: the real weather (when you've let the app look
+## it up) or any kind, remembered for next time.
+func _weather_picker() -> Dropdown:
+	var options := []
+	if Outdoors.enabled():
+		options.append(["real", Text.t("walk.weather_real")])
+	for kind in Weather.KINDS:
+		options.append([kind, Weather.look(kind, Content.weathers)["name"]])
+	var now := Outdoors.choice()
+	if now == "":
+		now = "real" if Outdoors.enabled() else "sunny"
+	var pick := Dropdown.new(options, now, false, Text.t("walk.weather"), false).on_dark()
+	pick.chosen.connect(func(option: String, _reversed: bool):
+		Outdoors.set_choice("" if option == "real" else option)
+		_update_ambience())
+	return pick
 
 
 ## Sound on means the sound effects or the ambience are; the button turns
@@ -219,6 +237,9 @@ func _process(delta: float) -> void:
 		if elapsed != _last_second:
 			_last_second = elapsed
 			_timer.text = SessionClock.format(elapsed)
+			# A day or more is three characters longer: smaller, to fit.
+			var wide := UI.is_wide(self)
+			_timer.add_theme_font_size_override("font_size", (84 if wide else 64) if elapsed < 86400 else (68 if wide else 48))
 			_gift.set_seconds(elapsed)
 
 	_ambience_check -= delta
@@ -293,6 +314,7 @@ func _on_gift_pressed() -> void:
 
 func _end() -> void:
 	_finishing = true
+	Audio.play("bong", 1.0, -4.0)
 	_result = App.finish_walk()
 	Motion.fade(_hud, 0.0)
 	var gift: Dictionary = _result.get("gift", {})

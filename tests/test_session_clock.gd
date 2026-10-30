@@ -33,13 +33,18 @@ func test_clock_going_backwards_never_negative() -> void:
 	eq(c.elapsed(500), 0)
 
 
-func test_forgotten_walk_is_capped() -> void:
+func test_long_walks_keep_counting() -> void:
 	var c := SessionClock.begin("p", 0)
-	eq(c.elapsed(3 * 86400), SessionClock.MAX_SESSION_SECONDS)
+	eq(c.elapsed(13 * 3600), 13 * 3600, "no cap at 12 hours")
+	eq(c.elapsed(3 * 86400), 3 * 86400)
 
 
 func test_format() -> void:
 	eq(SessionClock.format(3725), "01:02:05")
+	eq(SessionClock.format(23 * 3600 + 59 * 60 + 59), "23:59:59")
+	eq(SessionClock.format(86400), "1d 00:00:00")
+	eq(SessionClock.format(86400 + 2 * 3600 + 13 * 60 + 5), "1d 02:13:05")
+	eq(SessionClock.format(12 * 86400), "12d 00:00:00")
 
 
 func test_walk_left_running_stops_when_the_app_was_last_seen() -> void:
