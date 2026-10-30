@@ -9,6 +9,8 @@ signal held
 
 ## Where the last press started, in the owner's own space.
 var at := Vector2.ZERO
+## How long a press is held before it counts as a long press.
+var hold_time := Gestures.LONG_PRESS
 
 var _owner: Control
 var _watch_hold := false
@@ -40,7 +42,7 @@ func handle(e: InputEvent) -> void:
 			_down = true
 			at = e.position
 			if _watch_hold:
-				_timer = _owner.get_tree().create_timer(Gestures.LONG_PRESS)
+				_timer = _owner.get_tree().create_timer(hold_time)
 				_timer.timeout.connect(_on_timer.bind(_timer))
 		elif _down:
 			_down = false

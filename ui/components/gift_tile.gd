@@ -24,6 +24,8 @@ var tappable := false:
 var draggable := false:
 	set(v):
 		draggable = v
+		# Gifts that can be moved pick up after a short hold.
+		_press.hold_time = Gestures.QUICK_HOLD if v else Gestures.LONG_PRESS
 		_update_pointer()
 var _press := Press.new(self, true)
 var _glint: Glint
@@ -121,7 +123,7 @@ func _gui_input(e: InputEvent) -> void:
 		_drag_from = e.position
 		if e.pressed:
 			Gestures.lifts = true
-	elif e is InputEventMouseMotion and _armed and e.position.distance_to(_drag_from) >= Gestures.TAP_SLOP:
+	elif e is InputEventMouseMotion and _armed and e.position.distance_to(_drag_from) >= Gestures.LIFT_SLOP:
 		_armed = false
 		# The drag is the gift's now, not a scroll's or a swipe's.
 		Gestures.claimed = true
