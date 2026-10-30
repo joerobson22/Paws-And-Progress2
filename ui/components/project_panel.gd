@@ -17,7 +17,7 @@ extends PanelContainer
 signal grade_pressed(project_id: String)
 
 ## Narrower than this, the two podiums stack.
-const PODIUMS_SIDE_BY_SIDE := 440.0
+const PODIUMS_SIDE_BY_SIDE := 270.0
 
 var project_id := ""
 

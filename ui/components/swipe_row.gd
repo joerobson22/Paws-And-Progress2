@@ -153,7 +153,8 @@ func celebrate(colour: Color = UI.SUCCESS) -> void:
 		var burst := _Confetti.new()
 		burst.top_level = true
 		add_child(burst)
-		burst.global_position = global_position + Vector2(size.x * 0.5 + _offset, size.y * 0.35)
+		# From the middle of the panel, where it's springing back to.
+		burst.global_position = global_position + Vector2(size.x * 0.5, minf(size.y * 0.35, 120.0))
 		burst.start(size.x)
 	await get_tree().create_timer(maxf(Motion.time(0.65), 0.05)).timeout
 

@@ -23,9 +23,8 @@ func _init(title: String, rows: Array, empty_text: String) -> void:
 		add_child(UI.label(empty_text, 13, UI.INK_FAINT, false, 700))
 		return
 	var first := _spot(rows[0], 0, BIG)
-	# Wider than its picture, so a long name has room before it's cut short.
-	first.custom_minimum_size.x = BIG * 2.2
-	first.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# As wide as the podium, so a long name has room before it's cut short.
+	first.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(first)
 	if rows.size() > 1:
 		var under := UI.hbox(8)
