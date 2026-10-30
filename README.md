@@ -29,7 +29,9 @@ macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
 
 ## How it's laid out
 
-The app is five screens arranged like a plus sign. Swipe between them, use
+The app is five screens arranged like a plus sign. Swipe between them, give
+the mouse wheel or trackpad a small flick (a list under the pointer scrolls
+first; once it's at its end, a fresh flick moves on), use
 the arrow keys on a keyboard (Esc comes back to the middle), click the big
 faint arrows at the screen's edges (computers only: one on every side of the
 focus screen, and one back home on the others), or use the little map in the

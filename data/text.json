@@ -295,6 +295,8 @@
 		"school_placeholder": "e.g. University of Leeds",
 		"joined": "Joined",
 		"joined_today": "Today",
+		"total_focus": "Total focus time",
+		"total_focus_tap": "Total focus time {time}. Tap to show it another way",
 		"edit_field": "Edit {field}"
 	},
 	"friend": {
@@ -421,6 +423,14 @@
 	"dates": {
 		"hours_minutes": "{h}h {m}m",
 		"minutes": "{m}m",
+		"long": {
+			"years": "{n}yr",
+			"months": "{n}mo",
+			"weeks": "{n}wk",
+			"days": "{n}d",
+			"hours": "{n}h",
+			"minutes": "{n}m"
+		},
 		"date": "{day} {month} {year}",
 		"day": "{day} {month}",
 		"months": [

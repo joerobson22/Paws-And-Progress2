@@ -158,6 +158,24 @@ static func _run_ending(work: Dictionary, day: int) -> int:
 	return run
 
 
+## Longer stretches in the biggest units that fit, leaving out any at
+## zero: "1yr 2mo 3d 4h", "1wk 6d 40m", "0m" for nothing. A month is 30
+## days and a year 365.
+const LONG_UNITS := [["years", 365 * 86400], ["months", 30 * 86400], ["weeks", 7 * 86400], ["days", 86400], ["hours", 3600], ["minutes", 60]]
+
+
+static func format_long(seconds: int) -> String:
+	var parts: Array[String] = []
+	var left := maxi(0, seconds)
+	for unit in LONG_UNITS:
+		@warning_ignore("integer_division")
+		var n: int = left / int(unit[1])
+		left -= n * int(unit[1])
+		if n > 0:
+			parts.append(Text.t("dates.long." + str(unit[0]), {"n": n}))
+	return " ".join(parts) if not parts.is_empty() else Text.t("dates.long.minutes", {"n": 0})
+
+
 static func format_duration(seconds: int) -> String:
 	@warning_ignore("integer_division")
 	var h := seconds / 3600

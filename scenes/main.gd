@@ -37,6 +37,13 @@ const SWIPE_START := 16.0
 ## ...and goes through when let go past this much of the screen, or flicked.
 const SWIPE_COMMIT := 0.22
 const FLICK_SPEED := 1.6  # screens per second
+## The wheel or trackpad moves to the next pane after this much turning in
+## one go (a wheel notch is 1; a trackpad sends small amounts)...
+const WHEEL_STEP := 1.0
+## ...and a pause this long (seconds) between turns starts a fresh one.
+const WHEEL_GAP := 0.25
+## A trackpad's turn against a wheel's, so a small flick is enough.
+const PAN_SCALE := 1.6
 ## How long the old colours take to fade into the new ones.
 const PALETTE_FADE := 0.8
 
@@ -68,6 +75,12 @@ var _velocity := 0.0
 var _last_time := 0
 var _press_time := 0
 var _synthetic := false
+## The wheel or trackpad turn under way: when its last event came (usec),
+## how far it has gone each way, and whether it can still move pane (no
+## list took any of it, and it hasn't moved one yet).
+var _wheel_at := 0
+var _wheel_sum := Vector2.ZERO
+var _wheel_free := false
 
 
 func _ready() -> void:
@@ -430,10 +443,71 @@ func _unhandled_input(e: InputEvent) -> void:
 		_go_back()
 
 
+# --- Wheel and trackpad ------------------------------------------------------
+
+## How far a wheel or trackpad event turns, down and right positive, or zero
+## for anything else.
+static func _wheel_turn(e: InputEvent) -> Vector2:
+	var mb := e as InputEventMouseButton
+	if mb and mb.pressed:
+		var f: float = mb.factor if mb.factor > 0.0 else 1.0
+		match mb.button_index:
+			MOUSE_BUTTON_WHEEL_UP:
+				return Vector2(-f, 0) if mb.shift_pressed else Vector2(0, -f)
+			MOUSE_BUTTON_WHEEL_DOWN:
+				return Vector2(f, 0) if mb.shift_pressed else Vector2(0, f)
+			MOUSE_BUTTON_WHEEL_LEFT:
+				return Vector2(-f, 0)
+			MOUSE_BUTTON_WHEEL_RIGHT:
+				return Vector2(f, 0)
+	var pan := e as InputEventPanGesture
+	if pan:
+		return pan.delta * PAN_SCALE
+	return Vector2.ZERO
+
+
+## A wheel or trackpad turn at `pos`. A list under the pointer that can
+## still scroll that way takes it, and then the whole turn is the list's,
+## however long a trackpad keeps it going: only a fresh turn (after a short
+## pause) can move pane. Otherwise, once the turn has gone far enough one
+## way, it moves one pane that way, as the arrow keys do, and the rest of
+## the turn does nothing more.
+func _on_wheel(turn: Vector2, pos: Vector2) -> void:
+	var now := Time.get_ticks_usec()
+	if now - _wheel_at > WHEEL_GAP * 1000000.0:
+		_wheel_free = true
+		_wheel_sum = Vector2.ZERO
+	_wheel_at = now
+	if not _wheel_free or not _flows.is_empty() or Modal.is_open() or _swiping:
+		return
+	var sideways := absf(turn.x) > absf(turn.y)
+	var along := -(turn.x if sideways else turn.y)
+	# A list that only scrolls sideways takes the wheel down too.
+	if _moving or _scroll_blocks(pos, sideways, along) or (not sideways and _scroll_blocks(pos, true, along, true)):
+		_wheel_free = false
+		return
+	_wheel_sum += turn
+	var step := Vector2i.ZERO
+	if absf(_wheel_sum.x) >= WHEEL_STEP and absf(_wheel_sum.x) > absf(_wheel_sum.y):
+		step = Vector2i(1 if _wheel_sum.x > 0.0 else -1, 0)
+	elif absf(_wheel_sum.y) >= WHEEL_STEP:
+		step = Vector2i(0, 1 if _wheel_sum.y > 0.0 else -1)
+	if step == Vector2i.ZERO:
+		return
+	_wheel_free = false
+	if _can_go(_at + step):
+		get_viewport().set_input_as_handled()
+		_go_cell(_at + step)
+
+
 # --- Swiping -----------------------------------------------------------------
 
 func _input(e: InputEvent) -> void:
 	if _synthetic:
+		return
+	var turn := _wheel_turn(e)
+	if turn != Vector2.ZERO:
+		_on_wheel(turn, e.position)
 		return
 	if not _flows.is_empty() or Modal.is_open() or _moving:
 		_press = false
@@ -534,13 +608,16 @@ func _end_swipe() -> void:
 
 ## True if a scroll area under the finger can still move that way, so the
 ## drag should scroll it rather than swipe to another pane.
-func _scroll_blocks(pos: Vector2, horizontal: bool, along: float) -> bool:
+## With `only_sideways`, only lists that can't scroll down count.
+func _scroll_blocks(pos: Vector2, horizontal: bool, along: float, only_sideways: bool = false) -> bool:
 	var stack: Array[Node] = [_panes[_at]]
 	while not stack.is_empty():
 		var n: Node = stack.pop_back()
 		stack.append_array(n.get_children())
 		var sc := n as ScrollContainer
 		if sc == null or not sc.is_visible_in_tree() or not sc.get_global_rect().has_point(pos):
+			continue
+		if only_sideways and sc.get_v_scroll_bar().visible:
 			continue
 		var bar: ScrollBar = sc.get_v_scroll_bar()
 		if horizontal:

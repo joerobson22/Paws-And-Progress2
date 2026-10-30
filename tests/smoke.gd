@@ -395,6 +395,25 @@ func _run() -> void:
 	app.go("profile")
 	await _wait(50)
 	var profile_pane: Node = main._panes[Vector2i(0, -1)]
+	# Total focus time sits under Joined; a tap shows it another way.
+	var total_cap: Label = _find(profile_pane, func(n): return n is Label and n.text.to_lower() == "total focus time")
+	check(total_cap != null, "total focus time is on the profile")
+	if total_cap:
+		var total_row: Control = total_cap.get_parent().get_parent()
+		var total_value: Label = total_cap.get_parent().get_child(1)
+		var joined_cap: Label = _find(profile_pane, func(n): return n is Label and n.text.to_lower() == "joined")
+		check(joined_cap != null and joined_cap.get_global_rect().position.y < total_cap.get_global_rect().position.y, "under Joined")
+		var seconds: int = app.state.total_seconds()
+		check(total_value.text == _class("res://core/stats.gd").format_duration(seconds), "in hours and minutes (%s)" % total_value.text)
+		check(profile_pane.get_global_rect().encloses(total_row.get_global_rect()), "and it fits")
+		await _shot("profile_total")
+		await _tap_control(total_row, main)
+		await _wait(10)
+		check(total_value.text == _class("res://core/stats.gd").format_long(seconds), "a tap shows weeks and days (%s)" % total_value.text)
+		await _shot("profile_total_long")
+		await _tap_control(total_row, main)
+		await _wait(10)
+		check(total_value.text == _class("res://core/stats.gd").format_duration(seconds), "and back")
 	# Tapping the pencil opens the character popup (the picture itself
 	# doesn't); tapping the level badge (bottom left of the picture) opens
 	# the rewards.
@@ -571,6 +590,19 @@ func _run() -> void:
 
 	app.go("stats")
 	await _wait(50)
+	# The projects under the chart drag sideways from anywhere on them.
+	var legend_strip: ScrollContainer = main._panes[Vector2i(0, 1)]._legend.get_parent().get_parent()
+	var legend_bar := legend_strip.get_h_scroll_bar()
+	if legend_bar.max_value > legend_bar.page + 20.0:
+		var on_strip := legend_strip.get_global_rect().get_center()
+		await _drag(on_strip + Vector2(60, 0), on_strip - Vector2(60, 0), 8)
+		await _wait(30)
+		check(legend_strip.scroll_horizontal > 40, "dragging the projects list scrolls it (%d)" % legend_strip.scroll_horizontal)
+		check(not modal_class.is_open(), "without opening a project")
+		check(main._at == Vector2i(0, 1), "or swiping away")
+		await _shot("stats_strip_dragged")
+		legend_strip.scroll_horizontal = 0
+		await _wait(5)
 	main._panes[Vector2i(0, 1)]._show_project(app.state.projects[0].id, 0)
 	await _wait(25)
 	await _shot("stats_popup")
@@ -592,6 +624,17 @@ func _run() -> void:
 	await _stats_and_friends(main)
 	main._panes[Vector2i(0, 1)]._select_week(main._panes[Vector2i(0, 1)]._week - 7)
 	await _wait(10)
+
+	# A small wheel turn moves between screens, once per turn.
+	await create_timer(0.3).timeout
+	await _wheel(Vector2(main.size.x * 0.5, 30), MOUSE_BUTTON_WHEEL_UP)
+	await _wheel(Vector2(main.size.x * 0.5, 30), MOUSE_BUTTON_WHEEL_UP)
+	await _wait(40)
+	check(main._at == Vector2i.ZERO, "a wheel turn up from stats goes to the focus screen, and only one screen")
+	await create_timer(0.3).timeout
+	await _wheel(main.size * 0.5, MOUSE_BUTTON_WHEEL_DOWN)
+	await _wait(40)
+	check(main._at == Vector2i(0, 1), "a fresh turn down goes back to stats")
 
 	app.go("focus")
 	await _wait(50)
@@ -920,8 +963,9 @@ func _run() -> void:
 	var tipped: Control = _find(main, func(n): return n is Control and n.tooltip_text != "")
 	check(tipped == null, "no tooltips (%s has one)" % [tipped])
 	for pane in main._panes.values():
-		var title: Control = _find(pane, func(n): return n is TextureRect and n.get_parent() is PanelContainer and n.get_parent().get_parent() is HBoxContainer)
+		var title: Control = _find(pane, func(n): return n is TextureRect and n.get_parent() is CenterContainer and n.get_parent().get_parent() is HBoxContainer)
 		check(pane.name == "Focus" or title != null, "%s has its map icon by its title" % pane.name)
+		check(_find(pane, func(n): return n is PanelContainer and n.get_parent() is HBoxContainer and n.get_child_count() == 1 and n.get_child(0) is TextureRect and n.size.x == 44.0) == null, "%s's icon has no tile behind it" % pane.name)
 
 	if _failed:
 		quit(1)

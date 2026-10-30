@@ -10,3 +10,7 @@ const TAP_SLOP := 12.0
 const LONG_PRESS := 0.35
 
 static var claimed := false
+## Set when a press lands on something that picks up as soon as it's
+## dragged (a gift, with a mouse), so the drag isn't taken for a scroll.
+## Cleared by each new press.
+static var lifts := false

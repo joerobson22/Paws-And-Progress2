@@ -9,6 +9,10 @@ extends Pane
 ## gear in the top right opens the settings. A new save slot shows what's
 ## left to fill in above the achievements, and keeps you here till then.
 
+## Whether your total focus time shows in years, months, weeks and so on
+## (tap it to switch) rather than hours and minutes.
+var _long_total := false
+
 
 func build() -> void:
 	var col := frame(720, 14)
@@ -79,7 +83,8 @@ static func _hover_badge(badge: Control, on: bool) -> void:
 	t.tween_property(badge, "self_modulate", Color(1.22, 1.22, 1.22) if on else Color.WHITE, Motion.time(Motion.FAST))
 
 
-## Your name, where you study and when you joined: small, at the top.
+## Your name, where you study, when you joined and how long you've focused
+## in all (every project, finished or not): small, at the top.
 func _details() -> Control:
 	var p := App.state.profile
 	var username := str(p.get("username", ""))
@@ -91,7 +96,27 @@ func _details() -> Control:
 		ProfileCard.field(Text.t("profile.school"), school if school != "" else Text.t("profile.school_empty"), school == "",
 			_edit.bind("institution", Text.t("profile.school_prompt"), Text.t("profile.school_placeholder"), 60)),
 		ProfileCard.field(Text.t("profile.joined"), Stats.format_date(joined, App.tz_bias()) if joined > 0 else Text.t("profile.joined_today")),
+		_total_focus(),
 	])
+
+
+## Your total focus time; tapping it switches between "312h 40m" and
+## "1wk 6d 40m".
+func _total_focus() -> Control:
+	var row := ProfileCard.field(Text.t("profile.total_focus"), _total_text())
+	var value: Label = row.get_child(0).get_child(1)
+	row.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.accessibility_name = Text.t("profile.total_focus_tap", {"time": value.text})
+	Press.attach(row).tapped.connect(func():
+		_long_total = not _long_total
+		value.text = _total_text()
+		row.accessibility_name = Text.t("profile.total_focus_tap", {"time": value.text}))
+	return row
+
+
+func _total_text() -> String:
+	var seconds := App.state.total_seconds()
+	return Stats.format_long(seconds) if _long_total else Stats.format_duration(seconds)
 
 
 ## Your gift shelf, along the bottom of the card, with a pencil that opens
