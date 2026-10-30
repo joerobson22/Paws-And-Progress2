@@ -345,7 +345,7 @@ func _run() -> void:
 	# Ongoing first: each project with its podiums of pets and places.
 	check(projects_pane._filter() == "ongoing", "projects opens on ongoing")
 	var filter: Node = _find(projects_pane, func(n): return _is(n, "dropdown.gd") and not n.sortable)
-	check(filter != null and filter.get_global_rect().end.x > projects_pane.size.x - 120.0 and filter.get_global_rect().position.y < 90.0, "the filter is in the top right")
+	check(filter != null and filter.get_parent().get_global_rect().end.x - filter.get_global_rect().end.x < 4.0 and filter.get_global_rect().position.y < 90.0, "the filter is in the top right")
 	var ongoing_panels: Array = _all(projects_pane, func(n): return _is(n, "project_panel.gd"))
 	check(ongoing_panels.size() == app.state.active_projects().size(), "one panel per ongoing project (%d)" % ongoing_panels.size())
 	var podiums: Array = _all(ongoing_panels[0], func(n): return _is(n, "podium.gd"))
@@ -359,10 +359,13 @@ func _run() -> void:
 			for l in _all(pod, func(n): return n is Label):
 				check(l.get_global_rect().size.x > 20.0 or l.text.length() < 2, "podium words have room (%s)" % l.text)
 	await _shot("projects_ongoing")
-	# The headline numbers follow the filter: all of them shows a ring.
+	# The headline numbers follow the filter: all of them shows how much is done.
 	await _tap_menu(filter, "All")
 	await _wait(30)
-	check(_find(projects_pane, func(n): return _is(n, "progress_ring.gd")) != null, "all shows how much is complete")
+	var all_shown: Array = projects_pane.shown_projects()
+	var all_done := all_shown.filter(func(p): return p.is_complete()).size()
+	var percent := "%d%%" % floori(100.0 * all_done / maxi(all_shown.size(), 1))
+	check(_find(projects_pane, func(n): return n is Label and n.text == percent) != null, "all shows how much is complete (%s)" % percent)
 	await _shot("projects_all")
 	app.set_setting("projects_filter", "completed")
 	await _wait(30)

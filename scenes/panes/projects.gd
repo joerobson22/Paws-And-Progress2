@@ -142,8 +142,10 @@ func _stats(listed: Array[ProjectData], width: float) -> Control:
 			longest_s = span(p)
 	match _filter():
 		"all":
-			var ring := ProgressRing.new(done / float(maxi(listed.size(), 1)), UI.SUCCESS, 52)
-			panel.add(ring, Text.t("projects.complete"), Text.t("projects.x_of_y", {"x": done, "y": listed.size()}))
+			# A badge and a big number like the other cells, so the names line up.
+			panel.add(StatPanel.badge("check", UI.SUCCESS), Text.t("projects.complete"),
+				Text.t("projects.x_of_y", {"x": done, "y": listed.size()}),
+				"%d%%" % floori(100.0 * done / maxi(listed.size(), 1)))
 		"completed":
 			panel.add(StatPanel.badge("check", UI.SUCCESS), Text.t("projects.completed"),
 				Text.t("projects.graded", {"n": graded}), str(listed.size()))
