@@ -35,6 +35,10 @@ var _changes := 0
 const HEARTBEAT := 30.0
 
 
+## How many of each gift the debug "Unlock all" switch hands out.
+const DEBUG_GIFTS := 50
+
+
 func _ready() -> void:
 	rng.randomize()
 	slot = SaveSlots.read_index()["current"]
@@ -360,6 +364,17 @@ func facts() -> Dictionary:
 			found[id] = true
 		_facts = {"level": level(), "total_seconds": state.total_seconds(), "place_seconds": state.place_seconds(), "found": found}
 	return _facts
+
+
+## Debug builds only: tops every gift up to DEBUG_GIFTS, so trade-ins and
+## the collection can be tried out. Switching "Unlock all" on does this.
+func debug_fill_gifts() -> void:
+	if not OS.is_debug_build():
+		return
+	for g in Content.gifts:
+		var id: String = g["id"]
+		state.inventory[id] = maxi(state.gift_count(id), DEBUG_GIFTS)
+	_changed()
 
 
 ## The debug-only "unlock everything" switch on the focus screen. Ignored
