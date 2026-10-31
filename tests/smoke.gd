@@ -802,25 +802,48 @@ func _run() -> void:
 	await _shot("place_locked")
 	_close_modal()
 	await _wait(10)
-	# The pill lists ongoing projects, newest walked first, with a way to
-	# start a new one; picking one puts it in the pill.
+	# The pill lists ongoing projects, most recently worked on first, with a
+	# way to start a new one; picking one puts it in the pill. The popup is
+	# always the same size: three rows, then the list scrolls between the
+	# title and New project, which always show.
 	chooser._open_projects()
 	await _wait(30)
 	await _shot("choose_project")
-	var rows: Array = _all(modal_class.top().body, func(n): return n is Button and n.accessibility_name in app.state.active_projects().map(func(p): return p.name))
+	var popup = modal_class.top()
+	var names: Array = chooser.project_choices().map(func(p): return p.name)
+	var rows: Array = _all(popup.body, func(n): return n.has_method("spring_back"))
 	check(rows.size() == app.state.active_projects().size(), "every ongoing project is listed (%d)" % rows.size())
-	check(_find(modal_class.top().body, func(n): return n is Button and n.text == "New project") != null, "with New project at the bottom")
-	var picked: String = rows[1].accessibility_name
-	rows[1].pressed.emit()
+	check(rows.map(func(r): return r.content.accessibility_name) == names, "most recently worked on first (%s)" % [names])
+	check(_find(popup.footer, func(n): return n is Button and n.text == "New project") != null, "with New project at the bottom")
+	check(_find(popup.header, func(n): return n is Label and n.text == "Your projects") != null, "and the title stays at the top")
+	var list_area: Control = popup.body.get_child(0)
+	check(is_equal_approx(list_area.size.y, chooser.PROJECT_ROW * 3 + chooser.PROJECT_GAP * 2), "the list is three rows tall (%d)" % list_area.size.y)
+	var card_height: float = popup.card.size.y
+	var picked: String = rows[1].content.accessibility_name
+	rows[1].content.get_meta("press").tapped.emit()
 	await _wait(20)
 	check(chooser._project_pill.text == picked, "picking a project puts it in the pill")
+	# Swiping right to left completes it, just like on the Projects screen.
 	chooser._open_projects()
 	await _wait(20)
-	var add: Button = _find(modal_class.top().body, func(n): return n is Button and n.text == "New project")
+	popup = modal_class.top()
+	rows = _all(popup.body, func(n): return n.has_method("spring_back"))
+	var done_id: String = chooser.project_choices()[rows.size() - 1].id
+	rows[rows.size() - 1].swiped.emit(-1)
+	await _wait(90)
+	check(app.state.project(done_id).is_complete(), "swiping a project left completes it")
+	check(_all(popup.body, func(n): return n.has_method("spring_back")).size() == rows.size() - 1, "and it leaves the list")
+	check(absf(popup.card.size.y - card_height) < 1.0, "the popup keeps its size (%d, was %d)" % [popup.card.size.y, card_height])
+	app.reopen_project(done_id)
+	await _wait(10)
+	var add: Button = _find(popup.footer, func(n): return n is Button and n.text == "New project")
 	add.pressed.emit()
 	await _wait(20)
 	var project_edit: LineEdit = _find(modal_class.top().body, func(n): return n is LineEdit)
 	project_edit.text = "Chemistry"
+	check(_find(modal_class.top().body, func(n): return n is Button and n.text in ["Project", "Module"]) == null, "no project-or-module pills")
+	check(_find(modal_class.top().body, func(n): return n is Button and n.text == "Create project") != null, "the button says Create project")
+	await _wait(20)
 	await _shot("new_project")
 	var project_count: int = app.state.projects.size()
 	project_edit.text_submitted.emit("Chemistry")

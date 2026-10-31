@@ -7,6 +7,10 @@ extends Control
 
 signal closed(result: Variant)
 
+## How far the body's scroll reaches past it on each side (into the card's
+## padding), so hovered buttons have room to grow.
+const GROW_ROOM := Vector2(12, 4)
+
 static var layer: Control
 static var _stack: Array[Modal] = []
 
@@ -21,6 +25,8 @@ var body: VBoxContainer
 var footer: VBoxContainer
 var _backdrop: ColorRect
 var _scroll: ScrollContainer
+var _holder: Control
+var _room: MarginContainer
 var _max_width := 440.0
 var _closing := false
 
@@ -134,6 +140,11 @@ static func colour(title: String, start: Color, on_change: Callable, swatches: A
 	return m
 
 
+## The body's scroll, e.g. to keep a list clear of its bar (UI.clear_of_bar).
+func scroller() -> ScrollContainer:
+	return _scroll
+
+
 ## The title line at the top of a popup.
 func heading(text: String) -> Label:
 	var l := UI.label(text, 24, UI.INK, true, 600)
@@ -147,7 +158,7 @@ func heading_row(text: String) -> HBoxContainer:
 	var h := heading(text)
 	h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(h)
-	var x := UI.round_button("close", Text.t("common.close"), close.bind(null), UI.SURFACE_SOFT, UI.INK, 36, false)
+	var x := UI.ghost_button("close", Text.t("common.close"), close.bind(null))
 	x.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(x)
 	return row
@@ -200,12 +211,30 @@ func _build(padding: int) -> void:
 	header.child_entered_tree.connect(func(_child): header.visible = true)
 	header.minimum_size_changed.connect(_fit)
 	column.add_child(header)
+	# The scrolling part reaches GROW_ROOM out into the card's padding, with
+	# the same room inside it round the body, so a button that grows under
+	# the pointer isn't cut off at the scroll's edges.
+	_holder = Control.new()
+	_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_holder)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	column.add_child(_scroll)
+	_scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_scroll.offset_left = -GROW_ROOM.x
+	_scroll.offset_right = GROW_ROOM.x
+	_scroll.offset_top = -GROW_ROOM.y
+	_scroll.offset_bottom = GROW_ROOM.y
+	_holder.add_child(_scroll)
+	_room = MarginContainer.new()
+	_room.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_room.add_theme_constant_override("margin_left", int(GROW_ROOM.x))
+	_room.add_theme_constant_override("margin_right", int(GROW_ROOM.x))
+	_room.add_theme_constant_override("margin_top", int(GROW_ROOM.y))
+	_room.add_theme_constant_override("margin_bottom", int(GROW_ROOM.y))
+	_scroll.add_child(_room)
 	body = UI.vbox(16)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_scroll.add_child(body)
+	_room.add_child(body)
 	body.minimum_size_changed.connect(_fit)
 	footer = UI.vbox(16)
 	footer.visible = false
@@ -222,11 +251,11 @@ func _fit() -> void:
 	var view := get_viewport_rect().size
 	var pad := card.get_theme_stylebox("panel").get_minimum_size()
 	var w := minf(_max_width, view.x - 24.0) - pad.x
-	_scroll.custom_minimum_size.x = w
+	_holder.custom_minimum_size.x = w
 	body.custom_minimum_size.x = w
 	header.custom_minimum_size.x = w
 	footer.custom_minimum_size.x = w
-	_scroll.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, room())
+	_holder.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, room())
 
 
 ## The most height the body gets before it scrolls: the screen less the
@@ -252,7 +281,8 @@ func scroll_to(target: Control) -> void:
 	while n != body and n != null:
 		y += n.position.y
 		n = n.get_parent() as Control
-	var most := maxf(0.0, body.size.y - _scroll.size.y)
+	y += GROW_ROOM.y
+	var most := maxf(0.0, _room.size.y - _scroll.size.y)
 	Motion.to(_scroll, "scroll_vertical", int(clampf(y - _scroll.size.y * 0.5, 0.0, most)), Motion.SLOW)
 
 

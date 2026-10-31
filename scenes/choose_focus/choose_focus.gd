@@ -24,6 +24,12 @@ const SWATCHES := [
 	Color("#c9a46a"), Color("#e2c48f"), Color("#f2e6d8"), Color("#9c9c9c"), Color("#5a5a5a"),
 	Color("#b4533f"), Color("#d9822b"), Color("#e2c046"), Color("#7fae5a"), Color("#4f6f8f"),
 ]
+## The project list: each row's height, the gap between rows, how many rows
+## show before it scrolls, and the rows' corner rounding.
+const PROJECT_ROW := 56
+const PROJECT_GAP := 6
+const PROJECTS_SHOWN := 3
+const PROJECT_RADIUS := 16
 ## How tall pets stand in the chooser.
 const PET_HEIGHT := 200.0
 ## The place buttons: each one's side, the gap between them and the glass
@@ -559,40 +565,57 @@ func _refresh_hint() -> void:
 		_hint.text = Text.t("choose_focus.tap_to_walk" if current_project() else "choose_focus.pick_project_first")
 
 
-## Your ongoing projects, newest walked first, each with its time so far;
-## tap one to walk for it. "New project" at the bottom starts one.
+## Your ongoing projects, most recently worked on first, each with its time
+## so far; tap one to walk for it. The popup is always the same size: the
+## title and "New project" stay put and the list scrolls between them,
+## three projects tall. Swipe a project just as on the Projects screen: left
+## to right deletes it, right to left completes it.
 func _open_projects() -> void:
 	var m := Modal.open(420)
-	m.body.add_child(m.heading_row(Text.t("choose_focus.projects_title")))
-	var current := current_project()
-	var list := UI.vbox(4)
-	for p in project_choices():
-		var on := current != null and p.id == current.id
-		var row := UI.button("", func():
-			App.set_setting("last_project", p.id)
-			m.close(), "quiet" if on else "ghost")
-		row.custom_minimum_size.y = 52
-		row.accessibility_name = p.name
-		var inside := UI.hbox(10)
-		inside.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		inside.offset_left = 16
-		inside.offset_right = -16
-		var title := UI.trimmed(p.name, 16, UI.INK, false, 800)
-		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		inside.add_child(title)
-		var time := UI.label(Stats.format_duration(App.state.project_seconds(p.id)), 14, UI.INK_SOFT, false, 700)
-		time.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		inside.add_child(time)
-		UI.ignore_mouse(inside)
-		row.add_child(inside)
-		list.add_child(row)
-	if not list.get_children().is_empty():
-		m.body.add_child(list)
-		m.body.add_child(UI.divider())
+	m.header.add_child(m.heading_row(Text.t("choose_focus.projects_title")))
+	var list := UI.vbox(PROJECT_GAP)
+	var scroll := UI.scroll_area()
+	scroll.custom_minimum_size.y = PROJECT_ROW * PROJECTS_SHOWN + PROJECT_GAP * (PROJECTS_SHOWN - 1)
+	# No scrollbar eating into the rows (they line up with New project); a
+	# soft fade at the bottom says there's more below instead.
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	var empty := UI.label(Text.t("choose_focus.no_projects"), 15, UI.INK_FAINT, false, 700)
+	empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	empty.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var area := Control.new()
+	area.custom_minimum_size.y = scroll.custom_minimum_size.y
+	area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	area.add_child(scroll)
+	area.add_child(empty)
+	area.add_child(UI.scroll_fade(scroll))
+	m.body.add_child(area)
+	# Swipes play out before the list refills; refills from elsewhere (an
+	# undo) wait for them too.
+	var busy := [false]
+	var fill := func():
+		for c in list.get_children():
+			list.remove_child(c)
+			c.queue_free()
+		var current := current_project()
+		for p in project_choices():
+			list.add_child(_project_row(p, current != null and p.id == current.id, m, busy))
+		empty.visible = list.get_child_count() == 0
+	fill.call()
+	var refill := func():
+		if not busy[0] and is_instance_valid(list):
+			fill.call()
+	App.state_changed.connect(refill)
+	# The list goes when the popup closes or turns into the new project form.
+	list.tree_exiting.connect(func():
+		if App.state_changed.is_connected(refill):
+			App.state_changed.disconnect(refill))
 	var add := UI.button(Text.t("choose_focus.new_project"), _new_project.bind(m), "accent")
 	add.icon = Icons.texture("plus", 18, Color.WHITE, 2.6)
-	m.body.add_child(add)
+	m.footer.add_child(add)
 	m.closed.connect(func(_r):
 		if is_instance_valid(_project_pill):
 			_refresh_project_pill()
@@ -600,33 +623,60 @@ func _open_projects() -> void:
 			_layout())
 
 
-## Swaps the project list for a name box and project-or-module pills.
+## One project in the list: its name and time, filled in when it's the one
+## picked. Tap to pick it; swipe it like a Projects screen panel.
+func _project_row(p: ProjectData, on: bool, m: Modal, busy: Array) -> SwipeRow:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size.y = PROJECT_ROW
+	panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	panel.accessibility_name = p.name
+	# A swiping row doesn't grow under the pointer; it shades instead.
+	panel.set_meta("no_grow", true)
+	var fill := UI.SURFACE_SOFT if on else UI.SURFACE
+	var styles := UI.button_styles(fill, PROJECT_RADIUS)
+	panel.add_theme_stylebox_override("panel", styles["normal"])
+	panel.mouse_entered.connect(func(): panel.add_theme_stylebox_override("panel", styles["hover"]))
+	panel.mouse_exited.connect(func(): panel.add_theme_stylebox_override("panel", styles["normal"]))
+	var inside := UI.hbox(10)
+	var title := UI.trimmed(p.name, 16, UI.INK, false, 800)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	inside.add_child(title)
+	var time := UI.label(Stats.format_duration(App.state.project_seconds(p.id)), 14, UI.INK_SOFT, false, 700)
+	time.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	inside.add_child(time)
+	panel.add_child(inside)
+	UI.ignore_mouse(inside)
+	Press.attach(panel).tapped.connect(func():
+		App.set_setting("last_project", p.id)
+		m.close())
+	var row := ProjectSwipes.row(panel, p)
+	row.radius = PROJECT_RADIUS
+	row.swiped.connect(func(direction: int):
+		if busy[0]:
+			row.spring_back()
+			return
+		busy[0] = true
+		await ProjectSwipes.act(direction, row, p.id, true, false)
+		busy[0] = false
+		if is_instance_valid(row) and row.is_inside_tree():
+			App.state_changed.emit())
+	return row
+
+
+## Swaps the project list for a name box and a "Create project" button.
 func _new_project(m: Modal) -> void:
-	for c in m.body.get_children():
-		m.body.remove_child(c)
-		c.queue_free()
-	m.body.add_child(m.heading_row(Text.t("choose_focus.new_project")))
+	for part in [m.header, m.body, m.footer]:
+		for c in part.get_children():
+			part.remove_child(c)
+			c.queue_free()
+	m.footer.visible = false
+	m.header.add_child(m.heading_row(Text.t("choose_focus.new_project")))
 	var edit := LineEdit.new()
 	edit.placeholder_text = Text.t("choose_focus.project_placeholder")
 	edit.max_length = 40
 	edit.custom_minimum_size.y = 50
 	m.body.add_child(edit)
-	var kind := [ProjectData.KIND_PROJECT]
-	var kinds := UI.hbox(8)
-	# Remade on each pick; held in an array so the pills can call it again.
-	var fill_kinds: Array[Callable] = []
-	fill_kinds.append(func():
-		for c in kinds.get_children():
-			kinds.remove_child(c)
-			c.queue_free()
-		for k in [ProjectData.KIND_PROJECT, ProjectData.KIND_MODULE]:
-			var pill := UI.pill_button(Text.t("choose_focus.kind_project" if k == ProjectData.KIND_PROJECT else "choose_focus.kind_module"), kind[0] == k, func():
-				kind[0] = k
-				fill_kinds[0].call())
-			pill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			kinds.add_child(pill))
-	fill_kinds[0].call()
-	m.body.add_child(kinds)
 	var create := func():
 		var title := edit.text.strip_edges()
 		if title == "":
@@ -636,12 +686,11 @@ func _new_project(m: Modal) -> void:
 			return
 		var p := ProjectData.new()
 		p.name = title
-		p.kind = kind[0]
 		App.add_project(p)
 		App.set_setting("last_project", p.id)
 		Toast.show_text(Text.t("choose_focus.project_started", {"project": title}), "check")
 		m.close()
-	m.body.add_child(UI.button(Text.t("choose_focus.start_project"), create, "accent"))
+	m.body.add_child(UI.button(Text.t("choose_focus.create_project"), create, "accent"))
 	edit.text_submitted.connect(func(_t): create.call())
 	edit.grab_focus.call_deferred()
 
@@ -833,20 +882,15 @@ func _adopt() -> void:
 
 # --- Pieces ------------------------------------------------------------------
 
-## The × reads white over scenery and ink over the adopt form, with a faint
-## disc under the pointer. The paw is a ghost button over the scenery (a
-## thin ring, see-through inside) and a solid green tick on the form.
+## The × is just an icon: white over scenery and ink over the adopt form.
+## The paw is a ghost button over the scenery (a thin ring, see-through
+## inside) and a solid green tick on the form.
 func _style_top(on_form: bool) -> void:
 	var ink := UI.INK if on_form else UI.ON_DARK
+	# Just the icon: no disc under it, hovered or not.
 	UI.style_button(_close, Color.TRANSPARENT, ink, 999)
 	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
-		var sb: StyleBoxFlat = _close.get_theme_stylebox(state)
-		sb.set_content_margin_all(0)
-		match state:
-			"hover":
-				sb.bg_color = Color(ink, 0.12)
-			"pressed", "hover_pressed":
-				sb.bg_color = Color(ink, 0.2)
+		_close.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	_close.icon = Icons.texture("close", 24, Color.WHITE, 3.0)
 	if on_form:
 		UI.style_button(_new, UI.SUCCESS, Color.WHITE, 999)

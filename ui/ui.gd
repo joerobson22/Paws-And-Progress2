@@ -384,6 +384,42 @@ static func shadow_scroll(content: Control, room: int = 16) -> Control:
 	return holder
 
 
+## A soft fade into the card's colour along the top and bottom of `sc` (a
+## list without a scrollbar), each showing only while there's more to
+## scroll that way. Add it over the list, filling the same rect.
+static func scroll_fade(sc: ScrollContainer, height: float = 22.0, colour: Color = SURFACE) -> Control:
+	var fade := _ScrollFade.new()
+	fade.sc = sc
+	fade.height = height
+	fade.colour = colour
+	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sc.get_v_scroll_bar().value_changed.connect(func(_v): fade.queue_redraw())
+	sc.get_v_scroll_bar().changed.connect(fade.queue_redraw)
+	return fade
+
+
+class _ScrollFade extends Control:
+	var sc: ScrollContainer
+	var height := 22.0
+	var colour := Color.WHITE
+
+	func _draw() -> void:
+		if not is_instance_valid(sc):
+			return
+		var bar := sc.get_v_scroll_bar()
+		var above := bar.value > 0.5
+		var below := bar.value < bar.max_value - bar.page - 0.5
+		var clear := Color(colour, 0.0)
+		if above:
+			draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0), Vector2(size.x, height), Vector2(0, height)]),
+				PackedColorArray([colour, colour, clear, clear]))
+		if below:
+			var y := size.y - height
+			draw_polygon(PackedVector2Array([Vector2(0, y), Vector2(size.x, y), Vector2(size.x, size.y), Vector2(0, size.y)]),
+				PackedColorArray([clear, clear, colour, colour]))
+
+
 ## Keeps `content` (a MarginContainer inside `sc`) clear of `sc`'s scrollbar:
 ## while the bar shows, `gap` more room on its side (the right for a list
 ## that scrolls down, the bottom for a sideways strip), so nothing touches
@@ -441,6 +477,32 @@ static func round_button(icon: String, tip: String, on_press: Callable, fill: Co
 	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 		var sb: StyleBoxFlat = b.get_theme_stylebox(state)
 		sb.set_content_margin_all(0)
+	if on_press.is_valid():
+		b.pressed.connect(on_press)
+	return b
+
+
+## An icon with no button round it (the "x" that closes things): just the
+## icon in `ink`, a `diameter` square to hit. It grows on hover like every
+## button, but never shows a fill.
+static func ghost_button(icon: String, tip: String, on_press: Callable, ink: Color = INK,
+		diameter: int = 36, icon_px: int = 22) -> Button:
+	var b := Button.new()
+	b.accessibility_name = tip
+	b.flat = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(diameter, diameter)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	b.icon = Icons.texture(icon, icon_px, Color.WHITE, 2.6)
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.expand_icon = false
+	b.mouse_default_cursor_shape = Cursor.HOVER
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	for state in ["icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_hover_pressed_color", "icon_focus_color"]:
+		b.add_theme_color_override(state, ink)
+	b.add_theme_color_override("icon_disabled_color", Color(ink, 0.45))
 	if on_press.is_valid():
 		b.pressed.connect(on_press)
 	return b

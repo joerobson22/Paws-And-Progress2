@@ -23,6 +23,11 @@ var left_colour := UI.SUCCESS
 var left_icon := "check"
 var right_colour := UI.DANGER
 var right_icon := "bin"
+## The corner rounding of what shows behind the panel; match the panel's.
+var radius := RADIUS:
+	set(v):
+		radius = v
+		_flash.radius = v
 var content: Control
 
 var _offset := 0.0
@@ -129,7 +134,7 @@ func _draw() -> void:
 	var right := _offset > 0.0
 	var colour := right_colour if right else left_colour
 	var reach := clampf(absf(_offset) / (size.x * THRESHOLD), 0.0, 1.0)
-	var sb := UI.box(Color(colour, lerpf(0.35, 1.0, reach)), Color.TRANSPARENT, RADIUS)
+	var sb := UI.box(Color(colour, lerpf(0.35, 1.0, reach)), Color.TRANSPARENT, radius)
 	draw_style_box(sb, Rect2(Vector2.ZERO, Vector2(size.x, size.y)))
 	var px := 26
 	var tex := Icons.texture(right_icon if right else left_icon, px, Color.WHITE, 2.8)
@@ -185,6 +190,7 @@ func collapse() -> void:
 ## A rounded wash of colour over the panel, `strength` strong.
 class _Flash extends Control:
 	var colour := UI.SUCCESS
+	var radius := RADIUS
 	var strength := 0.0:
 		set(v):
 			strength = v
@@ -193,7 +199,7 @@ class _Flash extends Control:
 	func _draw() -> void:
 		if strength <= 0.0:
 			return
-		draw_style_box(UI.box(Color(colour, strength), Color.TRANSPARENT, RADIUS), Rect2(Vector2.ZERO, size))
+		draw_style_box(UI.box(Color(colour, strength), Color.TRANSPARENT, radius), Rect2(Vector2.ZERO, size))
 
 
 ## A burst of paper bits that fly up and flutter down.
