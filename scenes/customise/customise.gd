@@ -286,7 +286,7 @@ class _Dot extends Button:
 				var a0 := TAU * k / 12.0
 				draw_arc(c, r * 0.66, a0, a0 + TAU / 12.0 + 0.02, 6, Color.from_hsv(float(k) / 12.0, 0.7, 0.95), r * 0.5, true)
 		var plus := Icons.texture("plus", 14, UI.INK)
-		draw_circle(c, r * 0.45, Color(UI.SURFACE, 0.9), true, -1.0, true)
+		draw_circle(c, r * 0.45, Color(UI.SURFACE, UI.SURFACE.a * 0.9), true, -1.0, true)
 		draw_texture(plus, c - Vector2(plus.get_size()) * 0.5)
 
 

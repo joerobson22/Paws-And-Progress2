@@ -4,9 +4,10 @@ extends VBoxContainer
 ## screen, small, beside the home icon in the top left: a switch that
 ## unlocks every animal and place (and tops every gift up to 50), and one
 ## that gives the window a phone's shape and lays the app out as on a phone
-## (off: the window as it was). In the top right, sky_controls(): the
-## app's colours (Auto follows the time of day, or pin Light or Dark) and a
-## time of day slider for the sky (Now follows the clock).
+## (off: the window as it was). In the top right, sky_controls(): the UI
+## style being tried out, the app's colours (Auto follows the time of day,
+## or pin Light or Dark) and a time of day slider for the sky (Now follows
+## the clock).
 ## The walk also shows the buttons here that move it on.
 
 ## How far the walk's time buttons move it on, in minutes.
@@ -39,9 +40,26 @@ static func sky_controls() -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.scale = Vector2(SCALE, SCALE)
 	box.add_theme_constant_override("separation", 4)
+	box.add_child(_style_row())
 	box.add_child(_theme_row())
 	box.add_child(_time_row())
 	return box
+
+
+## The UI styles being tried out (UI.STYLES), the one in use filled in.
+static func _style_row() -> Control:
+	var row := UI.hbox(4)
+	row.add_child(_caption(Text.t("debug.style")))
+	var now := App.ui_style()
+	var names := {"classic": Text.t("debug.style_classic"), "glass": Text.t("debug.style_glass"),
+		"storybook": Text.t("debug.style_storybook"), "pixel": Text.t("debug.style_pixel")}
+	for kind in names:
+		var b := UI.pill_button(names[kind], kind == now, func():
+			App.set_setting("debug_style", kind), 24)
+		b.add_theme_font_size_override("font_size", 12)
+		b.accessibility_name = "%s %s" % [Text.t("debug.style"), names[kind]]
+		row.add_child(b)
+	return row
 
 
 ## Auto | Light | Dark, the one in use filled in.

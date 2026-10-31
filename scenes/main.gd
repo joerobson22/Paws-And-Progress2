@@ -63,7 +63,7 @@ var _fade_layer := Control.new()
 var _fading := 0
 var _minimap: Minimap
 var _arrows := {}  # Vector2i direction -> NavArrow
-var _bg := ColorRect.new()
+var _bg := UI.backdrop()
 ## The view behind the focus screen (art/home/backdrop.tscn), if there is one.
 var _backdrop: HomeBackdrop
 const BACKDROP := "res://art/home/backdrop.tscn"
@@ -97,13 +97,11 @@ var _wheel_free := false
 func _ready() -> void:
 	_apply_window()
 	_fit_design_size()
-	UI.set_dark(App.wants_dark())
+	UI.set_look(App.ui_style(), App.wants_dark())
 	theme = UI.build_theme()
 	# Before the panes connect, so a palette change lands before they rebuild.
 	App.state_changed.connect(_on_state_changed)
-	_bg.color = UI.BG
-	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UI.dress_backdrop(_bg)
 	add_child(_bg)
 	if ResourceLoader.exists(BACKDROP):
 		_backdrop = (load(BACKDROP) as PackedScene).instantiate()
@@ -280,16 +278,16 @@ func _on_state_changed() -> void:
 
 
 ## Looks at the time of day again: the backdrop's sky, and dark colours
-## from sunset to sunrise.
+## from sunset to sunrise. A new debug style changes the look the same way.
 func _on_sky_tick() -> void:
 	var want := App.wants_dark()
-	if want != UI.dark:
+	if want != UI.dark or App.ui_style() != UI.style:
 		_switch_palette(want)
 	if is_instance_valid(_backdrop):
 		_backdrop.refresh()
 
 
-## Swaps light and dark without anything moving: the screen on show is
+## Swaps light and dark (or the style) without anything moving: the screen on show is
 ## rebuilt in the new colours exactly as it was (same layout, scroll and
 ## text, no entry animations), under a picture of the old colours that
 ## then fades away. What a pane keeps through a rebuild (the orb, the
@@ -299,9 +297,9 @@ func _switch_palette(dark: bool) -> void:
 	var snapshot: Image = null
 	if DisplayServer.get_name() != "headless":
 		snapshot = get_viewport().get_texture().get_image()
-	UI.set_dark(dark)
+	UI.set_look(App.ui_style(), dark)
 	theme = UI.build_theme()
-	_bg.color = UI.BG
+	UI.dress_backdrop(_bg)
 	_minimap.queue_redraw()
 	for dir in _arrows:
 		_arrows[dir].refresh()

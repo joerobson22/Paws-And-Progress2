@@ -251,6 +251,6 @@ class Bar extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _draw() -> void:
-		draw_style_box(UI.box(UI.SURFACE_SOFT, Color.TRANSPARENT, 3), Rect2(Vector2.ZERO, size))
+		draw_style_box(UI.bar_box(UI.SURFACE_SOFT, 3), Rect2(Vector2.ZERO, size))
 		if share > 0.0:
 			draw_style_box(UI.box(UI.ACCENT, Color.TRANSPARENT, 3), Rect2(Vector2.ZERO, Vector2(maxf(size.y, size.x * share), size.y)))

@@ -71,7 +71,8 @@ func _pick_line() -> void:
 	if _line != "" and walks == _line_walks:
 		return
 	_line_walks = walks
-	var hour := int(Time.get_datetime_dict_from_system()["hour"])
+	# The time of day the sky shows (the debug slider can move it).
+	var hour := int(App.day_hour())
 	_line = Content.greeting(hour, str(App.state.profile.get("username", "")), App.rng)
 
 
@@ -85,13 +86,6 @@ func _place() -> void:
 	_orb.position = (size - _orb.size) * 0.5 + Vector2(0, size.y * 0.02)
 	_hint_pill.size = _hint_pill.get_combined_minimum_size()
 	_hint_pill.position = Vector2((size.x - _hint_pill.size.x) * 0.5, _orb.position.y + d + 24)
-	var w := minf(560.0, size.x - 48.0)
-	# A tall box with the words at its bottom, rather than one measured to
-	# fit: a wrapping label's measured height isn't stable across rebuilds,
-	# and the words would jump when the colours change.
-	_greeting.size = Vector2(w, GREETING_BOX)
-	# (It can come out taller; its bottom is what stays put.)
-	_greeting.position = Vector2((size.x - w) * 0.5, _orb.position.y - _greeting.size.y - GREETING_GAP)
 	# The home icon sits where the other screens' title icons do.
 	var insets := UI.safe_insets(self)
 	_home.size = _home.custom_minimum_size
@@ -107,6 +101,19 @@ func _place() -> void:
 		else:
 			# No room beside the switches (a phone): under them.
 			_sky_debug.position = Vector2(_debug.position.x, _debug.position.y + _debug.size.y * DebugBar.SCALE + 6.0)
+	var w := minf(560.0, size.x - 48.0)
+	var bottom := _orb.position.y - GREETING_GAP
+	# Debug builds: clear of the sky controls in the top right, if the
+	# greeting could reach up beside them.
+	if is_instance_valid(_sky_debug) and _sky_debug.position.x > size.x * 0.5 \
+			and bottom - GREETING_BOX < _sky_debug.position.y + _sky_debug.size.y * DebugBar.SCALE:
+		w = minf(w, (_sky_debug.position.x - size.x * 0.5 - 16.0) * 2.0)
+	# A tall box with the words at its bottom, rather than one measured to
+	# fit: a wrapping label's measured height isn't stable across rebuilds,
+	# and the words would jump when the colours change.
+	_greeting.size = Vector2(w, GREETING_BOX)
+	# (It can come out taller; its bottom is what stays put.)
+	_greeting.position = Vector2((size.x - w) * 0.5, bottom - _greeting.size.y)
 
 
 func _update_hint() -> void:
@@ -114,10 +121,21 @@ func _update_hint() -> void:
 	_place()
 
 
-## Only the hint (and, after a walk, the greeting) depend on the game state.
+## Only the hint (and, after a walk, the greeting) depend on the game state,
+## and in debug builds the sky controls.
 func _on_state_changed() -> void:
+	if is_instance_valid(_sky_debug):
+		# The debug pills show what's picked, even when the look stays the
+		# same (Light picked while Auto was already light).
+		var fresh := DebugBar.sky_controls()
+		add_child(fresh)
+		move_child(fresh, _sky_debug.get_index())
+		remove_child(_sky_debug)
+		_sky_debug.queue_free()
+		_sky_debug = fresh
 	if is_instance_valid(_hint):
 		_update_hint()
+
 
 
 func _on_resized() -> void:

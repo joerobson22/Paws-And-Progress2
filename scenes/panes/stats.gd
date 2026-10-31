@@ -344,7 +344,7 @@ func _legend_chip(id: String, seconds: int) -> Control:
 		b.add_theme_color_override(state, Color.WHITE)
 	for state in ["normal", "hover", "pressed", "hover_pressed"]:
 		var sb: StyleBoxFlat = b.get_theme_stylebox(state)
-		sb.set_corner_radius_all(999)
+		UI.corners(sb, 999)
 		sb.content_margin_left = 12
 		sb.content_margin_right = 14
 		sb.content_margin_top = 4

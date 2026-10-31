@@ -33,3 +33,9 @@ jobs:
           timeout 600 ./godot --headless --path . -s tests/smoke.gd 2>&1 | tee smoke.log
           grep -q "SMOKE OK" smoke.log
           ! grep -E "SCRIPT ERROR|Parse Error|triangulation failed" smoke.log
+
+      - name: Every UI style (main screens, light and dark)
+        run: |
+          timeout 300 ./godot --headless --path . -s tests/style_shots.gd 2>&1 | tee styles.log
+          grep -q "STYLE SHOTS OK" styles.log
+          ! grep -E "SCRIPT ERROR|Parse Error" styles.log
