@@ -56,6 +56,8 @@ func _run() -> void:
 	# whenever it runs. Dark mode is tried further down.
 	app.set_setting("debug_theme", "light")
 
+	# Long enough for the first frames to settle on a slow machine (CI), so
+	# the map is laid out before the pointer moves over it.
 	await _wait(70)
 	await _shot("focus")
 
