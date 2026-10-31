@@ -47,8 +47,6 @@ static func default_profile() -> Dictionary:
 		"walks_since_epic": 0,
 		# Walks finished, so the home screen can pick a new line after each.
 		"walks": 0,
-		# A new save slot asks for a name and where you study first.
-		"setup_pending": false,
 	}
 
 

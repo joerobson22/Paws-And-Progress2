@@ -35,11 +35,7 @@ func build() -> void:
 	side.add_child(_shelf())
 	body.add_child(side)
 
-	if App.setup_pending():
-		col.add_child(_setup())
-		col.add_child(_spare_achievements(me))
-	else:
-		col.add_child(_achievements())
+	col.add_child(_achievements())
 
 
 ## The character, with a pencil in the corner to change how they look. Your
@@ -151,72 +147,6 @@ func _achievements() -> Control:
 	return section
 
 
-## The achievements under a new account's setup card, when there's room
-## for a row of medals; on a short screen they're left out and the card
-## takes the room. When every medal fits with room to spare, the card takes
-## that too, as it does once setup is done.
-func _spare_achievements(card: Control) -> Control:
-	var section := _achievements()
-	# A plain Control, so the medals never squeeze the card or the setup.
-	var room := Control.new()
-	room.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	room.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	room.add_child(section)
-	card.size_flags_vertical = Control.SIZE_FILL
-	room.resized.connect(func():
-		var least := section.get_combined_minimum_size().y
-		if room.size.y < least:
-			# Hidden whole, so the column leaves no gap for it either.
-			room.hide()
-			card.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		else:
-			section.size = Vector2(room.size.x, maxf(least, room.size.y))
-		, CONNECT_DEFERRED)
-	(section.get_child(1) as MedalCard).shrank.connect(func():
-		room.size_flags_vertical = Control.SIZE_FILL
-		room.custom_minimum_size.y = section.get_combined_minimum_size().y
-		card.size_flags_vertical = Control.SIZE_EXPAND_FILL, CONNECT_DEFERRED)
-	return room
-
-
-## A new save slot's first stop, under the card (it has no achievements
-## yet): a tick by each thing to fill in, and "Start walking", which only
-## works once both are done and lets you leave this screen.
-func _setup() -> Control:
-	var c := UI.card(UI.SURFACE, 20)
-	var v := UI.vbox(12)
-	c.add_child(v)
-	v.add_child(UI.label(Text.t("setup.welcome"), 20, UI.INK, true, 600))
-	var p := App.state.profile
-	var todo := UI.hbox(20)
-	todo.add_child(_todo(Text.t("setup.name"), str(p.get("username", "")).strip_edges() != ""))
-	todo.add_child(_todo(Text.t("setup.school"), str(p.get("institution", "")).strip_edges() != ""))
-	v.add_child(todo)
-	var go := UI.button(Text.t("setup.start"), func():
-		App.finish_setup()
-		App.go("focus"), "accent")
-	go.disabled = not App.profile_complete()
-	v.add_child(go)
-	return c
-
-
-## One thing a new account fills in, ticked once it's done.
-func _todo(text: String, done: bool) -> Control:
-	var row := UI.hbox(8)
-	var dot := UI.panel(UI.ACCENT if done else UI.SURFACE_SOFT, 999, 0)
-	dot.custom_minimum_size = Vector2(22, 22)
-	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	if done:
-		var tick := UI.icon_rect("check", 14, UI.ON_COLOUR)
-		tick.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		tick.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		dot.add_child(tick)
-	row.add_child(dot)
-	row.add_child(UI.label(text, 15, UI.INK if done else UI.INK_SOFT, false, 700))
-	row.accessibility_name = Text.t("setup.step_done" if done else "setup.step_todo", {"step": text})
-	return row
-
-
 # --- Settings ----------------------------------------------------------------
 
 func open_settings() -> void:
@@ -238,6 +168,13 @@ func open_settings() -> void:
 	for row in Display.settings_rows(get_window()):
 		s.add_child(UI.divider())
 		s.add_child(row)
+	# Last, in red. The account stays on this device to log back into.
+	s.add_child(UI.divider())
+	var out := UI.button(Text.t("accounts.log_out"), func():
+		Modal.close_all()
+		App.log_out(), "danger")
+	out.accessibility_name = Text.t("accounts.log_out")
+	s.add_child(out)
 	var about := UI.para(Text.t("settings.about", {"version": ProjectSettings.get_setting("application/config/version", "")}), 13, UI.INK_FAINT)
 	about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	s.add_child(about)
@@ -248,8 +185,8 @@ func open_settings() -> void:
 	UI.clear_of_bar(m.scroller(), room)
 
 
-## Whose save this is, and "Switch account" for the other saves on this
-## device (AccountSwitcher).
+## Whose account this is: their face, name and where they study. Log out
+## is at the bottom.
 func _account_row() -> Control:
 	var row := UI.hbox(14)
 	var face := UI.character_portrait({}, Vector2(44, 44), true)
@@ -260,13 +197,10 @@ func _account_row() -> Control:
 	text.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var username := str(App.state.profile.get("username", ""))
 	text.add_child(UI.trimmed(username if username != "" else Text.t("accounts.unnamed"), 16, UI.INK, false, 800))
-	text.add_child(UI.para(Text.t("accounts.note"), 13))
+	var school := str(App.state.profile.get("institution", ""))
+	if school != "":
+		text.add_child(UI.trimmed(school, 13, UI.INK_SOFT, false, 600))
 	row.add_child(text)
-	var switch := UI.button(Text.t("accounts.title"), AccountSwitcher.open, "quiet")
-	switch.custom_minimum_size.y = 40
-	switch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	switch.add_theme_font_size_override("font_size", 14)
-	row.add_child(switch)
 	return row
 
 
