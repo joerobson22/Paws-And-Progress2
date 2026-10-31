@@ -44,8 +44,7 @@ These are optional. Without them the app uses the one-colour icon.
 | `home` | The Home (focus) tile on the map, and back home after a walk. |
 | `hourglass` | Ongoing projects, and the swipe to put a project back. |
 | `lock` | Locked places, animals and rewards. |
-| `moon` | The moon in the sky. |
-| `moon_fill` | Dark mode on the theme switch. |
+| `moon` | The moon in the walk's sky. |
 | `mute` | Sound off during a walk. |
 | `pause` | Pause a walk. |
 | `paw` | Pets, the walking badge, the Pets tile on the map, the create account screen. |
@@ -59,7 +58,7 @@ These are optional. Without them the app uses the one-colour icon.
 | `sound` | Sound on during a walk. |
 | `star` | Grades and favourites. |
 | `stats` | The Stats tile on the map. |
-| `sun` | The sun in the sky, and light mode on the theme switch. |
+| `sun` | The sun in the walk's sky. |
 | `trophy` | Achievements and the leaderboard. |
 | `user` | The Profile tile on the map. |
 | `walk` | Start a walk. |
@@ -74,4 +73,4 @@ These are optional. Without them the app uses the one-colour icon.
 | `place_moon` | The Moon button. |
 | `place_safari` | The Safari button. |
 | `place_tundra` | The Tundra button. |
-| `arrow_right`, `forward`, `board`, `shirt`, `trade` | Spare: not used right now. |
+| `arrow_right`, `forward`, `board`, `moon_fill`, `shirt`, `trade` | Spare: not used right now. |

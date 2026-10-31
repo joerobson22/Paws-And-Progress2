@@ -2,12 +2,12 @@ class_name ProjectPanel
 extends PanelContainer
 ## A wide panel about one project. Along the top: a badge saying whether it's
 ## ongoing (hourglass) or completed (tick), its name and its total focus
-## time, and for a completed one its grade in the top right. The gifts it
-## brought sit under the name, rarest first. Then two podiums (Podium): the
-## pets that walked for it most and the places it was walked most, side by
-## side (one above the other on a narrow panel). When it ran sits in muted
-## text bottom right. Used on the projects screen and in the stats popups,
-## so they always match.
+## time, then when it ran in muted text in the top right (left of a
+## completed one's grade). The gifts it brought sit under the name, rarest
+## first. Then two podiums (Podium): the pets that walked for it most and
+## the places it was walked most, side by side (one above the other on a
+## narrow panel). Used on the projects screen and in the stats popups, so
+## they always match.
 ## With `gradeable`, a completed project's grade is a button: a circled "?"
 ## until it has a grade, then its grade badge; either asks for a grade
 ## (`grade_pressed`). Nothing else on the panel can be tapped. `flat` drops
@@ -17,7 +17,10 @@ extends PanelContainer
 signal grade_pressed(project_id: String)
 
 ## Narrower than this, the two podiums stack.
-const PODIUMS_SIDE_BY_SIDE := 270.0
+const PODIUMS_SIDE_BY_SIDE := 480.0
+## Narrower than this, the dates leave the name's line for one of their own
+## under it (still on the right), so the name keeps its room.
+const DATES_BESIDE_NAME := 480.0
 
 var project_id := ""
 
@@ -32,11 +35,21 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-	var col := UI.vbox(10)
+	var col := UI.vbox(8)
 	add_child(col)
 
+	# The name's line and the gifts under it on the left; the grade (and a
+	# close button) to their right, beside both, so it doesn't push the
+	# gifts down.
 	var top := UI.hbox(10)
-	top.add_child(_status_badge(p.is_complete()))
+	var left := UI.vbox(8)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(left)
+	var name_line := UI.hbox(10)
+	name_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_child(name_line)
+	name_line.add_child(_status_badge(p.is_complete()))
 	var title := UI.trimmed(p.name, 21, UI.INK, true, 600)
 	title.size_flags_horizontal = Control.SIZE_FILL
 	title.size_flags_stretch_ratio = 0.0
@@ -57,7 +70,26 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 		var room := head.size.x - bar.get_combined_minimum_size().x - time.get_combined_minimum_size().x - 16.0
 		var want := title.get_theme_font("font").get_string_size(p.name, HORIZONTAL_ALIGNMENT_LEFT, -1, title.get_theme_font_size("font_size")).x + 2.0
 		title.custom_minimum_size.x = clampf(want, 0.0, maxf(room, 0.0)))
-	top.add_child(head)
+	name_line.add_child(head)
+	var bias := App.tz_bias()
+	var when := Text.t("project.dates", {"from": Stats.format_date(p.created_unix, bias),
+		"to": Stats.format_date(p.completed_unix, bias) if p.is_complete() else Text.t("project.now")})
+	if extra != "":
+		when = Text.t("project.extra_and_dates", {"extra": extra, "dates": when})
+	var dates := UI.label(when, 12, UI.INK_FAINT, false, 700)
+	dates.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	dates.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	name_line.add_child(dates)
+	left.resized.connect(func():
+		var beside := left.size.x >= DATES_BESIDE_NAME
+		if beside == (dates.get_parent() == name_line):
+			return
+		dates.get_parent().remove_child(dates)
+		if beside:
+			name_line.add_child(dates)
+		else:
+			left.add_child(dates)
+			left.move_child(dates, 1), CONNECT_DEFERRED)
 	var graded := p.is_complete() and p.grade != "" and not Content.grade(p.grade).is_empty()
 	var grade_button: _GradeButton = null
 	if gradeable and p.is_complete():
@@ -88,7 +120,7 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 		flow.add_child(_gift_chip(id, gifts[id]))
 	if ids.is_empty():
 		flow.add_child(UI.label(Text.t("project.no_gifts"), 13, UI.INK_FAINT, false, 700))
-	col.add_child(flow)
+	left.add_child(flow)
 
 	col.add_child(UI.divider())
 	var pair := BoxContainer.new()
@@ -104,16 +136,6 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 			pair.vertical = stack
 			rule.queue_redraw())
 	col.add_child(pair)
-
-	var bias := App.tz_bias()
-	var when := Text.t("project.dates", {"from": Stats.format_date(p.created_unix, bias),
-		"to": Stats.format_date(p.completed_unix, bias) if p.is_complete() else Text.t("project.now")})
-	if extra != "":
-		when = Text.t("project.extra_and_dates", {"extra": extra, "dates": when})
-	var dates := UI.label(when, 12, UI.INK_FAINT, false, 700)
-	dates.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	dates.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	col.add_child(dates)
 	UI.ignore_mouse(self)
 	for b in [grade_button, close_button]:
 		if b:

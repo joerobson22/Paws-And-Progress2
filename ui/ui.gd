@@ -89,13 +89,6 @@ static func set_dark(on: bool) -> void:
 	SHADOW = Color(p["SHADOW"])
 
 
-## Whether the saved setting asks for dark mode ("auto" follows the system).
-static func wants_dark(theme_setting: String) -> bool:
-	if theme_setting == "auto":
-		return DisplayServer.is_dark_mode_supported() and DisplayServer.is_dark_mode()
-	return theme_setting == "dark"
-
-
 # --- Type --------------------------------------------------------------------
 
 ## Nunito (body) or Fredoka (display) at a given weight, cached.

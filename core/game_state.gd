@@ -55,7 +55,6 @@ static func default_settings() -> Dictionary:
 		"sound": true,
 		"ambience": true,
 		"reduce_motion": false,
-		"theme": "auto",
 		"keep_screen_on": true,
 		# 0 = open-ended walk.
 		"walk_goal_seconds": 0,

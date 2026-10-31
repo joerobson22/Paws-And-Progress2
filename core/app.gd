@@ -5,6 +5,8 @@ extends Node
 ## Screens: the five panes ("focus", "gifts", "projects", "profile",
 ## "stats"), the full-screen flows ("choose_focus", "walk", "finish",
 ## "ended"), and "home", which closes any flow and returns to the focus pane.
+## The debug bar's time of day is being dragged: the sky follows.
+signal sky_moved
 signal navigate(screen: String, params: Dictionary)
 signal state_changed
 
@@ -445,6 +447,42 @@ var narrow_window := false
 ## that opens under the pointer.
 func phone_layout() -> bool:
 	return OS.has_feature("mobile") or debug_phone_view() or narrow_window
+
+
+# --- Time of day -------------------------------------------------------------
+
+## The local time as hours past midnight: the real time, or the debug
+## bar's time of day while it's set (debug builds only).
+func day_hour() -> float:
+	var forced := float(state.settings.get("debug_hour", -1.0))
+	if OS.is_debug_build() and forced >= 0.0:
+		return forced
+	return DayCycle.hour_now()
+
+
+## How much it's night where you are (0 day, 1 night), easing over the
+## twilight round sunrise and sunset (Outdoors.sun_hours()).
+func night() -> float:
+	var sun := Outdoors.sun_hours()
+	return DayCycle.night_at(day_hour(), sun.x, sun.y)
+
+
+## The sky now (DayCycle.at()), with the sun up while it's really up.
+func sky_look() -> Dictionary:
+	var sun := Outdoors.sun_hours()
+	var cycle := Content.day_cycle
+	return DayCycle.at(DayCycle.solar_hour(day_hour(), sun.x, sun.y, cycle), cycle)
+
+
+## Whether the app is in its dark colours: after sunset till sunrise. The
+## debug bar can pin it to light or dark ("debug_theme").
+func wants_dark() -> bool:
+	match str(state.settings.get("debug_theme", "auto")) if OS.is_debug_build() else "auto":
+		"light":
+			return false
+		"dark":
+			return true
+	return night() >= 0.5
 
 
 ## The walk's debug time buttons: the walk started `minutes` earlier.

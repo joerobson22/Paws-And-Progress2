@@ -64,6 +64,11 @@ var _fading := 0
 var _minimap: Minimap
 var _arrows := {}  # Vector2i direction -> NavArrow
 var _bg := ColorRect.new()
+## The view behind the focus screen (art/home/backdrop.tscn), if there is one.
+var _backdrop: HomeBackdrop
+const BACKDROP := "res://art/home/backdrop.tscn"
+## How often the time of day is looked at again, in seconds.
+const SKY_EVERY := 20.0
 ## The window settings last put in place, so only a change to them moves it.
 var _window_applied := ""
 ## True while the create account screen is up (App.needs_account()).
@@ -92,7 +97,7 @@ var _wheel_free := false
 func _ready() -> void:
 	_apply_window()
 	_fit_design_size()
-	UI.set_dark(UI.wants_dark(str(App.state.settings.get("theme", "auto"))))
+	UI.set_dark(App.wants_dark())
 	theme = UI.build_theme()
 	# Before the panes connect, so a palette change lands before they rebuild.
 	App.state_changed.connect(_on_state_changed)
@@ -100,6 +105,19 @@ func _ready() -> void:
 	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_bg)
+	if ResourceLoader.exists(BACKDROP):
+		_backdrop = (load(BACKDROP) as PackedScene).instantiate()
+		add_child(_backdrop)
+	# The sky and the app's colours follow the time of day.
+	var sky_timer := Timer.new()
+	sky_timer.wait_time = SKY_EVERY
+	sky_timer.autostart = true
+	sky_timer.timeout.connect(_on_sky_tick)
+	add_child(sky_timer)
+	Outdoors.changed.connect(_on_sky_tick)
+	App.sky_moved.connect(func():
+		if is_instance_valid(_backdrop):
+			_backdrop.refresh())
 
 	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_world)
@@ -247,6 +265,9 @@ func _process(_delta: float) -> void:
 	var ways: Array[Vector2i] = _ways_from(_at) if show else ([] as Array[Vector2i])
 	for dir in _arrows:
 		_arrows[dir].appear(ways.has(dir))
+	if is_instance_valid(_backdrop):
+		# Hidden under a flow (a walk covers everything).
+		_backdrop.pan = _world.position if _flows.is_empty() else size * 2.0
 
 
 # --- Light and dark ----------------------------------------------------------
@@ -255,9 +276,17 @@ func _on_state_changed() -> void:
 	_apply_window()
 	_fit_design_size()
 	_sync_lock()
-	var want := UI.wants_dark(str(App.state.settings.get("theme", "auto")))
+	_on_sky_tick()
+
+
+## Looks at the time of day again: the backdrop's sky, and dark colours
+## from sunset to sunrise.
+func _on_sky_tick() -> void:
+	var want := App.wants_dark()
 	if want != UI.dark:
 		_switch_palette(want)
+	if is_instance_valid(_backdrop):
+		_backdrop.refresh()
 
 
 ## Swaps light and dark without anything moving: the screen on show is

@@ -1,20 +1,23 @@
 class_name Podium
 extends VBoxContainer
 ## The top three of something (a project's pets, or its places) on a little
-## podium: first big in the middle, second and third smaller side by side
-## under it. Each picture has a soft glow in its medal's colour behind it,
-## and its name with the time under that. Fewer than three just shows the
-## places there are; none says so in one muted line.
+## podium, on one line: second, first, third, with first bigger and all
+## their bottoms level. Each picture has a soft glow in its medal's colour
+## behind it, and its name (trimmed with "..." if it's long) with the time
+## under that. Fewer than three leaves the missing spots empty, so first
+## always sits in the middle; none says so in one muted line.
 
 const MEDALS := [Color("#e2b33c"), Color("#aeb8c2"), Color("#c98a50")]
 ## Sides of the pictures: first, then second and third.
-const BIG := 76.0
-const SMALL := 54.0
+const BIG := 64.0
+const SMALL := 46.0
+## How much wider first's column is than the others.
+const FIRST_SHARE := 1.3
 
 ## `rows` are {"picture": Callable(side) -> Control, "name": String,
 ## "time": String, "faded": bool}, most first; only the first three show.
 func _init(title: String, rows: Array, empty_text: String) -> void:
-	add_theme_constant_override("separation", 10)
+	add_theme_constant_override("separation", 6)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cap := UI.caption(title)
@@ -25,26 +28,23 @@ func _init(title: String, rows: Array, empty_text: String) -> void:
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		add_child(empty)
 		return
-	var first := _spot(rows[0], 0, BIG)
-	# As wide as the podium, so a long name has room before it's cut short.
-	first.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(first)
-	if rows.size() > 1:
-		var under := UI.hbox(8)
-		under.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		under.alignment = BoxContainer.ALIGNMENT_CENTER
-		for i in range(1, mini(rows.size(), 3)):
-			var spot := _spot(rows[i], i, SMALL)
-			spot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			under.add_child(spot)
-		# Second always sits on the left, so a lone second doesn't drift
-		# into the middle under first.
-		if rows.size() == 2:
-			var gap := Control.new()
-			gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			under.add_child(gap)
-		add_child(under)
+	var line := UI.hbox(6)
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for rank in [1, 0, 2]:
+		var spot: Control
+		if rank < rows.size():
+			spot = _spot(rows[rank], rank, BIG if rank == 0 else SMALL)
+		else:
+			spot = Control.new()
+			spot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Equal columns (first's a little wider), so names have room before
+		# they're cut short; bottoms level.
+		spot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		spot.size_flags_stretch_ratio = FIRST_SHARE if rank == 0 else 1.0
+		spot.size_flags_vertical = Control.SIZE_SHRINK_END
+		spot.custom_minimum_size.x = 0
+		line.add_child(spot)
+	add_child(line)
 
 
 ## One place on the podium: the picture with its medal glow and a numbered
