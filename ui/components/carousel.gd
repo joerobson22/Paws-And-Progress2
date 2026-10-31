@@ -125,15 +125,27 @@ func _gui_input(e: InputEvent) -> void:
 							go_to(hit)
 				accept_event()
 			MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_LEFT:
+				# A sideways carousel leaves the up-and-down wheel to the list
+				# it's in.
+				if not vertical and e.button_index == MOUSE_BUTTON_WHEEL_UP:
+					return
 				if e.pressed:
 					go_to(index - 1)
 				accept_event()
 			MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_RIGHT:
+				if not vertical and e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+					return
 				if e.pressed:
 					go_to(index + 1)
 				accept_event()
 	elif e is InputEventMouseMotion and _pressing:
 		var along := _along(e.position - _press_at)
+		var moved: Vector2 = e.position - _press_at
+		var across: float = moved.x if vertical else moved.y
+		if not _dragging and absf(across) > Gestures.TAP_SLOP and absf(across) > absf(along):
+			# Moving the other way: that's the list around it scrolling.
+			_pressing = false
+			return
 		if not _dragging and absf(along) > Gestures.TAP_SLOP:
 			_dragging = true
 		if _dragging:

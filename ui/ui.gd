@@ -699,7 +699,8 @@ static func character_portrait(look: Dictionary, box_size: Vector2, face_only: b
 			view.position = frame.size * 0.5 + Vector2(0, 4) * s
 		else:
 			var usable := frame.size.y - bottom_room
-			var s := usable / 175.0
+			# By height, but never so big the character spills out sideways.
+			var s := minf(usable / 175.0, frame.size.x / 72.0)
 			view.scale = Vector2(s, s)
 			view.position = Vector2(frame.size.x * 0.48, usable * 0.94)
 	frame.resized.connect(place)
