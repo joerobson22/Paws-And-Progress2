@@ -53,7 +53,9 @@ func _run() -> void:
 	# goes out to the internet from CI); it's asked on purpose further down.
 	app.state.settings["location"] = "off"
 
-	await _wait(20)
+	# Long enough for the first frames to settle on a slow machine (CI), so
+	# the map is laid out before the pointer moves over it.
+	await _wait(70)
 	await _shot("focus")
 
 	# The map sits in the bottom left corner. With a mouse it grows up and to
