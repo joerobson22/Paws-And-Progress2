@@ -102,11 +102,25 @@ static func prompt(title: String, value: String, placeholder: String = "", max_l
 	return m
 
 
-## A colour picker: a wheel plus a row of natural animal colours. Calls
-## `on_change` live as the colour moves; closes with the final colour.
-static func colour(title: String, start: Color, on_change: Callable, swatches: Array = []) -> Modal:
+## The colours every colour picker offers under its wheel: two rows of
+## seven natural colours.
+const BASE_COLOURS := [
+	"#2b2523", "#4a3528", "#8a6248", "#a8683f", "#c9a46a", "#e2c48f", "#f2e6d8",
+	"#9c9c9c", "#5a5a5a", "#b4533f", "#d9822b", "#e2c046", "#7fae5a", "#4f6f8f",
+]
+## How many recently picked colours the third row keeps.
+const RECENT_COUNT := 7
+const SWATCH := 36
+
+
+## A colour picker: a wheel, then two rows of base colours and a row of the
+## seven you picked most recently (shared by every picker in the app), then
+## Done. Calls `on_change` live as the colour moves; closes with the final
+## colour, which joins the recent row. It never scrolls: on a short screen
+## the wheel gets smaller.
+static func colour(title: String, start: Color, on_change: Callable) -> Modal:
 	var m := open(400)
-	m.body.add_child(m.heading(title))
+	m.header.add_child(m.heading_row(title))
 	var picker := ColorPicker.new()
 	picker.color = start
 	picker.edit_alpha = false
@@ -121,23 +135,85 @@ static func colour(title: String, start: Color, on_change: Callable, swatches: A
 		picker.set("edit_intensity", false)
 	picker.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	picker.color_changed.connect(on_change)
+	# Whatever's left after the swatches, title and Done, up to a comfy size.
+	var view := (Engine.get_main_loop() as SceneTree).root.get_visible_rect().size
+	if Modal.layer and is_instance_valid(Modal.layer):
+		view = Modal.layer.get_viewport_rect().size
+	var wheel := int(clampf(view.y - 400.0, 130.0, 230.0))
+	picker.add_theme_constant_override("sv_width", wheel)
+	picker.add_theme_constant_override("sv_height", wheel)
 	m.body.add_child(picker)
-	if not swatches.is_empty():
-		var flow := HFlowContainer.new()
-		flow.add_theme_constant_override("h_separation", 8)
-		flow.add_theme_constant_override("v_separation", 8)
-		flow.alignment = FlowContainer.ALIGNMENT_CENTER
-		for c in swatches:
-			var dot := Button.new()
-			dot.custom_minimum_size = Vector2(34, 34)
-			UI.style_button(dot, c, UI.INK, 999)
-			dot.pressed.connect(func():
-				picker.color = c
-				on_change.call(c))
-			flow.add_child(dot)
-		m.body.add_child(flow)
-	m.body.add_child(UI.button(Text.t("common.done"), func(): m.close(picker.color), "accent"))
+	var pick := func(c: Color):
+		picker.color = c
+		on_change.call(c)
+	var rows := UI.vbox(8)
+	for r in 2:
+		var line := UI.hbox(8)
+		line.alignment = BoxContainer.ALIGNMENT_CENTER
+		for k in 7:
+			var c := Color(BASE_COLOURS[r * 7 + k])
+			line.add_child(_swatch(c, pick.bind(c)))
+		rows.add_child(line)
+	var recent := UI.hbox(8)
+	recent.alignment = BoxContainer.ALIGNMENT_CENTER
+	var recents := recent_colours()
+	for k in RECENT_COUNT:
+		if k < recents.size():
+			var c: Color = recents[k]
+			recent.add_child(_swatch(c, pick.bind(c)))
+		else:
+			recent.add_child(_empty_swatch())
+	rows.add_child(recent)
+	m.body.add_child(rows)
+	m.footer.add_child(UI.button(Text.t("common.done"), func():
+		remember_colour(picker.color)
+		m.close(picker.color), "accent"))
 	return m
+
+
+## The colours picked most recently, newest first.
+static func recent_colours() -> Array[Color]:
+	var out: Array[Color] = []
+	for h in App.state.settings.get("recent_colours", []):
+		out.append(Color.from_string(str(h), Color.WHITE))
+	return out
+
+
+## Puts `c` at the front of the recent colours (once), keeping seven.
+static func remember_colour(c: Color) -> void:
+	var hex := c.to_html(false)
+	var list: Array = (App.state.settings.get("recent_colours", []) as Array).duplicate()
+	list.erase(hex)
+	list.push_front(hex)
+	App.set_setting("recent_colours", list.slice(0, RECENT_COUNT))
+
+
+static func _swatch(c: Color, on_press: Callable) -> Button:
+	var dot := Button.new()
+	dot.custom_minimum_size = Vector2(SWATCH, SWATCH)
+	dot.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	dot.focus_mode = Control.FOCUS_NONE
+	dot.accessibility_name = "#" + c.to_html(false)
+	UI.style_button(dot, c, UI.INK, 999)
+	# A faint ring so pale colours still show on the white card.
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		var sb: StyleBoxFlat = dot.get_theme_stylebox(state)
+		sb.set_content_margin_all(0)
+		sb.set_border_width_all(1)
+		sb.border_color = Color(UI.INK, 0.12)
+	dot.pressed.connect(on_press)
+	return dot
+
+
+## A recent slot not filled yet: a faint ring.
+static func _empty_swatch() -> Control:
+	var c := Control.new()
+	c.custom_minimum_size = Vector2(SWATCH, SWATCH)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	c.draw.connect(func():
+		c.draw_arc(c.size * 0.5, SWATCH * 0.5 - 2.0, 0, TAU, 40, UI.LINE, 2.0, true))
+	return c
 
 
 ## The body's scroll, e.g. to keep a list clear of its bar (UI.clear_of_bar).

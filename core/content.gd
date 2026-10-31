@@ -24,6 +24,8 @@ var cosmetic_slots: Array = []
 var cosmetic_items: Array = []
 var skin_tones: Array[Color] = []
 var hair_tones: Array[Color] = []
+## The customise popup's tabs: [{id, name, rows: [slot or "skin_tone"/"hair_tone"]}].
+var cosmetic_sections: Array = []
 
 var _animals_by_id: Dictionary = {}
 var _gifts_by_id: Dictionary = {}
@@ -52,6 +54,7 @@ func _init() -> void:
 	var c := _load("res://data/cosmetics.json")
 	cosmetic_slots = c.get("slots", [])
 	cosmetic_items = c.get("items", [])
+	cosmetic_sections = c.get("sections", [])
 	for hex in c.get("skin_tones", []):
 		skin_tones.append(Color.from_string(hex, Color.WHITE))
 	for hex in c.get("hair_tones", []):
@@ -261,6 +264,24 @@ func cosmetic_options(slot: String, inventory: Dictionary) -> Array:
 		if g.get("slot", "") == slot and int(inventory.get(g["id"], 0)) > 0:
 			out.append(g)
 	return out
+
+
+## A look's skin colour: its own picked colour ("skin_colour", a hex) if it
+## has one, else its swatch ("skin_tone").
+func skin_of(look: Dictionary) -> Color:
+	return _tone_of(look, "skin", skin_tones)
+
+
+## A look's hair colour, the same way ("hair_colour", else "hair_tone").
+func hair_of(look: Dictionary) -> Color:
+	return _tone_of(look, "hair", hair_tones)
+
+
+func _tone_of(look: Dictionary, which: String, tones: Array[Color]) -> Color:
+	var own := str(look.get(which + "_colour", ""))
+	if own != "":
+		return Color.from_string(own, tones[0])
+	return tones[clampi(int(look.get(which + "_tone", 0)), 0, tones.size() - 1)]
 
 
 ## The colour an item is drawn in: its own, else its rarity's for a gift.

@@ -15,7 +15,7 @@ const SHADER := "res://art/animal_colours.gdshader"
 ## each cosmetic uses for its piece on that limb.
 const LIMBS := {"Torso": "torso", "Head": "head", "ArmBack": "arm_back", "ArmFront": "arm_front", "LegBack": "leg_back", "LegFront": "leg_front"}
 ## Cosmetics stack on a limb in this order, first at the bottom.
-const DRESS_ORDER := ["trousers", "shoes", "gloves", "top", "neckwear", "face", "hair", "hat", "walking_stick"]
+const DRESS_ORDER := ["trousers", "shoes", "gloves", "top", "neckwear", "face", "facial_hair", "hair", "hat", "walking_stick"]
 const EXTENSIONS := ["png", "svg", "webp"]
 ## Where the head sits, standing still.
 const HEAD := Vector2(2, -124)
@@ -187,8 +187,9 @@ func _dress() -> void:
 		head_sprites = (_limbs["Head"]["node"] as Node).find_children("*", "Sprite2D", false, false)
 	for sprite in _body:
 		sprite.material = skin
-		# Seen on their own, items hide the body (the head stays for hair and a face).
-		sprite.visible = part == "" or (part in ["hair", "face"] and head_sprites.has(sprite))
+		# Seen on their own, items hide the body, head and all: hair, a face
+		# or facial hair show just themselves.
+		sprite.visible = part == ""
 	for limb in ["ArmBack", "ArmFront", "LegBack", "LegFront"]:
 		if _limbs.has(limb):
 			(_limbs[limb]["node"] as Node2D).visible = not face_only
@@ -290,8 +291,12 @@ static func part_rect(slot: String, item: Dictionary) -> Rect2:
 			var tops := {"witch": 48, "bunny_ears": 44, "pot": 38, "alpine": 36, "tophat": 34, "feather_cap": 32, "ears": 28, "beanie": 26, "nest": 26}
 			var top := float(tops.get(_style(item), 22))
 			return Rect2(HEAD.x - 24, HEAD.y - top, 50, top + 2)
-		"hair", "face":
-			return Rect2(HEAD.x - 21, HEAD.y - 25, 42, 50 if _style(item) == "long" else 42)
+		"hair":
+			return Rect2(HEAD.x - 21, HEAD.y - 25, 42, 50 if _style(item) == "long" else 30)
+		"face":
+			return Rect2(HEAD.x + 1, HEAD.y - 8, 16, 18)
+		"facial_hair":
+			return Rect2(HEAD.x - 2, HEAD.y - 2, 22, 24)
 		"neckwear":
 			match _style(item):
 				"bowtie":
@@ -313,11 +318,11 @@ static func part_rect(slot: String, item: Dictionary) -> Rect2:
 
 
 func _skin() -> Color:
-	return Content.skin_tones[clampi(int(_look().get("skin_tone", 0)), 0, Content.skin_tones.size() - 1)]
+	return Content.skin_of(_look())
 
 
 func _hair() -> Color:
-	return Content.hair_tones[clampi(int(_look().get("hair_tone", 0)), 0, Content.hair_tones.size() - 1)]
+	return Content.hair_of(_look())
 
 
 func _draw() -> void:
@@ -397,8 +402,15 @@ func _draw_part(skin: Color, hair: Color) -> void:
 	match part:
 		"hat":
 			_draw_hat(HEAD)
-		"hair", "face":
-			_draw_head(HEAD, skin, hair, false)
+		"hair":
+			# Just the hair, with no head under it.
+			var colour := _hair_colour(hair)
+			_draw_hair(HEAD, colour, true)
+			_draw_hair(HEAD, colour, false)
+		"face":
+			_draw_face(HEAD)
+		"facial_hair":
+			_draw_facial_hair(HEAD, _hair_colour(hair))
 		"neckwear":
 			_draw_neckwear(0.0)
 		"top":
@@ -541,29 +553,75 @@ func _draw_neckwear(bob: float) -> void:
 
 
 func _draw_head(h: Vector2, skin: Color, hair_tone: Color, with_hat: bool = true) -> void:
-	var hair := _item("hair")
-	var hair_colour := Content.cosmetic_colour(hair, hair_tone) if hair.has("rarity") else hair_tone
-	var style := _style(hair)
-	if style == "long":
-		draw_rect(Rect2(h.x - 17, h.y - 6, 17, 30), hair_colour)
+	var colour := _hair_colour(hair_tone)
+	_draw_hair(h, colour, true)
 	draw_circle(h, 16, skin, true, -1.0, true)
 	draw_circle(h + Vector2(-3, 2), 4, skin.darkened(0.08), true, -1.0, true)
 	_draw_face(h)
+	_draw_facial_hair(h, colour)
+	_draw_hair(h, colour, false)
+	if with_hat:
+		_draw_hat(h)
+
+
+## The hair's colour: the player's, or a hair gift's own.
+func _hair_colour(hair_tone: Color) -> Color:
+	var hair := _item("hair")
+	return Content.cosmetic_colour(hair, hair_tone) if hair.has("rarity") else hair_tone
+
+
+## The hairstyle: what hangs behind the head (`behind`) or sits on top.
+## Bald draws nothing.
+func _draw_hair(h: Vector2, colour: Color, behind: bool) -> void:
+	var style := _style(_item("hair"))
+	if behind:
+		if style == "long":
+			draw_rect(Rect2(h.x - 17, h.y - 6, 17, 30), colour)
+		return
 	match style:
+		"none":
+			pass
 		"buzz":
-			draw_arc(h, 15, PI * 1.02, TAU * 0.99, 16, hair_colour, 4, true)
+			draw_arc(h, 15, PI * 1.02, TAU * 0.99, 16, colour, 4, true)
 		"curly":
 			for i in 8:
 				var a := PI + PI * i / 7.0
-				draw_circle(h + Vector2(cos(a), sin(a)) * 14.5, 6.5, hair_colour, true, -1.0, true)
+				draw_circle(h + Vector2(cos(a), sin(a)) * 14.5, 6.5, colour, true, -1.0, true)
 		"bun":
-			draw_arc(h, 12, PI, TAU, 16, hair_colour, 9, true)
-			draw_circle(h + Vector2(-9, -17), 7, hair_colour, true, -1.0, true)
+			draw_arc(h, 12, PI, TAU, 16, colour, 9, true)
+			draw_circle(h + Vector2(-9, -17), 7, colour, true, -1.0, true)
 		_:
-			draw_arc(h, 12, PI, TAU, 16, hair_colour, 9, true)
-			draw_circle(h + Vector2(11, -9), 4.5, hair_colour, true, -1.0, true)
-	if with_hat:
-		_draw_hat(h)
+			draw_arc(h, 12, PI, TAU, 16, colour, 9, true)
+			draw_circle(h + Vector2(11, -9), 4.5, colour, true, -1.0, true)
+
+
+## Stubble, a moustache or a beard on the face's lower half (it faces
+## right), in the hair colour.
+func _draw_facial_hair(h: Vector2, colour: Color) -> void:
+	match _style(_item("facial_hair")):
+		"stubble":
+			var dot := Color(colour, 0.55)
+			for i in 9:
+				var a := 0.15 + 1.9 * i / 8.0
+				for ring in [12.5, 14.5]:
+					draw_circle(h + Vector2(cos(a), sin(a)) * ring, 0.8, dot, true, -1.0, true)
+		"moustache":
+			draw_line(h + Vector2(4, 4), h + Vector2(13, 3.5), colour, 3.0, true)
+			draw_circle(h + Vector2(4, 4.5), 1.6, colour, true, -1.0, true)
+		"short_beard":
+			draw_arc(h, 14, 0.05, 2.3, 16, colour, 4.5, true)
+			draw_line(h + Vector2(4, 4), h + Vector2(12, 3.5), colour, 2.6, true)
+		"full_beard":
+			var pts := PackedVector2Array()
+			for i in 13:
+				var a := -0.1 + 2.5 * i / 12.0
+				pts.append(h + Vector2(cos(a), sin(a)) * (16.5 + 3.0 * sin(a)))
+			for i in 13:
+				var a := 2.4 - 2.5 * i / 12.0
+				pts.append(h + Vector2(cos(a), sin(a)) * 9.0 + Vector2(1.5, 2.5))
+			draw_colored_polygon(pts, colour)
+			# The mouth shows through.
+			draw_arc(h + Vector2(8, 7), 2.5, 0.2, PI - 0.6, 8, colour.darkened(0.45), 1.4, true)
 
 
 func _draw_face(h: Vector2) -> void:

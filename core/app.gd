@@ -435,10 +435,14 @@ func remove_from_shelf(index: int) -> void:
 
 # --- Character ---------------------------------------------------------------
 
-## Saves a look from the customise popup: {skin_tone, hair_tone, cosmetics}.
+## Saves a look from the customise popup: {skin_tone, hair_tone, cosmetics,
+## and skin_colour / hair_colour (hex, "" for none) when a colour was picked
+## instead of a swatch}.
 func set_look(look: Dictionary) -> void:
 	state.profile["skin_tone"] = int(look.get("skin_tone", 0))
 	state.profile["hair_tone"] = int(look.get("hair_tone", 0))
+	state.profile["skin_colour"] = str(look.get("skin_colour", ""))
+	state.profile["hair_colour"] = str(look.get("hair_colour", ""))
 	state.profile["cosmetics"] = (look.get("cosmetics", {}) as Dictionary).duplicate()
 	_changed()
 
