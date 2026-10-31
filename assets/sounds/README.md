@@ -16,6 +16,7 @@ Tip: trim any silence at the start of a file. Even 30ms of silence makes a sound
 | `button_click` | Any button goes down | file |
 | `orb_tap` | Tapping the focus orb to choose a focus | made in code (bong) |
 | `map_open` | The minimap opens | made in code (pop) |
+| `locked` | Tapping a locked place or animal (it wiggles) | made in code (pop) |
 | `level_up` | The level bar reaches a new level | made in code |
 
 ## Walking

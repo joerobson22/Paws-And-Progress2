@@ -528,17 +528,44 @@ func _run() -> void:
 		var preview: Control = _find(editor.body, func(n): return _is(n, "round_frame.gd"))
 		check(parts != null and preview != null and not preview.is_ancestor_of(parts) and not parts.is_ancestor_of(preview), "the preview sits beside the list of parts")
 		check(not editor._scroll.get_v_scroll_bar().visible, "the popup itself doesn't scroll")
-		var minis := _all(editor.body, func(n): return n is Control and n.get("_slot") != null)
-		check(minis.size() == _content().cosmetic_slots.size() + 2 and minis.all(func(n): return n.accessibility_name != ""), "every part shows a picture of what's chosen")
-		check(_find(editor.body, func(n): return n is Label and n.text == "Jeans") == null, "not its name")
+		# Head, Body and Legs tabs over the parts; Head first.
+		var tab_names := func(): return _all(editor.body, func(n): return n is Button and n.text in ["Head", "Body", "Legs"]).map(func(b): return b.text)
+		check(tab_names.call() == ["Head", "Body", "Legs"], "Head, Body and Legs tabs (%s)" % [tab_names.call()])
+		var row_slots := func(): return _all(parts, func(n): return n.has_meta("slot")).map(func(n): return n.get_meta("slot"))
+		check(row_slots.call() == ["hat", "hair", "hair_tone", "face", "facial_hair"], "Head has hat, hair, hair colour, face and facial hair (%s)" % [row_slots.call()])
+		var carousels: Array = _all(parts, func(n): return _is(n, "carousel.gd"))
+		check(carousels.size() == 4, "each part is a carousel (%d)" % carousels.size())
+		check(_find(parts, func(n): return n is Button and _is(n, "carousel.gd")) == null and _find(editor.body, func(n): return n is Button and n.accessibility_name.begins_with("Previous")) == null, "no arrows")
+		# Scrolling the hair carousel changes the hair, and the name under it.
+		var hair_row: Node = _find(parts, func(n): return n.has_meta("slot") and n.get_meta("slot") == "hair")
+		var hair_carousel: Node = _find(hair_row, func(n): return _is(n, "carousel.gd"))
+		var bald_at: int = hair_carousel.items.map(func(m): return m.accessibility_name).find("Bald")
+		check(bald_at >= 0, "bald is a hair option")
+		hair_carousel.go_to(bald_at)
+		await _wait(25)
+		var hair_name: Label = hair_row.get_child(hair_row.get_child_count() - 1)
+		check(hair_name.text == "Bald", "the name under it follows the carousel (%s)" % hair_name.text)
+		var facial: Node = _find(parts, func(n): return n.has_meta("slot") and n.get_meta("slot") == "facial_hair")
+		var beards: Array = _find(facial, func(n): return _is(n, "carousel.gd")).items.map(func(m): return m.accessibility_name)
+		check(beards.has("Moustache") and beards.has("Full beard"), "facial hair options (%s)" % [beards])
+		var hair_dots: Array = _find(parts, func(n): return n.has_meta("slot") and n.get_meta("slot") == "hair_tone").find_children("*", "Button", true, false)
+		check(hair_dots.size() == 6, "hair colour: five swatches and a pick-any (%d)" % hair_dots.size())
+		var hat_mini = _find(parts, func(n): return n is Control and n.get("_slot") == "hat" and n._view.visible)
+		check(hat_mini != null and hat_mini._view.position != Vector2.ZERO, "each option is drawn, fitted to its box")
+		await _shot("customise_head")
+		var body_tab: Button = _find(editor.body, func(n): return n is Button and n.text == "Body")
+		body_tab.pressed.emit()
+		await _wait(15)
+		check(row_slots.call() == ["skin_tone", "neckwear", "top", "gloves", "walking_stick"], "Body has skin colour and the rest (%s)" % [row_slots.call()])
+		var gloves_row: Node = _find(parts, func(n): return n.has_meta("slot") and n.get_meta("slot") == "gloves")
+		var no_gloves = _find(gloves_row, func(n): return n is Control and n.get("_slot") == "gloves" and n.accessibility_name == "No gloves")
+		check(no_gloves != null and not no_gloves._view.visible, "no gloves shows the none icon")
+		await _shot("customise_body")
 		if parts and preview and main.size.y >= 590:
 			var preview_at := preview.get_global_rect()
 			parts.scroll_vertical = 10000
 			await _wait(10)
-			# A tall phone fits every part; otherwise they scroll.
-			check(parts.scroll_vertical > 0 or not parts.get_v_scroll_bar().visible, "the parts scroll when they don't fit")
 			check(preview.get_global_rect().is_equal_approx(preview_at), "the preview stays put while they scroll")
-			check(parts.get_global_rect().encloses(minis.back().get_global_rect()), "the last part scrolls into view")
 			await _shot("customise_scrolled")
 		_close_modal()
 		await _wait(15)
@@ -568,7 +595,10 @@ func _run() -> void:
 		check(rewards.header.get_child_count() == 2, "the title and your level sit above the list")
 		check(rewards._scroll.scroll_vertical > 0, "it opens scrolled down to where you are (level %d)" % app.level())
 		# The next reward to come is in view: the first one with a padlock.
-		var next_up: Control = _find(rewards.body, func(n): return n is HBoxContainer and n.get_child_count() == 4)
+		var next_up: Control = _find(rewards.body, func(n): return n is HBoxContainer and n.get_meta("locked", false))
+		check(next_up != null and next_up.get_child(0).get_global_rect().position.x - rewards.body.get_global_rect().position.x < 1.0, "rewards hug the left")
+		check(next_up != null and next_up.get_child(next_up.get_child_count() - 1).custom_minimum_size.x == 28.0, "the level line runs down the right")
+		check(_find(rewards.body, func(n): return n is Label and n.text == "Unlocked by exploring") == null, "a divider, not a heading, before the exploring rewards")
 		check(next_up != null and rewards._scroll.get_global_rect().encloses(next_up.get_global_rect()), "the next reward to come is in view")
 		await _shot("rewards")
 		rewards._scroll.scroll_vertical = 0
@@ -821,10 +851,11 @@ func _run() -> void:
 	chooser._pick_place("moon")
 	await _wait(30)
 	check(first_pet.place == "beach", "a locked place can't be picked")
-	check(modal_class.is_open(), "it shows what unlocks it instead")
-	await _shot("place_locked")
-	_close_modal()
-	await _wait(10)
+	check(not modal_class.is_open(), "it opens no popup")
+	chooser._pick_place("moon")
+	await _wait(2)
+	check(absf(chooser._places["moon"].rotation) > 0.01, "it wiggles instead")
+	await _wait(20)
 	# The pill lists ongoing projects, most recently worked on first, with a
 	# way to start a new one; picking one puts it in the pill. The popup is
 	# always the same size: three rows, then the list scrolls between the
@@ -902,12 +933,24 @@ func _run() -> void:
 	check(chooser._new.disabled, "a locked animal can't be adopted")
 	check(chooser._swatch_row.modulate.a < 0.05, "a locked animal hides the colour buttons")
 	check(not chooser._animal_hint.text.contains("level") or _content().unlock_rule("animal", _content().animals[locked]["id"]).has("level"), "the hint says what unlocks it")
+	check(not chooser._animal_hint.text.ends_with("to unlock"), "without \"to unlock\" on the end (%s)" % chooser._animal_hint.text)
 	await _shot("new_pet_locked")
 	chooser._animals.activated.emit(locked)
-	await _wait(30)
-	check(modal_class.is_open(), "tapping a locked animal shows how far along you are")
-	await _shot("animal_locked_popup")
-	_close_modal()
+	await _wait(2)
+	check(not modal_class.is_open() and absf(chooser._animals.items[locked].rotation) > 0.01, "tapping a locked animal wiggles it, no popup")
+	await _wait(20)
+	var table_at := -1
+	for i in _content().animals.size():
+		var a: Dictionary = _content().animals[i]
+		if _content().unlock_rule("animal", a["id"]).has("table") and not app.is_unlocked("animal", a["id"]):
+			table_at = i
+			break
+	if table_at >= 0:
+		chooser._animals.go_to(table_at, false)
+		await _wait(10)
+		var table_name: String = str(_content().table(_content().unlock_rule("animal", _content().animals[table_at]["id"])["table"])["name"]).to_lower()
+		check(chooser._animal_hint.text == "Discover all %s gifts" % table_name, "a gift-table animal says which gifts to find (%s)" % chooser._animal_hint.text)
+	chooser._animals.go_to(locked, false)
 	await _wait(10)
 	chooser._animals.go_to(1)
 	await _wait(25)
@@ -918,10 +961,22 @@ func _run() -> void:
 	await _wait(25)
 	check(chooser._pet_edit.text == "Bramble", "a name you typed stays when the animal changes")
 	await _shot("new_pet_named")
+	# The colour picker: the wheel, two rows of seven base colours and a row
+	# of seven recent ones, then Done, all without scrolling.
+	app.state.settings["recent_colours"] = ["ff0000", "00aa00"]
 	chooser._pick_colour(0)
 	await _wait(20)
+	var picker_modal = modal_class.top()
+	var swatch_rows: Array = _all(picker_modal.body, func(n): return n is HBoxContainer and n.get_child_count() == 7)
+	check(swatch_rows.size() == 3, "three rows of seven colours (%d)" % swatch_rows.size())
+	check(swatch_rows.size() == 3 and swatch_rows[2].get_child(0) is Button and not (swatch_rows[2].get_child(2) is Button), "the third row has the recent colours, then empty slots")
+	check(main.size.y < 590 or picker_modal.scroller().get_v_scroll_bar().max_value <= picker_modal.scroller().size.y + 1.0, "the picker doesn't scroll")
+	var swatch: Button = swatch_rows[0].get_child(0)
+	check(is_equal_approx(swatch.size.x, swatch.size.y), "the swatches are circles (%s)" % swatch.size)
 	await _shot("colour_picker")
-	_close_modal()
+	_find(picker_modal.footer, func(n): return n is Button and n.text == "Done").pressed.emit()
+	await _wait(10)
+	check(str(app.state.settings["recent_colours"][0]) == chooser._draft.colours[0].to_html(false), "Done puts the colour first in the recents")
 	var count: int = app.state.pets.size()
 	chooser._on_new()
 	await _wait(30)
@@ -1211,7 +1266,7 @@ func _art_check(main: Node) -> void:
 	await _wait(3)
 	check(character._dressing.size() == 1 and character._body.all(func(sp): return not sp.visible), "a hat on its own hides the body")
 	character.part = "hair"
-	check(character._body.any(func(sp): return sp.visible), "hair on its own keeps the head")
+	check(character._body.all(func(sp): return not sp.visible), "hair on its own shows no head")
 	character.part = ""
 	character.face_only = true
 	await _wait(3)

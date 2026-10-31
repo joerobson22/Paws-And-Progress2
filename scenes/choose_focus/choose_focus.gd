@@ -18,12 +18,6 @@ extends Control
 ## turns into a tick that adopts it.
 ## params: {"from": where the opening circle grew from}
 
-## Quick picks in the colour popup: coat colours first, then a few brighter ones.
-const SWATCHES := [
-	Color("#2b2523"), Color("#4a3528"), Color("#6e5a4e"), Color("#8a6248"), Color("#a8683f"),
-	Color("#c9a46a"), Color("#e2c48f"), Color("#f2e6d8"), Color("#9c9c9c"), Color("#5a5a5a"),
-	Color("#b4533f"), Color("#d9822b"), Color("#e2c046"), Color("#7fae5a"), Color("#4f6f8f"),
-]
 ## The project list: each row's height, the gap between rows, how many rows
 ## show before it scrolls, and the rows' corner rounding.
 const PROJECT_ROW := 56
@@ -225,8 +219,9 @@ func _attach_front() -> void:
 
 func _pick_place(id: String) -> void:
 	if not App.is_unlocked("place", id):
-		Motion.shake(_places[id], 6.0)
-		LockPopup.open("place", id)
+		# Locked: it just wiggles. What unlocks it is on the level rewards.
+		Motion.wiggle(_places[id])
+		Audio.play("locked", 0.8, -8.0, "pop")
 		return
 	if id == _place_id():
 		return
@@ -803,7 +798,8 @@ func _build_adopt() -> void:
 	_animals.activated.connect(func(i: int):
 		var a: Dictionary = Content.animals[i]
 		if not App.is_unlocked("animal", a["id"]):
-			LockPopup.open("animal", a["id"]))
+			Motion.wiggle(_animals.items[i])
+			Audio.play("locked", 0.8, -8.0, "pop"))
 	_animals.set_items(items, maxi(first_open, 0))
 	_on_animal_changed(_animals.index)
 
@@ -856,7 +852,7 @@ func _refresh_swatches() -> void:
 
 func _pick_colour(k: int) -> void:
 	var start := _draft.colours[k]
-	Modal.colour(Text.t("choose_focus.colour_name", {"role": Text.list("choose_focus.colour_roles")[k]}), start, _set_colour.bind(k), SWATCHES)
+	Modal.colour(Text.t("choose_focus.colour_name", {"role": Text.list("choose_focus.colour_roles")[k]}), start, _set_colour.bind(k))
 
 
 func _set_colour(c: Color, k: int) -> void:

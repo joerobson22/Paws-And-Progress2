@@ -4,7 +4,7 @@ extends RefCounted
 
 ## Character slots, in the order the customise popup lists them (data/cosmetics.json).
 const COSMETIC_SLOTS: Array[String] = [
-	"hat", "hair", "face", "neckwear", "top", "gloves", "walking_stick", "trousers", "shoes",
+	"hat", "hair", "face", "facial_hair", "neckwear", "top", "gloves", "walking_stick", "trousers", "shoes",
 ]
 const SHELF_SIZE := 3
 
@@ -37,6 +37,9 @@ static func default_profile() -> Dictionary:
 		"created_unix": 0,
 		"skin_tone": 0,
 		"hair_tone": 0,
+		# A picked colour (hex) used instead of the swatch; "" for none.
+		"skin_colour": "",
+		"hair_colour": "",
 		# slot -> equipped item id ("" = the slot's default look).
 		"cosmetics": cosmetics,
 		# Favourite gifts on the gift shelf, left to right ("" = empty spot).

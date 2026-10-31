@@ -180,7 +180,7 @@
 		],
 		"colour_name": "{role} colour",
 		"scroll_animals": "Scroll for more animals",
-		"animal_locked": "{rule} to unlock",
+		"animal_locked": "{rule}",
 		"say_hello": "Say hello to {pet}"
 	},
 	"pet": {
@@ -364,17 +364,15 @@
 		"to_next": "{xp} XP to level {level}. You get 1 XP for each minute focused, and more for gifts.",
 		"from_start": "From the start",
 		"new_place": "{when}  ·  new place",
-		"new_animal": "{when}  ·  new animal",
-		"exploring": "Unlocked by exploring"
+		"new_animal": "{when}  ·  new animal"
 	},
 	"unlock": {
-		"locked_title": "{name} is locked",
 		"start": "Yours from the start",
 		"level": "Reach level {level}",
 		"hours": "Focus for {hours} hours",
 		"hours_in": "Focus for {hours} hours {where}",
-		"table": "Find every gift in the {table} table",
-		"all_tables": "Find every gift in every table",
+		"table": "Discover all {table} gifts",
+		"all_tables": "Discover every gift",
 		"progress_level": "Level {have} of {goal}",
 		"progress_hours": "{have} of {goal}",
 		"hours_short": "{hours}h",
@@ -389,8 +387,7 @@
 		"skin_option": "Tone {n}",
 		"hair": "Hair colour",
 		"hair_option": "Shade {n}",
-		"previous": "Previous {option}",
-		"next": "Next {option}"
+		"custom_colour": "Pick any colour"
 	},
 	"settings": {
 		"title": "Settings",
