@@ -102,7 +102,8 @@ static func open() -> Modal:
 		var tallest := 0.0
 		for section in Content.cosmetic_sections:
 			tallest = maxf(tallest, _section_height(section))
-		var tabs_tall := tabs.get_combined_minimum_size().y + 12.0
+		var gap := float((m.body if narrow else side).get_theme_constant("separation"))
+		var tabs_tall := tabs.get_combined_minimum_size().y + gap
 		if narrow:
 			row.custom_minimum_size.y = minf(tallest, m.room() - tabs_tall)
 		else:
