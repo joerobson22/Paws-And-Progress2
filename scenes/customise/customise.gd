@@ -19,7 +19,7 @@ static func open() -> Modal:
 
 	# The title and the preview stay put; only the list of parts scrolls.
 	var top := UI.hbox(10)
-	top.add_child(UI.round_button("close", Text.t("common.cancel"), m.close.bind(null), UI.SURFACE_SOFT, UI.INK, 44, false))
+	top.add_child(UI.ghost_button("close", Text.t("common.cancel"), m.close.bind(null), UI.INK, 44, 24))
 	var title := UI.label(Text.t("customise.title"), 22, UI.INK, true, 600)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -58,6 +58,7 @@ func _figure() -> Control:
 	badge.mouse_filter = Control.MOUSE_FILTER_STOP
 	badge.mouse_default_cursor_shape = Cursor.HOVER
 	badge.accessibility_name = Text.t("profile.levels")
+	badge.set_meta("no_grow", true)
 	Press.attach(badge).tapped.connect(open_rewards)
 	var shine := Glint.new(0.5)
 	badge.add_child(shine)
@@ -79,8 +80,8 @@ static func _hover_badge(badge: Control, on: bool) -> void:
 	badge.pivot_offset = badge.size * 0.5
 	var t := Motion.tween(badge, "hover")
 	t.set_parallel(true)
-	t.tween_property(badge, "scale", Vector2.ONE * (1.12 if on else 1.0), Motion.time(Motion.FAST))
-	t.tween_property(badge, "self_modulate", Color(1.22, 1.22, 1.22) if on else Color.WHITE, Motion.time(Motion.FAST))
+	t.tween_property(badge, "scale", Vector2.ONE * (HoverGrow.GROW if on else 1.0), Motion.time(HoverGrow.TIME))
+	t.tween_property(badge, "self_modulate", Color(1.22, 1.22, 1.22) if on else Color.WHITE, Motion.time(HoverGrow.TIME))
 
 
 ## Your name, where you study, when you joined and how long you've focused
@@ -244,7 +245,7 @@ func open_settings() -> void:
 	var room := MarginContainer.new()
 	room.add_child(s)
 	m.body.add_child(room)
-	UI.clear_of_bar(m.body.get_parent() as ScrollContainer, room)
+	UI.clear_of_bar(m.scroller(), room)
 
 
 ## Whose save this is, and "Switch account" for the other saves on this
