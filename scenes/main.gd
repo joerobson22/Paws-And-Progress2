@@ -64,7 +64,8 @@ var _fading := 0
 var _minimap: Minimap
 var _arrows := {}  # Vector2i direction -> NavArrow
 var _bg := UI.backdrop()
-## The view behind the focus screen (art/home/backdrop.tscn), if there is one.
+## The view behind every screen (art/home/backdrop.tscn), if there is one:
+## made once and kept, panning as you move between screens.
 var _backdrop: HomeBackdrop
 const BACKDROP := "res://art/home/backdrop.tscn"
 ## How often the time of day is looked at again, in seconds.
@@ -264,8 +265,10 @@ func _process(_delta: float) -> void:
 	for dir in _arrows:
 		_arrows[dir].appear(ways.has(dir))
 	if is_instance_valid(_backdrop):
-		# Hidden under a flow (a walk covers everything).
-		_backdrop.pan = _world.position if _flows.is_empty() else size * 2.0
+		_backdrop.pan = _world.position
+		# A flow that has finished opening covers everything, so the view
+		# needn't draw; it shows again as soon as one starts closing.
+		_backdrop.covered = not _world.visible
 
 
 # --- Light and dark ----------------------------------------------------------
@@ -361,7 +364,9 @@ func _sync_lock(instant: bool = false) -> void:
 	if locked:
 		_close_flows()
 		_show_account(instant)
+		_show_home(false, instant)
 		return
+	_show_home(true, instant)
 	if _at != Vector2i.ZERO:
 		_at = Vector2i.ZERO
 		_minimap.show_cell(_at, true)
@@ -378,8 +383,18 @@ func _sync_lock(instant: bool = false) -> void:
 			Motion.fade(going, 0.0, Motion.NORMAL).tween_callback(going.queue_free)
 
 
+## Fades the screens and the minimap in or out, leaving the hilltop view:
+## the create account screen sits straight on it.
+func _show_home(on: bool, instant: bool) -> void:
+	for item: CanvasItem in [_world, _minimap]:
+		if instant:
+			item.modulate.a = 1.0 if on else 0.0
+		else:
+			Motion.fade(item, 1.0 if on else 0.0, Motion.NORMAL)
+
+
 func _show_account(instant: bool, typed: Array = ["", ""]) -> void:
-	_account = CreateAccount.new(typed[0], typed[1])
+	_account = CreateAccount.new(typed[0], typed[1], _backdrop == null)
 	_account_layer.add_child(_account)
 	if not instant:
 		_account.modulate.a = 0.0

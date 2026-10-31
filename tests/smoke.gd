@@ -308,6 +308,27 @@ func _run() -> void:
 			check(_find(info, func(n): return n is Label and n.text == str(_content().rarity_name(g["rarity"])).to_upper()) != null, "and its rarity")
 			check(info.get_global_rect().end.y <= first_tile.get_global_rect().position.y + 1.0 or info.get_global_rect().position.y >= first_tile.get_global_rect().end.y - 1.0,
 				"the card sits clear of the gift")
+			var layer: CanvasLayer = info.get_parent() as CanvasLayer
+			check(layer != null and layer.layer > 1, "on a layer over everything else")
+		first_tile._hover(false)
+		await _wait(25)
+		# From the first frame it shows, it stays on one side of the gift
+		# (above, where there's room): never below, then snapping up.
+		var low_tile: Control = grid_tiles[min(9, grid_tiles.size() - 1)]
+		low_tile._hover(true)
+		var sides := {}
+		for f in 10:
+			await process_frame
+			var card = info_class.showing(low_tile)
+			if card and card.modulate.a > 0.0:
+				var r: Rect2 = card.get_global_rect()
+				var t: Rect2 = low_tile.get_global_rect()
+				sides["above" if r.end.y <= t.position.y + 1.0 else ("below" if r.position.y >= t.end.y - 1.0 else "over")] = true
+		check(sides.size() == 1 and not sides.has("over"), "a card keeps to one side of its gift from its first visible frame (%s)" % ", ".join(sides.keys()))
+		low_tile._hover(false)
+		await _wait(25)
+		first_tile._hover(true)
+		await _wait(25)
 		check(first_tile.scale.x > 1.05, "and the gift grows (%.2f)" % first_tile.scale.x)
 		await _shot("gifts_popup")
 		first_tile._hover(false)
@@ -1185,8 +1206,8 @@ func _run() -> void:
 	check(main._flows.is_empty(), "back home from the jungle")
 	check(_audio().current_ambience() == "", "the jungle's sounds stop at home")
 
-	# The hilltop view behind the focus screen: the sun by day, the moon and
-	# stars by night, and it pans away as you slide to another screen.
+	# The hilltop view behind every screen: the sun by day, the moon and
+	# stars by night, and its layers pan as you slide to another screen.
 	var focus_pane: Node = main._panes[Vector2i.ZERO]
 	var backdrop: Control = main._backdrop
 	check(backdrop != null and backdrop.visible and backdrop.get_index() < main._world.get_index(), "the hilltop view sits behind the focus screen")
@@ -1213,10 +1234,18 @@ func _run() -> void:
 		await _wait(8)
 		check(backdrop._layers[4].position.x - near_spot.x > backdrop._layers[0].position.x - far_spot.x + 4.0, "sliding away, near layers move further than far ones")
 		await _wait(50)
-		check(not backdrop.visible, "and it's gone on the other screens")
+		check(backdrop.visible and backdrop.modulate.a > 0.99 and main._backdrop == backdrop, "and it stays, the same one, on the other screens")
+		var hilltop: Control = backdrop._layers[4]
+		check(hilltop.position.x + hilltop.size.x >= main.size.x and hilltop.position.x <= 0.0, "with no edge showing")
 		app.go("focus")
 		await _wait(50)
-		check(backdrop.visible and backdrop.modulate.a > 0.99, "back on the focus screen it's there again")
+		app.go("stats")
+		await _wait(50)
+		check(hilltop.position.y < 0.0 or hilltop.position.y + hilltop.size.y < main.size.y, "looking down lifts the layers")
+		check(backdrop._skirts[4].visible and hilltop.position.y + hilltop.size.y + backdrop._skirts[4].size.y >= main.size.y, "and ground fills in below them")
+		app.go("focus")
+		await _wait(50)
+		check(backdrop.visible and backdrop.modulate.a > 0.99, "back on the focus screen it's there")
 		app.set_setting("debug_hour", -1.0)
 		await _wait(5)
 

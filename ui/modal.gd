@@ -264,16 +264,6 @@ func _build(padding: int) -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_backdrop = ColorRect.new()
 	_backdrop.color = UI.SCRIM
-	if UI.style == "glass":
-		# Frosted: the screen behind, blurred under the scrim's tint. A
-		# fresh copy of the screen, so popups over popups blur them too.
-		add_child(BackBufferCopy.new())
-		(get_child(0) as BackBufferCopy).copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
-		var frost := ShaderMaterial.new()
-		frost.shader = preload("res://ui/frost.gdshader")
-		frost.set_shader_parameter("tint", UI.SCRIM)
-		_backdrop.material = frost
-		_backdrop.color = Color.WHITE
 	_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_backdrop.gui_input.connect(_on_backdrop_input)
 	add_child(_backdrop)

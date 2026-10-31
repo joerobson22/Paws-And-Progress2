@@ -40,26 +40,27 @@ const LOOKS := {
 			"EDGE": "#00000000", "ON_ACCENT": "#ffffff", "BG_TOP": "#121714", "BG_BOTTOM": "#121714",
 		},
 	},
-	# Frosted glass: see-through white panels with a fine light rim over a
-	# soft sky-to-meadow gradient; Outfit and Figtree.
+	# Glass: milky panels with a fine light rim over a soft sky-to-meadow
+	# gradient; Outfit and Figtree. The panels are nearly opaque so what's on
+	# them always reads, whatever is behind.
 	"glass": {
 		"fonts": ["Outfit", "Figtree"], "display_scale": 1.0,
 		"corner": 1.1, "wobble": false, "edge": 1, "edge_buttons": false,
 		"hard_shadow": false, "crisp": false, "backdrop": 1,
 		"light": {
-			"BG": "#d9eadf", "SURFACE": "#ffffff9e", "SURFACE_SOFT": "#ffffff73",
+			"BG": "#d9eadf", "SURFACE": "#ffffffeb", "SURFACE_SOFT": "#ffffffc7",
 			"INK": "#18302a", "INK_SOFT": "#4b6660", "INK_FAINT": "#8aa19b",
 			"LINE": "#18302a1f", "ACCENT": "#2f7a5a", "ACCENT_SOFT": "#cfe6da",
-			"NEUTRAL": "#a9bdb7", "SHELF": "#ffffff80",
-			"SCRIM": "#0f1d3333", "SHADOW": "#1e3c5024",
+			"NEUTRAL": "#a9bdb7", "SHELF": "#ffffffb8",
+			"SCRIM": "#0f1d3359", "SHADOW": "#1e3c5024",
 			"EDGE": "#ffffffb3", "ON_ACCENT": "#ffffff", "BG_TOP": "#bfe0f2", "BG_BOTTOM": "#a9cdb3",
 		},
 		"dark": {
-			"BG": "#1c2f3a", "SURFACE": "#ffffff17", "SURFACE_SOFT": "#ffffff1f",
+			"BG": "#1c2f3a", "SURFACE": "#1f3540eb", "SURFACE_SOFT": "#2b4552d6",
 			"INK": "#e8f2ef", "INK_SOFT": "#a7bdb7", "INK_FAINT": "#6f8580",
 			"LINE": "#ffffff1a", "ACCENT": "#6fd0a3", "ACCENT_SOFT": "#2a4a40",
-			"NEUTRAL": "#4f625d", "SHELF": "#ffffff1f",
-			"SCRIM": "#00000066", "SHADOW": "#00000059",
+			"NEUTRAL": "#4f625d", "SHELF": "#2b4552c7",
+			"SCRIM": "#00000099", "SHADOW": "#00000059",
 			"EDGE": "#ffffff2e", "ON_ACCENT": "#08251a", "BG_TOP": "#0f1d33", "BG_BOTTOM": "#12261d",
 		},
 	},
