@@ -16,10 +16,10 @@ static func file(id: String, index_path: String = INDEX_PATH) -> String:
 	return dir.path_join(SaveSystem.SAVE_PATH.get_file() if id == FIRST else "save_%s.json" % id)
 
 
-## {current: slot id, slots: [slot ids, oldest first]}. With no index yet,
-## just the first slot.
+## {current: slot id, slots: [slot ids, oldest first], signed_out: whether
+## you logged out}. With no index yet, just the first slot.
 static func read_index(index_path: String = INDEX_PATH) -> Dictionary:
-	var out := {"current": FIRST, "slots": [FIRST]}
+	var out := {"current": FIRST, "slots": [FIRST], "signed_out": false}
 	if not FileAccess.file_exists(index_path):
 		return out
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(index_path))
@@ -35,6 +35,7 @@ static func read_index(index_path: String = INDEX_PATH) -> Dictionary:
 	var current := str(parsed.get("current", ""))
 	out["slots"] = slots
 	out["current"] = current if slots.has(current) else slots[0]
+	out["signed_out"] = bool(parsed.get("signed_out", false))
 	return out
 
 
@@ -42,7 +43,7 @@ static func write_index(index: Dictionary, index_path: String = INDEX_PATH) -> E
 	var f := FileAccess.open(index_path, FileAccess.WRITE)
 	if f == null:
 		return FileAccess.get_open_error()
-	f.store_string(JSON.stringify({"current": index["current"], "slots": index["slots"]}, "\t"))
+	f.store_string(JSON.stringify({"current": index["current"], "slots": index["slots"], "signed_out": bool(index.get("signed_out", false))}, "\t"))
 	f.close()
 	return OK
 

@@ -82,12 +82,20 @@ func test_summary() -> void:
 	eq(SaveSlots.summary(s, [])["achievements"], 0, "no achievements")
 
 
-func test_setup_flag_survives_a_save() -> void:
-	var s := GameState.new()
-	check(not s.profile["setup_pending"], "off by default")
-	s.profile["setup_pending"] = true
-	check(SaveSystem.from_dict(SaveSystem.to_dict(s)).profile["setup_pending"] == true)
-	check(SaveSystem.from_dict({"version": SaveSystem.CURRENT_VERSION, "profile": {}}).profile["setup_pending"] == false, "a save without it isn't a new account")
+## Logging out is remembered, so the create account screen is still up
+## next time the app opens.
+func test_logged_out_survives_a_restart() -> void:
+	_cleanup()
+	check(not SaveSlots.read_index(INDEX)["signed_out"], "logged in by default")
+	eq(SaveSlots.write_index({"current": "main", "slots": ["main"], "signed_out": true}, INDEX), OK)
+	check(SaveSlots.read_index(INDEX)["signed_out"], "then logged out")
+	SaveSlots.write_index({"current": "main", "slots": ["main"]}, INDEX)
+	check(not SaveSlots.read_index(INDEX)["signed_out"], "an index without it is logged in")
+
+
+func test_old_half_made_accounts_lose_their_flag() -> void:
+	var s := SaveSystem.from_dict({"version": SaveSystem.CURRENT_VERSION, "profile": {"setup_pending": true}})
+	check(not s.profile.has("setup_pending"))
 
 
 func test_no_friends_means_an_empty_leaderboard() -> void:

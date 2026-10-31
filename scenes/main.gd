@@ -66,8 +66,11 @@ var _arrows := {}  # Vector2i direction -> NavArrow
 var _bg := ColorRect.new()
 ## The window settings last put in place, so only a change to them moves it.
 var _window_applied := ""
-## True while a new save slot keeps you on the profile screen.
+## True while the create account screen is up (App.needs_account()).
 var _locked := false
+## Holds the create account screen, over flows and under popups.
+var _account_layer := Control.new()
+var _account: CreateAccount
 
 var _press := false
 var _press_pos := Vector2.ZERO
@@ -100,8 +103,6 @@ func _ready() -> void:
 
 	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_world)
-	if App.setup_pending():
-		_at = PANES["profile"][0]
 	for pane_name in PANES:
 		var cell: Vector2i = PANES[pane_name][0]
 		var pane: Pane = load(PANES[pane_name][1]).new()
@@ -125,13 +126,14 @@ func _ready() -> void:
 	_minimap.picked.connect(_go_cell)
 	add_child(_minimap)
 
-	for layer in [_fade_layer, _flow_layer, _modal_layer]:
+	for layer in [_fade_layer, _flow_layer, _account_layer, _modal_layer]:
 		layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(layer)
 	# Flows and popups always draw on top, even over things lifted above
 	# the fade between light and dark.
 	_flow_layer.z_index = 2
+	_account_layer.z_index = 2
 	_modal_layer.z_index = 2
 	Modal.layer = _modal_layer
 
@@ -274,6 +276,10 @@ func _switch_palette(dark: bool) -> void:
 	_minimap.queue_redraw()
 	for dir in _arrows:
 		_arrows[dir].refresh()
+	if _account:
+		var typed := _account.typed()
+		_account.queue_free()
+		_show_account(true, typed)
 	var lifted: Array[Node] = []
 	Motion.still = true
 	for cell in _panes:
@@ -315,25 +321,48 @@ func _settle() -> void:
 
 # --- Navigation --------------------------------------------------------------
 
-## Hides the map while a new save slot keeps you on the profile screen
-## (the arrows hide in _process), and brings it back after.
+## Puts up the create account screen when App.needs_account() (a first
+## launch, or after Log out), and takes it away after. Leaving it always
+## lands on the focus screen, with any flow closed.
 func _sync_lock(instant: bool = false) -> void:
-	var locked := App.setup_pending()
+	var locked := App.needs_account()
 	if locked == _locked:
+		if _account:
+			_account.refresh_accounts()
 		return
 	_locked = locked
-	_minimap.shrink(true)
-	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE if locked else Control.MOUSE_FILTER_STOP
-	if instant:
-		_minimap.modulate.a = 0.0 if locked else 1.0
-	else:
-		Motion.fade(_minimap, 0.0 if locked else 1.0, Motion.FAST)
+	if locked:
+		_close_flows()
+		_show_account(instant)
+		return
+	if _at != Vector2i.ZERO:
+		_at = Vector2i.ZERO
+		_minimap.show_cell(_at, true)
+		_layout()
+		_panes[_at].visible = true
+		_panes[_at].show_pane()
+		_hide_others()
+	var going := _account
+	_account = null
+	if going:
+		if instant:
+			going.queue_free()
+		else:
+			Motion.fade(going, 0.0, Motion.NORMAL).tween_callback(going.queue_free)
+
+
+func _show_account(instant: bool, typed: Array = ["", ""]) -> void:
+	_account = CreateAccount.new(typed[0], typed[1])
+	_account_layer.add_child(_account)
+	if not instant:
+		_account.modulate.a = 0.0
+		Motion.fade(_account, 1.0, Motion.NORMAL)
 
 
 ## True if you can go to `cell`: anywhere, unless a new save slot is
 ## keeping you on the profile screen.
 func _can_go(cell: Vector2i) -> bool:
-	return _panes.has(cell) and (not _locked or cell == PANES["profile"][0])
+	return _panes.has(cell) and not _locked
 
 func _open(screen: String, params: Dictionary) -> void:
 	if PANES.has(screen):

@@ -127,8 +127,8 @@ static func _row(r: Dictionary) -> Control:
 
 ## An achievement's disc: in colour once earned (green for hours, gold for
 ## every gift, blue for an animal's set), grey before, with a ring round it
-## showing how far along you are. Hours and gifts have an icon; animal sets
-## show the animal.
+## showing how far along you are. Hours and gifts have an icon (or your own
+## assets/icons/achievements/<id>.svg, as drawn); animal sets show the animal.
 class Disc extends Control:
 	var info: Dictionary
 	var diameter := 52.0
@@ -150,6 +150,12 @@ class Disc extends Control:
 		else:
 			var px := int(side * 0.46)
 			var icon := UI.icon_rect(str(row["icon"]), px, Color.WHITE if row["earned"] else UI.INK_FAINT)
+			# Your own full-colour picture for it, if you've drawn one.
+			var own := Icons.drawn("achievements/" + str(row["id"]), int(side * 0.62))
+			if own:
+				px = int(side * 0.62)
+				icon.texture = own
+				icon.modulate = Color.WHITE if row["earned"] else Color(1, 1, 1, 0.4)
 			icon.position = Vector2(side - px, side - px) * 0.5
 			add_child(icon)
 		UI.ignore_mouse(self)

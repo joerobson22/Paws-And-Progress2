@@ -23,6 +23,9 @@ var ended_walk := {}
 var friends: Array = []
 ## The save slot in use (see SaveSlots).
 var slot := SaveSlots.FIRST
+## True after Log out, until you create an account or pick one: the create
+## account screen covers everything till then (needs_account()).
+var signed_out := false
 
 ## What's been done so far, for the unlock rules (Unlocks); worked out again
 ## after each change.
@@ -41,7 +44,9 @@ const DEBUG_GIFTS := 50
 
 func _ready() -> void:
 	rng.randomize()
-	slot = SaveSlots.read_index()["current"]
+	var index := SaveSlots.read_index()
+	slot = index["current"]
+	signed_out = index["signed_out"]
 	friends = _friends_for(slot)
 	if SaveSystem.out_of_date(SaveSlots.file(slot)):
 		SaveSystem.set_aside(SaveSlots.file(slot))
@@ -137,7 +142,9 @@ func switch_slot(id: String) -> void:
 	var index := SaveSlots.read_index()
 	if id == slot or not (index["slots"] as Array).has(id):
 		return
-	save()
+	# A blank account left after deleting the one you logged out of isn't kept.
+	if (index["slots"] as Array).has(slot):
+		save()
 	if SaveSystem.out_of_date(SaveSlots.file(id)):
 		SaveSystem.set_aside(SaveSlots.file(id))
 	var next := SaveSystem.read(SaveSlots.file(id))
@@ -147,45 +154,85 @@ func switch_slot(id: String) -> void:
 	_enter_slot(id, next, index)
 
 
-## Makes a new, empty slot and moves into it. It starts with no friends and
-## with your settings from this one (sound, theme, window...), and asks for
-## a name and where you study before you can go anywhere (setup_pending()).
-func add_slot() -> void:
+## Whether the create account screen should be up: after Log out, and for
+## an account with no name yet (a first launch).
+func needs_account() -> bool:
+	return signed_out or str(state.profile.get("username", "")).strip_edges() == ""
+
+
+## Whether there's a named account to log back into, for "I have an account".
+func has_accounts() -> bool:
+	return slots().any(func(r): return str(r["name"]).strip_edges() != "")
+
+
+## The create account screen's Create: fills in this slot if it has no name
+## yet (a first launch keeps anything done so far), or else makes a new,
+## empty slot with your settings from this one and moves into it.
+func create_account(username: String, institution: String) -> void:
 	var index := SaveSlots.read_index()
-	var id := SaveSlots.new_id(now(), rng, index["slots"])
-	var fresh := GameState.new()
-	fresh.profile["created_unix"] = now()
-	fresh.profile["setup_pending"] = true
-	fresh.settings = state.settings.duplicate(true)
+	if str(state.profile.get("username", "")).strip_edges() != "":
+		var id := SaveSlots.new_id(now(), rng, index["slots"])
+		var fresh := GameState.new()
+		fresh.profile["created_unix"] = now()
+		fresh.settings = state.settings.duplicate(true)
+		save()
+		(index["slots"] as Array).append(id)
+		_enter_slot(id, fresh, index)
+	elif not (index["slots"] as Array).has(slot):
+		(index["slots"] as Array).append(slot)
+	state.profile["username"] = username.strip_edges()
+	state.profile["institution"] = institution.strip_edges()
+	_set_signed_out(false, index)
+	_changed()
+
+
+## Saves and goes back to the create account screen. The account stays on
+## this device, to log back into.
+func log_out() -> void:
 	save()
-	(index["slots"] as Array).append(id)
-	_enter_slot(id, fresh, index)
+	_set_signed_out(true, SaveSlots.read_index())
+	state_changed.emit()
 
 
-## Deletes another slot's save for good. The slot in use can't be deleted.
+## "I have an account": carries on in slot `id`, as it was left.
+func log_in(id: String) -> void:
+	switch_slot(id)
+	_set_signed_out(false, SaveSlots.read_index())
+	state_changed.emit()
+
+
+func _set_signed_out(on: bool, index: Dictionary) -> void:
+	signed_out = on
+	index["current"] = slot
+	index["signed_out"] = on
+	SaveSlots.write_index(index)
+
+
+## Deletes a slot's save for good. The slot in use can only go once you've
+## logged out of it; you're then left in a new, blank one till you create
+## or pick an account.
 func delete_slot(id: String) -> void:
 	var index := SaveSlots.read_index()
+	if id == slot:
+		if not signed_out:
+			return
+		var rest: Array = (index["slots"] as Array).filter(func(x): return x != id)
+		var blank := SaveSlots.FIRST if not rest.has(SaveSlots.FIRST) else SaveSlots.new_id(now(), rng, index["slots"])
+		# Out of the slot first, so it can go; the blank one joins the list
+		# when it's given a name.
+		index["current"] = blank
+		SaveSlots.remove(index, id)
+		var fresh := GameState.new()
+		fresh.profile["created_unix"] = now()
+		fresh.settings = state.settings.duplicate(true)
+		slot = blank
+		state = fresh
+		friends = _friends_for(blank)
+		SaveSlots.write_index(index)
+		state_changed.emit()
+		return
 	if SaveSlots.remove(index, id):
 		SaveSlots.write_index(index)
-
-
-## True in a new slot until its profile is filled in: the app stays on the
-## profile screen till then.
-func setup_pending() -> bool:
-	return bool(state.profile.get("setup_pending", false))
-
-
-## Whether the profile has everything a new slot asks for.
-func profile_complete() -> bool:
-	return str(state.profile.get("username", "")).strip_edges() != "" \
-		and str(state.profile.get("institution", "")).strip_edges() != ""
-
-
-## Ends a new slot's setup once its profile is filled in.
-func finish_setup() -> void:
-	if setup_pending() and profile_complete():
-		state.profile["setup_pending"] = false
-		_changed()
 
 
 func _enter_slot(id: String, next: GameState, index: Dictionary) -> void:

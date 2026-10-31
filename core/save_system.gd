@@ -59,10 +59,11 @@ static func from_dict(d: Dictionary) -> GameState:
 	state.profile["cosmetics"] = cosmetics
 	for k in ["created_unix", "skin_tone", "hair_tone", "walks_since_epic", "walks"]:
 		state.profile[k] = int(state.profile[k])
-	state.profile["setup_pending"] = bool(state.profile["setup_pending"])
 	state.profile["username"] = str(state.profile["username"])
 	state.profile["institution"] = str(state.profile["institution"])
 	state.profile["shelf"] = state.shelf()
+	# Older saves marked a half-made account; the create account screen does that now.
+	state.profile.erase("setup_pending")
 	state.xp = int(d.get("xp", 0))
 	for p in d.get("projects", []):
 		state.projects.append(ProjectData.from_dict(p))

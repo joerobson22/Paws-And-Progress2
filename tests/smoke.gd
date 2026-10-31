@@ -1581,11 +1581,12 @@ func _stats_and_friends(main: Node) -> void:
 	await _wait(50)
 
 
-## Settings has "Switch account", which lists every save slot under a
-## title that stays put, with a + below the list. The + makes a new slot and
-## goes to its profile, which can't be left till it's filled in; it has no
-## friends, so its leaderboard is empty. Then back to the first slot, and
-## the new one is deleted.
+## Settings ends in a red Log out, which puts up the create account screen
+## over everything: nothing can leave it. "I have an account" lists the
+## accounts on this device. Create, once both boxes are filled in, makes a
+## new account with no friends and goes to the focus screen; its
+## leaderboard is empty. Then log out, delete the new one from the list,
+## and log back into the first, as it was left.
 func _accounts(main: Node) -> void:
 	var app := _app()
 	var modal_class := _class("res://ui/modal.gd")
@@ -1593,71 +1594,74 @@ func _accounts(main: Node) -> void:
 	var profile_pane: Control = main._panes[profile_cell]
 	var home_slot: String = app.slot
 	var before: int = app.slots().size()
+	app.go("profile")
+	await _wait(50)
 	profile_pane.open_settings()
 	await _wait(25)
-	var switch: Button = _find(modal_class.top().body, func(n): return n is Button and n.text == "Switch account")
-	check(switch != null, "settings has a Switch account button")
-	if switch == null:
-		_close_modal()
-		return
-	await _tap_control(switch, main)
-	await _wait(25)
-	var picker: Node = modal_class.top()
-	check(_find(picker.header, func(n): return n is Label and n.text == "Switch account") != null, "its title stays above the list")
-	var cards: Array = _all(picker.body, func(n): return n.has_meta("press"))
-	check(cards.size() == before, "a card for every save slot (%d)" % cards.size())
-	var add: Button = _find(picker.footer, func(n): return n is Button and n.accessibility_name == "New account")
-	check(add != null, "a + under the list, outside it")
-	check(_find(picker.body, func(n): return n is Button and n.accessibility_name.begins_with("Delete")) == null,
-		"the account you're using can't be deleted")
-	await _shot("accounts")
-	if add == null:
+	var settings: Node = modal_class.top()
+	check(_find(settings.body, func(n): return n is Button and n.text == "Switch account") == null, "no Switch account any more")
+	var out: Button = _find(settings.body, func(n): return n is Button and n.text == "Log out")
+	check(out != null, "settings ends in Log out")
+	if out == null:
 		modal_class.close_all()
 		return
-	await _tap_control(add, main)
-	await _wait(60)
+	var switches: Array = _all(settings.body, func(n): return _is(n, "switch.gd"))
+	if not switches.is_empty():
+		check(out.get_global_rect().position.y > (switches.back() as Control).get_global_rect().end.y, "below every setting")
+	await _tap_control(out, main)
+	await _wait(40)
+	var screen: Control = main._account
+	check(app.needs_account() and screen != null and screen.is_visible_in_tree() and not modal_class.is_open(), "Log out closes settings and shows the create account screen")
+	check(app.slot == home_slot and app.slots().size() == before, "the account stays on this device")
+	if screen == null:
+		return
+	var create: Button = _find(screen, func(n): return n is Button and n.text == "Create")
+	var have: Button = _find(screen, func(n): return n is Button and n.text == "I have an account")
+	var boxes: Array = _all(screen, func(n): return n is LineEdit)
+	check(boxes.size() == 2, "it asks for a name and where you study")
+	check(create != null and create.disabled, "Create waits for both")
+	check(have != null and have.is_visible_in_tree(), "I have an account shows when there's one")
+	check(screen.get_global_rect().has_point(main.size * 0.5) and screen.get_global_rect().size == main.size, "it covers the screen")
+	await _shot("create_account")
+	await _key(KEY_DOWN)
+	await _wait(40)
+	app.go("stats")
+	await _wait(40)
+	check(main._at == profile_cell and app.needs_account(), "nothing can leave it")
+
+	if have:
+		await _tap_control(have, main)
+		await _wait(25)
+	var picker: Node = modal_class.top()
+	check(picker != null and _find(picker.header, func(n): return n is Label and n.text == "Your accounts") != null, "I have an account lists them under a title")
+	if picker:
+		check(_all(picker.body, func(n): return n.has_meta("press")).size() == before, "a card for every account (%d)" % before)
+		check(_find(picker.body, func(n): return n.has_meta("press") and n.accessibility_name == "Log in as Joe") != null, "listed by name")
+		check(not picker.footer.visible, "no + under the list")
+		await _shot("accounts")
+		modal_class.close_all()
+		await _wait(20)
+
+	if boxes.size() == 2:
+		(boxes[0] as LineEdit).text = "Sam"
+		(boxes[0] as LineEdit).text_changed.emit("Sam")
+		await _wait(5)
+		check(create.disabled, "a name alone isn't enough")
+		(boxes[1] as LineEdit).text = "University of York"
+		(boxes[1] as LineEdit).text_changed.emit("University of York")
+		await _wait(5)
+		check(not create.disabled, "then it's ready")
+		await _shot("create_account_ready")
+		await _tap_control(create, main)
+		await _wait(60)
 	var new_slot: String = app.slot
-	check(new_slot != home_slot and not modal_class.is_open(), "the + makes a new account and closes the popups")
-	check(main._at == profile_cell and app.setup_pending(), "it opens on the new account's profile")
+	check(new_slot != home_slot and not app.needs_account(), "Create makes a new account")
+	check(app.state.profile["username"] == "Sam" and app.state.profile["institution"] == "University of York", "with that name and place")
+	check(main._at == Vector2i.ZERO and main._account == null, "and goes to the focus screen")
 	check(app.friends.is_empty(), "a new account has no friends")
 	check(app.state.projects.is_empty() and app.state.days.is_empty() and app.state.inventory.is_empty(), "and nothing else either")
 	check(app.state.settings.get("location") == "off", "it keeps your settings")
 	await _shot("account_new")
-	check(main._minimap.modulate.a < 0.01 and main._arrows.values().all(func(a): return not a.visible), "no map or arrows till it's filled in")
-	await _key(KEY_DOWN)
-	await _wait(40)
-	check(main._at == profile_cell, "the arrow keys can't leave")
-	app.go("stats")
-	await _wait(40)
-	check(main._at == profile_cell, "nor can anything else")
-	var go: Button = _find(profile_pane, func(n): return n is Button and n.text == "Start walking")
-	check(go != null and go.disabled, "Start walking waits for the profile")
-	app.set_profile("username", "Sam")
-	await _wait(10)
-	go = _find(profile_pane, func(n): return n is Button and n.text == "Start walking")
-	check(go != null and go.disabled, "all of it")
-	app.set_profile("institution", "University of York")
-	await _wait(10)
-	go = _find(profile_pane, func(n): return n is Button and n.text == "Start walking")
-	check(go != null and not go.disabled, "then it's ready")
-	if main.size.y >= 590:
-		var fields: Control = _find(profile_pane, func(n): return n is Label and n.text == "JOINED")
-		var shelf_cap: Control = _find(profile_pane, func(n): return n is Label and n.text == "GIFT SHELF")
-		check(fields != null and shelf_cap != null, "the card has its details and shelf")
-		if fields and shelf_cap:
-			var gap: float = shelf_cap.get_global_rect().position.y - fields.get_global_rect().end.y
-			check(gap < 200.0,
-				"no big gap between the details and the shelf (%d)" % gap)
-		if main.size.y > main.size.x * 1.5:
-			check(_find(profile_pane, func(n): return _is(n, "medal_card.gd") and n.is_visible_in_tree()) != null,
-				"a tall screen shows the achievements to come under the setup")
-	await _shot("account_ready")
-	if go:
-		await _tap_control(go, main)
-		await _wait(60)
-	check(not app.setup_pending() and main._at == Vector2i.ZERO, "Start walking goes to the focus screen")
-	await _wait(20)
-	check(main._minimap.modulate.a > 0.99, "and the map is back")
 
 	app.go("stats")
 	await _wait(50)
@@ -1671,25 +1675,14 @@ func _accounts(main: Node) -> void:
 			"with only this week there are no weeks to pick between")
 	await _shot("leaderboard_empty")
 
-	# Back to the first account, then delete the new one.
-	app.go("profile")
-	await _wait(50)
-	profile_pane.open_settings()
-	await _wait(20)
-	picker = _class("res://ui/components/account_switcher.gd").open()
-	await _wait(25)
-	var home_card: Control = _find(picker.body, func(n): return n.has_meta("press") and n.accessibility_name == "Switch to Joe")
-	check(home_card != null, "the first account is listed by name")
-	if home_card:
-		await _tap_control(home_card, main)
-		await _wait(40)
-	check(app.slot == home_slot and app.state.profile["username"] == "Joe" and not modal_class.is_open(), "tapping its card switches back")
-	check(main._at == profile_cell and not app.state.projects.is_empty(), "to its profile, as it was left")
+	# Log out, delete Sam, and log back in as Joe.
+	app.log_out()
+	await _wait(40)
+	check(main._account != null, "logging out again shows the screen")
 	picker = _class("res://ui/components/account_switcher.gd").open()
 	await _wait(25)
 	var bin: Button = _find(picker.body, func(n): return n is Button and n.accessibility_name == "Delete Sam")
-	check(bin != null, "other accounts have a bin")
-	await _shot("accounts_two")
+	check(bin != null, "every account has a bin")
 	if bin:
 		await _tap_control(bin, main)
 		await _wait(25)
@@ -1697,10 +1690,16 @@ func _accounts(main: Node) -> void:
 		await _shot("account_delete")
 		_close_modal(true)
 		await _wait(30)
-	check(app.slots().size() == before and not FileAccess.file_exists(SaveSlots.file(new_slot)), "and deletes it")
+	check(not FileAccess.file_exists(_class("res://core/save_slots.gd").file(new_slot)) and not app.slots().any(func(r): return r["name"] == "Sam"), "and deletes it")
 	check(_all(picker.body, func(n): return n.has_meta("press")).size() == before, "the list updates")
-	modal_class.close_all()
-	await _wait(20)
+	check(app.needs_account(), "you're still logged out")
+	var home_card: Control = _find(picker.body, func(n): return n.has_meta("press") and n.accessibility_name == "Log in as Joe")
+	check(home_card != null, "the first account is listed by name")
+	if home_card:
+		await _tap_control(home_card, main)
+		await _wait(60)
+	check(app.slot == home_slot and app.state.profile["username"] == "Joe" and not app.needs_account() and not modal_class.is_open(), "tapping its card logs back in")
+	check(main._at == Vector2i.ZERO and main._account == null and not app.state.projects.is_empty(), "on the focus screen, as it was left")
 	# Debug builds only give the first slot sample friends; the rest of the
 	# run wants them whichever slot it's in.
 	app.friends = _class("res://core/friends.gd").sample()

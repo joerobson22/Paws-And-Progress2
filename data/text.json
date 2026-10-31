@@ -531,24 +531,22 @@
 		"phone_size_note": "Show the app at a phone's proportions (debug builds only)",
 		"add_minutes": "+{minutes}"
 	},
-	"setup": {
-		"welcome": "Welcome to your new account",
+	"create": {
+		"title": "Create account",
+		"note": "Walk animals through beautiful places while you work.",
 		"name": "Your name",
 		"school": "Where you study",
-		"start": "Start walking",
-		"step_done": "{step}: done",
-		"step_todo": "{step}: to do"
+		"create": "Create",
+		"have_account": "I have an account"
 	},
 	"accounts": {
-		"title": "Switch account",
-		"new": "New account",
+		"title": "Your accounts",
+		"log_out": "Log out",
 		"unnamed": "New account",
-		"note": "Each account on this device keeps its own projects, gifts and stats.",
-		"switch_to": "Switch to {name}",
+		"switch_to": "Log in as {name}",
 		"unnamed_lower": "new account",
 		"focused": "{time} focused",
 		"achievements": "{percent}% of achievements",
-		"current": "The account you're using",
 		"delete": "Delete {who}",
 		"whose": "{name}'s account",
 		"this_one": "this account",
