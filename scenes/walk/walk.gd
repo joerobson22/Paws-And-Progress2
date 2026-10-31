@@ -316,7 +316,7 @@ func _on_gift_pressed() -> void:
 
 func _end() -> void:
 	_finishing = true
-	Audio.play("bong", 1.0, -4.0)
+	Audio.play("walk_end", 1.0, -4.0, "bong")
 	_result = App.finish_walk()
 	Motion.fade(_hud, 0.0)
 	var gift: Dictionary = _result.get("gift", {})
@@ -368,7 +368,7 @@ func _dive(gift_id: String) -> void:
 	if _done:
 		return
 
-	Audio.play("rustle")
+	Audio.play("bush_rustle", 1.0, 0.0, "rustle")
 	t = Motion.tween(_bush, "rustle")
 	for i in 7:
 		t.tween_property(_bush, "rotation", 0.07 * (1.0 if i % 2 == 0 else -1.0), 0.1)
@@ -389,7 +389,7 @@ func _dive(gift_id: String) -> void:
 	_animal.walking = false
 	_animal.scale.x = absf(_animal.scale.x)
 	Motion.pop(_animal, 0.12)
-	Audio.play("chime", 1.0, -6.0)
+	Audio.play("gift_found", 1.0, -6.0, "chime")
 	await get_tree().create_timer(Motion.time(0.7)).timeout
 	_go_finish()
 

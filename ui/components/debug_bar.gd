@@ -2,7 +2,7 @@ class_name DebugBar
 extends VBoxContainer
 ## Only in debug builds (runs from the editor, debug exports). On the focus
 ## screen, small, beside the home icon in the top left: a switch that
-## unlocks every animal and place, and one that gives the window a phone's
+## unlocks every animal and place (and tops every gift up to 50), and one that gives the window a phone's
 ## shape and lays the app out as on a phone (off: the window as it was).
 ## The walk also shows the buttons here that move it on.
 
@@ -35,7 +35,11 @@ func _switch(grid: GridContainer, title: String, tip: String, on: bool, setting:
 	var sw := Switch.new(on)
 	sw.custom_minimum_size.y = ROW
 	sw.accessibility_name = tip
-	sw.toggled.connect(func(value: bool): App.set_setting(setting, value))
+	sw.toggled.connect(func(value: bool):
+		App.set_setting(setting, value)
+		# Unlocking everything hands out 50 of every gift too (kept after).
+		if value and setting == "debug_unlock_all":
+			App.debug_fill_gifts())
 	grid.add_child(sw)
 	var words := UI.label(title, 13, UI.INK_SOFT, false, 800)
 	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER

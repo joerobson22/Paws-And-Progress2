@@ -188,11 +188,16 @@ func _run() -> void:
 	check(debug != null, "the debug bar shows in a debug build")
 	if debug:
 		var unlock: Button = _find(debug, func(n): return _is(n, "switch.gd"))
+		var inventory_before: Dictionary = app.state.inventory.duplicate()
 		unlock.button_pressed = true
 		await _wait(10)
 		check(app.is_unlocked("place", "moon") and app.is_unlocked("animal", "bear"), "the debug switch unlocks everything")
+		check(_content().gifts.all(func(g): return app.state.gift_count(g["id"]) >= 50), "and gives 50 of every gift")
 		await _shot("debug")
 		unlock.button_pressed = false
+		# The gifts stay; put the old ones back so the rest of the run sees them.
+		app.state.inventory = inventory_before
+		app.set_setting("debug_unlock_all", false)
 		await _wait(10)
 		check(not app.is_unlocked("place", "moon"), "and locks it all again")
 		# The second switch lays the app out as on a phone (and, with a real
@@ -249,7 +254,6 @@ func _run() -> void:
 	await _shot("gifts")
 	var gifts_pane: Node = main._panes[Vector2i(-1, 0)]
 	var modal_class := _class("res://ui/modal.gd")
-	var details := _class("res://ui/components/gift_details.gd")
 	# The gifts screen: three rings (gifts discovered, pets' gift tables
 	# completed and cosmetics unlocked), then every gift you have, with its
 	# count, in a list that scrolls on its own. The shelf is on the profile.
@@ -263,8 +267,8 @@ func _run() -> void:
 	var grid_tiles: Array = _all(gifts_pane._grid, func(n): return _is(n, "gift_tile.gd"))
 	check(grid_tiles.size() == have and gifts_pane._grid.columns == (8 if gifts_pane.wide else 5),
 		"every gift you have, %d to a row (%d of %d)" % [gifts_pane._grid.columns, grid_tiles.size(), have])
-	check(grid_tiles.all(func(t): return t.tappable and not t.draggable and _find(t, func(n): return n is Label and n.text.begins_with("×")) != null),
-		"each shows how many you have and can be tapped")
+	check(grid_tiles.all(func(t): return t.trades and not t.draggable and _find(t, func(n): return n is Label and n.text.begins_with("×")) != null),
+		"each shows how many you have and can be traded in")
 	# The screens are made to fit a window at least 600 tall (a headless run's
 	# is much smaller, so only the bigger runs check the fit).
 	var roomy: bool = main.size.y >= 590.0
@@ -280,43 +284,62 @@ func _run() -> void:
 		await _shot("gifts_sort")
 		sort_on_gifts._close()
 		await _wait(15)
-	# Tapping a gift has a closer look, with its trade-in.
+	# Hovering a gift shows its card above it: name, rarity, description and
+	# how close it is to a trade-in. Clicking one with enough trades it in;
+	# one without enough just wiggles.
+	var info_class := _class("res://ui/components/gift_info.gd")
 	var first_tile: Control = grid_tiles[0] if grid_tiles.size() > 0 else null
-	if first_tile and not roomy:
-		# Too small a window for the list to show: open it directly.
-		details.open(first_tile.gift_id)
-		await _wait(25)
-	elif first_tile:
+	if first_tile:
 		gifts_pane.scroll.ensure_control_visible(first_tile)
 		await _wait(5)
-		var at_first := first_tile.get_global_rect().intersection(gifts_pane.scroll.get_global_rect()).get_center()
-		await _drag(at_first, at_first, 1)
+		first_tile._hover(true)
 		await _wait(25)
-	check(modal_class.is_open() and _find(modal_class.top(), func(n): return n is Button and n.text.contains("shelf")) == null,
-		"a gift opens its details, with no shelf buttons")
-	await _shot("gifts_popup")
-	if modal_class.is_open():
-		_close_modal()
-	await _wait(20)
+		var info = info_class.showing(first_tile)
+		check(info != null, "hovering a gift shows its card")
+		if info:
+			var g: Dictionary = _content().gift(first_tile.gift_id)
+			check(_find(info, func(n): return n is Label and n.text == g["name"]) != null, "with its name")
+			check(_find(info, func(n): return n is Label and n.text == str(_content().rarity_name(g["rarity"])).to_upper()) != null, "and its rarity")
+			check(info.get_global_rect().end.y <= first_tile.get_global_rect().position.y + 1.0 or info.get_global_rect().position.y >= first_tile.get_global_rect().end.y - 1.0,
+				"the card sits clear of the gift")
+		check(first_tile.scale.x > 1.05, "and the gift grows (%.2f)" % first_tile.scale.x)
+		await _shot("gifts_popup")
+		first_tile._hover(false)
+		await _wait(25)
+		check(info_class.showing(first_tile) == null and is_equal_approx(first_tile.scale.x, 1.0), "moving off puts it away")
 
-	# Trading in ten commons for a rare.
+	# Trading in ten commons for a rare, straight from the collection.
 	var rares: int = app.state.gift_count("dog_rare")
-	details.open("dog_common")
+	app.state.inventory["dog_common"] = 12
+	gifts_pane.rebuild()
+	await _wait(10)
+	var common_tile = _find(gifts_pane._grid, func(n): return _is(n, "gift_tile.gd") and n.gift_id == "dog_common")
+	common_tile._hover(true)
 	await _wait(20)
-	details.trade(modal_class.top(), "dog_common")
+	var ready_info = info_class.showing(common_tile)
+	check(ready_info != null and _find(ready_info, func(n): return n is Label and n.text == "12/10") != null, "the card counts towards a trade (12/10)")
+	check(ready_info != null and _find(ready_info, func(n): return n is Label and n.text == "Click to trade 10 in for a rare!") != null, "and calls you to click once there are enough")
+	await _shot("gift_ready")
+	common_tile._on_tapped()
 	await _wait(25)
-	check(app.state.gift_count("dog_common") == 2 and app.state.gift_count("dog_rare") == rares + 1, "trade in")
+	check(app.state.gift_count("dog_common") == 2 and app.state.gift_count("dog_rare") == rares + 1, "clicking trades it in")
+	check(modal_class.is_open(), "and shows what it brought")
 	await _shot("trade_result")
 	_close_modal()
 	await _wait(10)
+	# Two left isn't enough: a click wiggles and trades nothing.
+	common_tile = _find(gifts_pane._grid, func(n): return _is(n, "gift_tile.gd") and n.gift_id == "dog_common")
+	common_tile._on_tapped()
+	await _wait(3)
+	check(app.state.gift_count("dog_common") == 2 and absf(common_tile.rotation) > 0.01, "too few just wiggles")
+	await _wait(20)
 
 	# Trading in every last one of a shelf gift takes it off the shelf.
 	app.state.inventory["dog_common"] = 10
 	app.place_on_shelf("dog_common", 0)
 	await _wait(10)
-	details.open("dog_common")
-	await _wait(20)
-	details.trade(modal_class.top(), "dog_common")
+	common_tile = _find(gifts_pane._grid, func(n): return _is(n, "gift_tile.gd") and n.gift_id == "dog_common")
+	common_tile._on_tapped()
 	await _wait(25)
 	check(not app.state.shelf().has("dog_common"), "trading away all of a shelf gift takes it off the shelf")
 	_close_modal()
@@ -1127,7 +1150,6 @@ func _run() -> void:
 		var title: Control = _find(pane, func(n): return n is TextureRect and n.get_parent() is CenterContainer and n.get_parent().get_parent() is HBoxContainer)
 		check(pane.name == "Focus" or title != null, "%s has its map icon by its title" % pane.name)
 		check(_find(pane, func(n): return n is PanelContainer and n.get_parent() is HBoxContainer and n.get_child_count() == 1 and n.get_child(0) is TextureRect and n.size.x == 44.0) == null, "%s's icon has no tile behind it" % pane.name)
-
 	if _failed:
 		quit(1)
 		return

@@ -122,7 +122,7 @@ func _ready() -> void:
 	_build_words(session, roll)
 	_play.call_deferred()
 	if not roll.is_empty():
-		Audio.play("chime", 1.0, -6.0)
+		Audio.play("walk_gifts", 1.0, -6.0, "chime")
 
 
 func go_back() -> void:
@@ -333,7 +333,7 @@ func _pick_up(pointer: Vector2) -> void:
 	_hand.add_child(_held)
 	_hold_target = pointer
 	Motion.to(_held, "scale", Vector2.ONE, Motion.FAST)
-	Audio.play("pop", 0.9, -6.0)
+	Audio.play("gift_pick_up", 0.9, -6.0, "pop")
 
 
 func _process(delta: float) -> void:
@@ -424,7 +424,7 @@ func _bank_y() -> float:
 
 func _throw(v: Vector2) -> void:
 	_state = "flying"
-	Audio.play("whoosh", 1.1, -4.0)
+	Audio.play("gift_throw", 1.1, -4.0, "whoosh")
 	var k := _stage.scale.x
 	var start := (_held.position + _held.size * 0.5 - _stage.position) / k
 	_fly = GiftArt.new(_gift_id, 0.6)
@@ -484,14 +484,14 @@ func _land() -> void:
 	var spot := Vector2(f["x"], _ground_y(f["z"]))
 	_fly.rotation = 0.0
 	if spot.y < _bank_y():
-		Audio.play("splash", 1.0, -2.0)
+		Audio.play("gift_splash", 1.0, -2.0, "splash")
 		_ripple = _Ripple.new()
 		_ripple.position = spot
 		_ripple.scale = Vector2.ONE * _perspective(f["z"]) * _unit
 		_scenery.add_child(_ripple)
 		Motion.float_loop(_fly, 3.0 * _unit, 1.4)
 	else:
-		Audio.play("pop", 0.7, -8.0)
+		Audio.play("gift_land", 0.7, -8.0, "pop")
 		Motion.pop(_fly, 0.15)
 	_fetch(spot, f["z"])
 

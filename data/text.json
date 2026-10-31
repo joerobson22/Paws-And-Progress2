@@ -243,10 +243,11 @@
 		"new": "NEW",
 		"wearable": "Wearable ({slot}). Dress your character on your profile, above the focus screen.",
 		"you_have": "You have {n}",
-		"trade": "Trade in {cost} for {a_rarity}",
-		"trade_short": "Trade in {cost} for {a_rarity} gift: {left} more to go.",
 		"no_trade": "Legendary gifts can't be traded in.",
 		"count": "×{n}",
+		"tally": "{have}/{need}",
+		"click_to_trade": "Click to trade {cost} in for {a_rarity}!",
+		"tap_to_trade": "Tap again to trade {cost} in for {a_rarity}!",
 		"on_shelf": "{gift} (on your shelf)"
 	},
 	"sort": {
@@ -528,7 +529,7 @@
 	"debug": {
 		"title": "DEBUG",
 		"unlock_all": "Unlock all",
-		"unlock_all_note": "Unlock every animal and place (debug builds only)",
+		"unlock_all_note": "Unlock every animal and place, and get 50 of every gift (debug builds only)",
 		"phone_size": "Phone size",
 		"phone_size_note": "Show the app at a phone's proportions (debug builds only)",
 		"add_minutes": "+{minutes}"
