@@ -157,7 +157,7 @@ func _cell_rect(cell: Vector2) -> Rect2:
 
 
 func _draw() -> void:
-	var bg := UI.with_shadow(UI.box(Color(UI.SURFACE, 0.92 + 0.08 * _grow), Color.TRANSPARENT, int(lerpf(16.0, 26.0, _grow))), 0.7 + 0.3 * _grow)
+	var bg := UI.with_shadow(UI.box(Color(UI.SURFACE, maxf(UI.SURFACE.a, 0.3 if UI.dark else 0.75) * (0.92 + 0.08 * _grow)), Color.TRANSPARENT, int(lerpf(16.0, 26.0, _grow))), 0.7 + 0.3 * _grow)
 	draw_style_box(bg, Rect2(Vector2.ZERO, size))
 	var radius := int(lerpf(3.0, 14.0, _grow))
 	var tile := UI.LINE.lerp(UI.SURFACE_SOFT, _grow)

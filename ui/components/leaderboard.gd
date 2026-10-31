@@ -49,7 +49,7 @@ func _init(list: Array) -> void:
 		full.add_theme_font_size_override("font_size", 13)
 		for state in ["normal", "hover", "pressed", "hover_pressed"]:
 			var sb: StyleBoxFlat = full.get_theme_stylebox(state)
-			sb.set_corner_radius_all(999)
+			UI.corners(sb, 999)
 			sb.content_margin_left = 14
 			sb.content_margin_right = 14
 			sb.content_margin_top = 2

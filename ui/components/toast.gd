@@ -62,7 +62,7 @@ func _run() -> void:
 		_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_text.custom_minimum_size.x = most - around
 		var b := get_theme_stylebox("panel") as StyleBoxFlat
-		b.set_corner_radius_all(20)
+		UI.corners(b, 20)
 	size = get_combined_minimum_size()
 	var rest := Vector2((view.x - size.x) * 0.5, view.y - size.y - 96.0 - UI.safe_insets(self)["bottom"])
 	position = rest + Vector2(0, 16)

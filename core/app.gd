@@ -485,6 +485,15 @@ func wants_dark() -> bool:
 	return night() >= 0.5
 
 
+## The UI style to draw in (one of UI.STYLES): picked on the debug bar while
+## the looks are tried out; always the app's own outside debug builds.
+func ui_style() -> String:
+	if not OS.is_debug_build():
+		return "classic"
+	var picked := str(state.settings.get("debug_style", "classic"))
+	return picked if picked in UI.STYLES else "classic"
+
+
 ## The walk's debug time buttons: the walk started `minutes` earlier.
 ## Does nothing outside debug builds.
 func debug_add_minutes(minutes: int) -> void:
