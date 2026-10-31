@@ -9,6 +9,7 @@ art/
   animals/<animal id>/animal.tscn   an animal's rig (and its limb images beside it)
   gifts/<gift id>.png          a gift's picture (.svg and .webp work too)
   places/<place id>.png        a place's icon on its button, white on transparent
+  home/backdrop.tscn           the hilltop view behind the focus screen
   character/character.tscn     the player's character rig
   cosmetics/<item id>/         an item's pieces, one image per limb it covers
   scenery/...                  tile scenes for biomes.json layers
@@ -112,3 +113,27 @@ daytime colours.
 
 For the ground layer, the data's `y` and `height` still decide where the path
 is, whether or not it has art.
+
+## The home view
+
+`home/backdrop.tscn` is the forest seen from a hilltop behind the focus
+screen. Open it in Godot to change it.
+
+- **Layers**: five pictures, far to near (`Mountains`, `Hills`,
+  `ForestFar`, `ForestNear`, `Hilltop`). Paint each in **one colour**
+  (white is easiest), then set its colour with the node's **Modulate**.
+  Each picture covers the screen with its bottom on the screen's bottom,
+  so draw them all on the same canvas (1600 x 1000 now).
+- Each layer has **Parallax** (how far it moves as you slide to another
+  screen: far layers small, near ones bigger), **Drift** (a slow sway, in
+  pixels) and **Night Brightness** (below 0 uses the backdrop's own).
+- **DaySky** and **NightSky** are full-colour pictures. The night one fades
+  in over about 40 minutes round sunset, and out round sunrise.
+- **Sun** and **Moon** are their own pictures. They cross the sky with the
+  real time of day, setting behind the hills (Horizon and Climb on the
+  backdrop set where).
+- On the `Backdrop` node: **Night Brightness** (how dark the layers get at
+  night, 0.45), **Wash** (how much of the app's background colour lies over
+  it, so the screen reads on top) and **Spare** (extra width for panning).
+- The debug bar's **Time** slider (top right of the focus screen) tries any
+  time of day; **Theme** pins the app's colours to Light or Dark.

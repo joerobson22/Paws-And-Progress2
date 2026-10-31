@@ -77,7 +77,7 @@ func build() -> void:
 	scroll = holder.get_child(0)
 	col.add_child(holder)
 	_fill_list()
-	_make_room(holder, stats, inner)
+	_make_room(holder, stats, list_head, inner)
 
 
 func _filter() -> String:
@@ -105,15 +105,18 @@ func _on_state_changed() -> void:
 
 
 ## On a screen too short for the stats and a whole project under them, the
-## stats go to the top of the list and scroll away with it, so there's
-## always room for the list itself.
-func _make_room(holder: Control, stats: Control, inner: VBoxContainer) -> void:
+## stats and the list's heading (the swipe hint and Sort by) go to the top
+## of the list, in that order, and scroll away with it, so there's always
+## room for the list itself.
+func _make_room(holder: Control, stats: Control, list_head: Control, inner: VBoxContainer) -> void:
 	await get_tree().process_frame
 	if not is_instance_valid(holder) or holder.size.y >= LIST_MIN:
 		return
-	stats.get_parent().remove_child(stats)
-	inner.add_child(stats)
+	for c in [stats, list_head]:
+		c.get_parent().remove_child(c)
+		inner.add_child(c)
 	inner.move_child(stats, 0)
+	inner.move_child(list_head, 1)
 
 
 ## The four headline numbers for the projects shown. Side by side on a wide

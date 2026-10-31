@@ -1,19 +1,24 @@
 extends Pane
 ## The middle of the app: a greeting, and under it the focus orb. Tap the orb
 ## (a soft bong) and the choose focus screen grows out of it. A home icon
-## in the top left marks it, as each screen's icon does. The sun or moon in
-## the top right switches between light and dark. Debug builds also get
-## small switches beside the home icon (DebugBar).
+## in the top left marks it, as each screen's icon does. Behind it all is
+## the hilltop view (HomeBackdrop, drawn by the app shell). Debug builds
+## also get small switches beside the home icon (DebugBar).
 
 ## Room above the orb for the greeting, whose words sit at the bottom of it.
 const GREETING_BOX := 160.0
+const GREETING_SIZE := 24
+## The gap between the greeting's last line and the orb.
+const GREETING_GAP := 48.0
 
 var _orb: FocusOrb
 var _greeting: Label
 var _hint: Label
-var _toggle: ThemeToggle
+## A soft pill behind the hint, so it reads over the view.
+var _hint_pill: PanelContainer
 var _home: Control
 var _debug: DebugBar
+var _sky_debug: Control
 var _line := ""
 ## How many walks there had been when the greeting was picked: a new line
 ## each time you come home from one.
@@ -22,7 +27,7 @@ var _line_walks := -1
 
 func build() -> void:
 	_pick_line()
-	_greeting = UI.label(_line, 30, UI.INK, true, 600)
+	_greeting = UI.label(_line, GREETING_SIZE, UI.INK, true, 600)
 	_greeting.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_greeting.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	_greeting.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -32,26 +37,33 @@ func build() -> void:
 		_orb = FocusOrb.new()
 		_orb.tapped.connect(_on_tapped)
 		add_child(_orb)
-	_hint = UI.label("", 15, UI.INK_FAINT, false, 700)
+	_hint_pill = PanelContainer.new()
+	var pill := UI.box(Color(UI.BG, 0.8), Color.TRANSPARENT, 99)
+	pill.content_margin_left = 16
+	pill.content_margin_right = 16
+	pill.content_margin_top = 4
+	pill.content_margin_bottom = 4
+	_hint_pill.add_theme_stylebox_override("panel", pill)
+	_hint_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_hint_pill)
+	_hint = UI.label("", 15, UI.INK_SOFT, false, 700)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_child(_hint)
+	_hint_pill.add_child(_hint)
 	_home = UI.icon_tile(Minimap.ICONS["focus"])
 	add_child(_home)
-	if not is_instance_valid(_toggle):
-		_toggle = ThemeToggle.new()
-		add_child(_toggle)
-	_toggle.sync()
 	if OS.is_debug_build():
 		_debug = DebugBar.new()
 		add_child(_debug)
+		_sky_debug = DebugBar.sky_controls()
+		add_child(_sky_debug)
 	_update_hint()
 	_place()
 
 
-## The orb keeps drifting and the toggle keeps spinning through a rebuild
-## (neither takes its colours from the palette).
+## The orb keeps drifting through a rebuild (it doesn't take its colours
+## from the palette).
 func keeps() -> Array[Node]:
-	return [_orb, _toggle]
+	return [_orb]
 
 
 func _pick_line() -> void:
@@ -71,30 +83,35 @@ func _place() -> void:
 	var d := minf(size.x * 0.7, size.y * 0.5)
 	_orb.size = Vector2(d, d)
 	_orb.position = (size - _orb.size) * 0.5 + Vector2(0, size.y * 0.02)
-	_hint.size = Vector2(size.x, 24)
-	_hint.position = Vector2(0, _orb.position.y + d + 28)
+	_hint_pill.size = _hint_pill.get_combined_minimum_size()
+	_hint_pill.position = Vector2((size.x - _hint_pill.size.x) * 0.5, _orb.position.y + d + 24)
 	var w := minf(560.0, size.x - 48.0)
 	# A tall box with the words at its bottom, rather than one measured to
 	# fit: a wrapping label's measured height isn't stable across rebuilds,
 	# and the words would jump when the colours change.
 	_greeting.size = Vector2(w, GREETING_BOX)
 	# (It can come out taller; its bottom is what stays put.)
-	_greeting.position = Vector2((size.x - w) * 0.5, _orb.position.y - _greeting.size.y - 22.0)
-	# The home icon sits where the other screens' title icons do, with the
-	# light/dark switch level with it on the right.
+	_greeting.position = Vector2((size.x - w) * 0.5, _orb.position.y - _greeting.size.y - GREETING_GAP)
+	# The home icon sits where the other screens' title icons do.
 	var insets := UI.safe_insets(self)
 	_home.size = _home.custom_minimum_size
 	_home.position = Vector2((32.0 if wide else 18.0) + insets["left"], float(Pane.EDGE_GAP) + insets["top"])
-	var middle := _home.position.y + _home.size.y * 0.5
-	_toggle.size = _toggle.custom_minimum_size
-	_toggle.position = Vector2(size.x - _toggle.size.x - (32.0 if wide else 18.0) - insets["right"], middle - _toggle.size.y * 0.5)
 	if is_instance_valid(_debug):
 		_debug.size = _debug.get_combined_minimum_size()
-		_debug.position = Vector2(_home.position.x + _home.size.x + 12.0, middle - _debug.size.y * DebugBar.SCALE * 0.5)
+		_debug.position = Vector2(_home.position.x + _home.size.x + 12.0, _home.position.y)
+		_sky_debug.size = _sky_debug.get_combined_minimum_size()
+		var right: float = size.x - _sky_debug.size.x * DebugBar.SCALE - (32.0 if wide else 18.0) - insets["right"]
+		var after_switches: float = _debug.position.x + _debug.size.x * DebugBar.SCALE + 16.0
+		if right >= after_switches:
+			_sky_debug.position = Vector2(right, _home.position.y)
+		else:
+			# No room beside the switches (a phone): under them.
+			_sky_debug.position = Vector2(_debug.position.x, _debug.position.y + _debug.size.y * DebugBar.SCALE + 6.0)
 
 
 func _update_hint() -> void:
 	_hint.text = Text.t("focus.hint_first_pet" if App.state.active_pets().is_empty() else "focus.hint")
+	_place()
 
 
 ## Only the hint (and, after a walk, the greeting) depend on the game state.

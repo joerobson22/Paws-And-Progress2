@@ -52,8 +52,11 @@ func _run() -> void:
 	# Answered, so the location question doesn't pop up mid-run (and nothing
 	# goes out to the internet from CI); it's asked on purpose further down.
 	app.state.settings["location"] = "off"
+	# The colours follow the time of day; light, so the run looks the same
+	# whenever it runs. Dark mode is tried further down.
+	app.set_setting("debug_theme", "light")
 
-	await _wait(20)
+	await _wait(70)
 	await _shot("focus")
 
 	# The map sits in the bottom left corner. With a mouse it grows up and to
@@ -205,7 +208,8 @@ func _run() -> void:
 		# and the edge arrows go, as phones swipe.
 		var switches: Array = _all(debug, func(n): return _is(n, "switch.gd"))
 		check(switches.size() == 2, "a phone size switch under the unlock one")
-		check(debug.get_global_rect().size.y <= 46.0, "the debug switches are small, level with the home icon (%.0f)" % debug.get_global_rect().size.y)
+		var grid_tall: float = (debug.get_child(0) as Control).get_global_rect().size.y
+		check(grid_tall <= 46.0, "the debug switches are small, level with the home icon (%.0f)" % grid_tall)
 		switches[1].button_pressed = true
 		await _wait(30)
 		check(root.content_scale_size == Vector2i(390, 390) and app.phone_layout() and not map.hover_grow,
@@ -381,6 +385,19 @@ func _run() -> void:
 		for pod in _all(panel, func(n): return _is(n, "podium.gd")):
 			for l in _all(pod, func(n): return n is Label):
 				check(l.get_global_rect().size.x > 20.0 or l.text.length() < 2, "podium words have room (%s)" % l.text)
+	# Podiums on one line: second, first, third, their bottoms level.
+	var spots: Array = podiums[0].get_child(1).get_children() if podiums[0].get_child_count() > 1 else []
+	if spots.size() == 3 and spots[0].get_child_count() > 0 and spots[2].get_child_count() > 0:
+		check(spots[0].get_global_rect().position.x < spots[1].get_global_rect().position.x and spots[1].get_global_rect().position.x < spots[2].get_global_rect().position.x
+			and _find(spots[1], func(n): return n is Label and n.text == app.state.pet(top_pets[0][0]).name) != null, "second, first, third on one line")
+		check(absf(spots[0].get_global_rect().end.y - spots[1].get_global_rect().end.y) < 1.0 and absf(spots[2].get_global_rect().end.y - spots[1].get_global_rect().end.y) < 1.0, "bottoms level")
+	# When it ran sits in the top right, level with the name.
+	var dates: Label = _find(ongoing_panels[0], func(n): return n is Label and n.text.ends_with("now"))
+	check(dates != null and dates.get_global_rect().position.y < podiums[0].get_global_rect().position.y
+		and ongoing_panels[0].get_global_rect().end.x - dates.get_global_rect().end.x < 24.0, "the dates are in the top right")
+	if main.size.x >= 1200 and main.size.y >= 780:
+		var list_box: Control = projects_pane.scroll
+		check(ongoing_panels[0].get_global_rect().end.y <= list_box.get_global_rect().end.y + 1.0, "on a computer the first project fits without scrolling (%.0f > %.0f)" % [ongoing_panels[0].get_global_rect().end.y, list_box.get_global_rect().end.y])
 	await _shot("projects_ongoing")
 	# The headline numbers follow the filter: all of them shows how much is done.
 	await _tap_menu(filter, "All")
@@ -1166,24 +1183,62 @@ func _run() -> void:
 	check(main._flows.is_empty(), "back home from the jungle")
 	check(_audio().current_ambience() == "", "the jungle's sounds stop at home")
 
-	# Dark mode: the sun in the corner switches the whole app, fading into
-	# the new colours with nothing on screen moving or starting over.
+	# The hilltop view behind the focus screen: the sun by day, the moon and
+	# stars by night, and it pans away as you slide to another screen.
 	var focus_pane: Node = main._panes[Vector2i.ZERO]
-	var toggle: Node = _find(focus_pane, func(n): return _is(n, "theme_toggle.gd"))
+	var backdrop: Control = main._backdrop
+	check(backdrop != null and backdrop.visible and backdrop.get_index() < main._world.get_index(), "the hilltop view sits behind the focus screen")
+	check(_find(focus_pane, func(n): return _is(n, "theme_toggle.gd")) == null, "no light/dark switch any more")
+	if backdrop:
+		check(backdrop._layers.size() == 5, "five layers")
+		app.set_setting("debug_hour", 12.0)
+		await _wait(5)
+		check(backdrop.get_node("Sun").visible and not backdrop.get_node("Moon").visible and backdrop.get_node("NightSky").modulate.a < 0.01, "midday: the sun, no stars")
+		var sun_noon: float = backdrop.get_node("Sun").position.y
+		app.set_setting("debug_hour", 9.0)
+		await _wait(5)
+		check(backdrop.get_node("Sun").position.y > sun_noon, "it's lower in the morning")
+		await _shot("backdrop_morning")
+		app.set_setting("debug_hour", 23.0)
+		await _wait(5)
+		check(backdrop.get_node("Moon").visible and not backdrop.get_node("Sun").visible and backdrop.get_node("NightSky").modulate.a > 0.99, "at night: the moon and stars")
+		var dimmed: Color = backdrop._layers[4].modulate
+		check(dimmed.v < backdrop._colours[4].v * 0.6, "and the layers dim")
+		await _shot("backdrop_night_light_theme")
+		var near_spot: Vector2 = backdrop._layers[4].position
+		var far_spot: Vector2 = backdrop._layers[0].position
+		app.go("gifts")
+		await _wait(8)
+		check(backdrop._layers[4].position.x - near_spot.x > backdrop._layers[0].position.x - far_spot.x + 4.0, "sliding away, near layers move further than far ones")
+		await _wait(50)
+		check(not backdrop.visible, "and it's gone on the other screens")
+		app.go("focus")
+		await _wait(50)
+		check(backdrop.visible and backdrop.modulate.a > 0.99, "back on the focus screen it's there again")
+		app.set_setting("debug_hour", -1.0)
+		await _wait(5)
+
+	# Dark mode follows the time of day; the debug bar can pin it. The whole
+	# app fades into the new colours with nothing on screen moving or
+	# starting over.
 	var orb_before: Node = focus_pane._orb
 	var greeting_before: String = focus_pane._greeting.text
 	var orb_spot: Rect2 = orb_before.get_global_rect()
 	var greeting_end: Vector2 = focus_pane._greeting.get_global_rect().end
-	toggle._flip()
+	var dark_pill: Button = _find(focus_pane, func(n): return n is Button and n.accessibility_name == "Theme Dark")
+	check(dark_pill != null, "the debug bar has Theme Auto, Light and Dark")
+	if dark_pill:
+		await _tap_control(dark_pill, main)
+	else:
+		app.set_setting("debug_theme", "dark")
 	await _wait(60)
-	check(_class("res://ui/ui.gd").dark, "the toggle switches to dark mode")
-	check(app.state.settings.get("theme") == "dark", "dark mode is saved")
-	check(focus_pane._orb == orb_before and focus_pane._toggle == toggle, "the orb and the toggle carry on through the switch")
+	check(_class("res://ui/ui.gd").dark, "Dark switches to dark mode")
+	check(focus_pane._orb == orb_before, "the orb carries on through the switch")
 	check(focus_pane._greeting.text == greeting_before and focus_pane._orb.get_global_rect().is_equal_approx(orb_spot)
 		and focus_pane._greeting.get_global_rect().end.is_equal_approx(greeting_end), "the greeting and layout stay put")
-	check(not toggle.disabled and not _class("res://ui/motion.gd").still, "the toggle can be tapped again, and animations are back on")
+	check(not _class("res://ui/motion.gd").still, "animations are back on")
 	await _wait(30)
-	check(main._fade_layer.get_child_count() == 0 and toggle.z_index == 0, "the old colours have faded away")
+	check(main._fade_layer.get_child_count() == 0, "the old colours have faded away")
 	await _shot("focus_dark")
 	for pane in ["gifts", "stats", "profile"]:
 		app.go(pane)
@@ -1195,9 +1250,16 @@ func _run() -> void:
 	_close_modal()
 	app.go("focus")
 	await _wait(50)
-	_find(main._panes[Vector2i.ZERO], func(n): return _is(n, "theme_toggle.gd"))._flip()
+	app.set_setting("debug_theme", "auto")
+	app.set_setting("debug_hour", 23.0)
 	await _wait(60)
-	check(not _class("res://ui/ui.gd").dark, "and back to light")
+	check(_class("res://ui/ui.gd").dark, "Auto is dark at night")
+	app.set_setting("debug_hour", 12.0)
+	await _wait(60)
+	check(not _class("res://ui/ui.gd").dark, "and light by day")
+	app.set_setting("debug_hour", -1.0)
+	app.set_setting("debug_theme", "light")
+	await _wait(60)
 	# No tooltips anywhere: every pane has been built by now.
 	var tipped: Control = _find(main, func(n): return n is Control and n.tooltip_text != "")
 	check(tipped == null, "no tooltips (%s has one)" % [tipped])
