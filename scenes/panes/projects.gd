@@ -184,11 +184,7 @@ func _fill_list() -> void:
 	for p in sort_projects(shown_projects(), by, reversed):
 		var panel := ProjectPanel.new(p, "", true)
 		panel.grade_pressed.connect(_pick_grade)
-		var row := SwipeRow.new(panel)
-		if p.is_complete():
-			# Swiping a completed one the same way puts it back to ongoing.
-			row.left_colour = UI.SERIES[1]
-			row.left_icon = "hourglass"
+		var row := ProjectSwipes.row(panel, p)
 		row.swiped.connect(_on_swiped.bind(row, p.id))
 		_list.add_child(row)
 
@@ -199,25 +195,7 @@ func _on_swiped(direction: int, row: SwipeRow, id: String) -> void:
 		row.spring_back()
 		return
 	_busy = true
-	if direction > 0:
-		var at := App.state.projects.find(p)
-		await row.vanish()
-		App.delete_project(id)
-		Toast.show_action(Text.t("projects.deleted", {"project": p.name}), "bin", Text.t("common.undo"), func():
-			App.restore_project(p, at))
-	elif p.is_complete():
-		row.spring_back()
-		if _filter() == "completed":
-			await row.collapse()
-		App.reopen_project(id)
-		Toast.show_text(Text.t("projects.reopened", {"project": p.name}), "hourglass")
-	else:
-		Audio.play("project_complete")
-		await row.celebrate()
-		if _filter() == "ongoing":
-			await row.collapse()
-		App.complete_project(id)
-		Toast.show_text(Text.t("projects.completed_toast", {"project": p.name}), "check")
+	await ProjectSwipes.act(direction, row, id, _filter() != "completed", _filter() != "ongoing")
 	_busy = false
 	if shown:
 		rebuild()

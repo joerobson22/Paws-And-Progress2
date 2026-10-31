@@ -54,6 +54,10 @@ func _ready() -> void:
 	heartbeat.autostart = true
 	heartbeat.timeout.connect(_on_heartbeat)
 	add_child(heartbeat)
+	# Every button grows a little under the pointer (HoverGrow).
+	get_tree().node_added.connect(func(n: Node):
+		if n is BaseButton:
+			HoverGrow.attach(n))
 
 
 func _notification(what: int) -> void:

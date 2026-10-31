@@ -70,7 +70,7 @@ func _init(p: ProjectData, extra: String = "", gradeable: bool = false, flat: bo
 		top.add_child(badge)
 	var close_button: Button = null
 	if on_close.is_valid():
-		close_button = UI.round_button("close", Text.t("common.close"), on_close, UI.SURFACE_SOFT, UI.INK, 36, false)
+		close_button = UI.ghost_button("close", Text.t("common.close"), on_close)
 		close_button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		top.add_child(close_button)
 	col.add_child(top)

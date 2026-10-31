@@ -127,7 +127,7 @@ static func open_full(list: Array) -> void:
 	var room := MarginContainer.new()
 	room.add_child(_list(list))
 	m.body.add_child(room)
-	UI.clear_of_bar(m.body.get_parent() as ScrollContainer, room)
+	UI.clear_of_bar(m.scroller(), room)
 
 
 ## The rows, a line between each.

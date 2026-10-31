@@ -8,7 +8,7 @@ extends Control
 
 signal tapped
 
-const HOVER_GROW := 1.07
+const HOVER_GROW := HoverGrow.GROW
 const PRESS_GROW := 0.95
 
 ## [colour, opacity, radius, orbit, speed (radians/s), phase]; radius and
@@ -80,7 +80,7 @@ func _notification(what: int) -> void:
 
 
 func _grow_to(v: float) -> void:
-	Motion.method(self, "grow", _set_grow, _grow, v, Motion.FAST)
+	Motion.method(self, "grow", _set_grow, _grow, v, HoverGrow.TIME)
 
 
 func _set_grow(v: float) -> void:

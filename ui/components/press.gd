@@ -33,6 +33,7 @@ static func attach(control: Control, watch_hold: bool = false) -> Press:
 	var press := Press.new(control, watch_hold)
 	control.set_meta("press", press)
 	control.gui_input.connect(press.handle)
+	HoverGrow.attach(control)
 	return press
 
 
