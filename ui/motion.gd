@@ -104,6 +104,21 @@ static func shake(control: Control, distance: float = 10.0) -> Tween:
 	return t
 
 
+## A quick rock from side to side about its centre, for "that's locked" or
+## "not yet" on things that sit in a layout (which a shake would fight).
+static func wiggle(control: Control, degrees: float = 7.0) -> Tween:
+	control.pivot_offset = control.size * 0.5
+	var t := tween(control, "wiggle")
+	if reduced() or still:
+		t.tween_property(control, "rotation", 0.0, 0.01)
+		return t
+	for i in 4:
+		var a := deg_to_rad(degrees * (1.0 - i * 0.22) * (1.0 if i % 2 == 0 else -1.0))
+		t.tween_property(control, "rotation", a, 0.06)
+	t.tween_property(control, "rotation", 0.0, 0.06)
+	return t
+
+
 ## Repeats a gentle up-and-down drift until the node leaves the tree.
 static func float_loop(item: CanvasItem, height: float = 6.0, seconds: float = 1.6) -> Tween:
 	var rest: Vector2 = item.get("position")

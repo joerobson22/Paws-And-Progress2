@@ -66,7 +66,7 @@ func set_seconds(seconds: int) -> void:
 		_first_gift(odds)
 	elif reached > _level:
 		_pop(0.22)
-		Audio.play("pop", 1.0 + 0.12 * reached)
+		Audio.play("gift_odds_up", 1.0 + 0.12 * reached, 0.0, "pop")
 		_blend_to(odds)
 	else:
 		_to = odds
@@ -91,7 +91,7 @@ func shown() -> Dictionary:
 ## Ten minutes: a ding and a pop, the bright green fills from the middle,
 ## then the rarer slices grow in.
 func _first_gift(odds: Dictionary) -> void:
-	Audio.play("ding", 1.0, -2.0)
+	Audio.play("first_gift", 1.0, -2.0, "ding")
 	_pop(0.25)
 	_from = {"common": 1.0}
 	_to = {"common": 1.0}

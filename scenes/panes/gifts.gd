@@ -4,8 +4,9 @@ extends Pane
 ## your collection's coming along: gifts discovered, animals whose whole gift
 ## table you've found, and cosmetics unlocked from gifts. Under them, every
 ## gift you have, with how many on each and a "Sort by" menu (shared with
-## the shelf editor); only the gifts scroll. Gifts grow under the pointer;
-## tap one for a closer look and its trade-in. Your shelf is on your profile.
+## the shelf editor); only the gifts scroll. Gifts grow under the pointer
+## and show a card with their trade-in progress (GiftInfo); click one with
+## enough to trade it in. Your shelf is on your profile.
 
 var _stats: StatPanel
 var _grid: GiftGrid
@@ -51,12 +52,11 @@ func _on_shown() -> void:
 		_stats.sweep()
 
 
-## One gift in the collection: its picture and how many you have; tap it
-## for a closer look.
+## One gift in the collection: its picture and how many you have; hover
+## for its card, click to trade it in.
 func _tile(id: String) -> GiftTile:
 	var tile := GiftTile.new(id, App.state.gift_count(id))
-	tile.tappable = true
-	tile.tapped.connect(GiftDetails.open)
+	tile.trades = true
 	return tile
 
 

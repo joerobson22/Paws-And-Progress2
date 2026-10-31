@@ -103,7 +103,7 @@ func grow() -> void:
 	if open:
 		return
 	open = true
-	Audio.play("pop", 1.2, -10.0)
+	Audio.play("map_open", 1.2, -10.0, "pop")
 	Motion.method(self, "grow", _set_grow, _grow, 1.0, Motion.NORMAL)
 
 

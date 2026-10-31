@@ -123,6 +123,6 @@ func _on_hidden() -> void:
 
 
 func _on_tapped() -> void:
-	Audio.play("bong", 1.0, -4.0)
+	Audio.play("orb_tap", 1.0, -4.0, "bong")
 	Motion.pop(_orb, 0.06, 0.3)
 	App.go("choose_focus", {"from": _orb.get_global_rect().get_center()})

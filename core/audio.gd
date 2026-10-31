@@ -8,6 +8,8 @@ const AMBIENCE := {
 	"lake": "water_ambience",
 	"day": "daytime_birds",
 	"night": "night_ambience",
+	"wind": "wind_ambience",
+	"rain": "rain_ambience",
 }
 ## One-off sounds can overlap (a rustle, then a bark) up to this many at once.
 const VOICES := 4
@@ -16,6 +18,10 @@ var _voices: Array[AudioStreamPlayer] = []
 var _next_voice := 0
 var _ambience := AudioStreamPlayer.new()
 var _ambience_name := ""
+## Sounds already looked up in assets/sounds/ (null: none there).
+var _cache := {}
+## The file types a sound in assets/sounds/ can be, first found wins.
+const EXTENSIONS := ["wav", "ogg", "mp3"]
 
 
 func _ready() -> void:
@@ -29,16 +35,21 @@ func _ready() -> void:
 	# Every button in the app clicks, without each screen wiring it up.
 	get_tree().node_added.connect(_on_node_added)
 	WorkerThreadPool.add_task(Synth.warm, false, "Generate placeholder sounds")
+	# Ready before the first tap, so the first click isn't late either.
+	_stream("button_click")
 
 
 ## Plays a sound from assets/sounds/, or its generated placeholder (Synth).
+## Every sound the app makes is listed in assets/sounds/README.md.
 ## `pitch` raises or lowers it, e.g. for the gift button's rising pops.
-func play(sound: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
+## `fallback` names the generated sound to use while there's no file for
+## `sound`, so each moment can have its own recording but share a placeholder.
+func play(sound: String, pitch: float = 1.0, volume_db: float = 0.0, fallback: String = "") -> void:
 	if not App.state.settings.get("sound", true):
 		return
 	var stream := _stream(sound)
 	if stream == null:
-		stream = Synth.sound(sound)
+		stream = Synth.sound(fallback if fallback != "" else sound)
 	if stream == null:
 		return
 	var p := _voices[_next_voice]
@@ -77,13 +88,38 @@ func current_ambience() -> String:
 	return _ambience_name
 
 
+## Your own recording of `sound` in assets/sounds/ (.wav, .ogg or .mp3, in
+## that order), loaded once and kept, or null to use the generated one.
 func _stream(sound: String) -> AudioStream:
-	var path := SOUND_DIR + sound + ".mp3"
-	return load(path) if ResourceLoader.exists(path) else null
+	if _cache.has(sound):
+		return _cache[sound]
+	var stream: AudioStream = null
+	for ext in EXTENSIONS:
+		var path: String = SOUND_DIR + sound + "." + str(ext)
+		if ResourceLoader.exists(path):
+			stream = load(path)
+			break
+	_cache[sound] = stream
+	return stream
 
 
 func _on_node_added(node: Node) -> void:
 	# Nodes are re-added when a pane rebuilds, so connect only once.
 	if node is BaseButton and not node.has_meta("clicks"):
 		node.set_meta("clicks", true)
-		node.pressed.connect(play.bind("button_click", 1.0, -6.0))
+		# The click plays the moment the button goes down, so it never lags
+		# behind your finger. In a list that scrolls, a press might be the
+		# start of a scroll, so there it waits for the button to be pressed.
+		if _in_scroll(node):
+			node.pressed.connect(play.bind("button_click", 1.0, -6.0))
+		else:
+			node.button_down.connect(play.bind("button_click", 1.0, -6.0))
+
+
+static func _in_scroll(node: Node) -> bool:
+	var n := node.get_parent()
+	while n:
+		if n is ScrollContainer:
+			return true
+		n = n.get_parent()
+	return false
