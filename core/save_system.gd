@@ -151,5 +151,5 @@ static func _parse(path: String) -> Dictionary:
 
 
 ## When the save was last written (unix seconds), or 0 if there isn't one.
-static func saved_unix(path: String = SAVE_PATH) -> int:
-	return int(FileAccess.get_modified_time(path)) if FileAccess.file_exists(path) else 0
+static func saved_unix() -> int:
+	return int(FileAccess.get_modified_time(SAVE_PATH)) if FileAccess.file_exists(SAVE_PATH) else 0

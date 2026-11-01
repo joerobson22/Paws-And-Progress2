@@ -77,7 +77,6 @@ texture = ExtResource("7")
 expand_mode = 1
 script = ExtResource("2")
 parallax = 0.04
-drift = 2.0
 night_brightness = 0.55
 
 [node name="Hills" type="TextureRect" parent="Layers"]
@@ -90,7 +89,6 @@ texture = ExtResource("8")
 expand_mode = 1
 script = ExtResource("2")
 parallax = 0.08
-drift = 3.0
 
 [node name="ForestFar" type="TextureRect" parent="Layers"]
 modulate = Color(0.44, 0.6, 0.47, 1)
@@ -102,7 +100,6 @@ texture = ExtResource("9")
 expand_mode = 1
 script = ExtResource("2")
 parallax = 0.14
-drift = 4.0
 
 [node name="ForestNear" type="TextureRect" parent="Layers"]
 modulate = Color(0.32, 0.49, 0.36, 1)
@@ -114,7 +111,6 @@ texture = ExtResource("10")
 expand_mode = 1
 script = ExtResource("2")
 parallax = 0.22
-drift = 5.0
 
 [node name="Hilltop" type="TextureRect" parent="Layers"]
 modulate = Color(0.24, 0.38, 0.28, 1)
@@ -126,4 +122,3 @@ texture = ExtResource("11")
 expand_mode = 1
 script = ExtResource("2")
 parallax = 0.34
-drift = 0.0

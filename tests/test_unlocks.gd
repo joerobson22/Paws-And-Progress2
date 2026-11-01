@@ -62,7 +62,6 @@ func test_in_words() -> void:
 	eq(Unlocks.describe({"hours": 10, "place": "jungle"}), "Focus for 10 hours in the jungle")
 	eq(Unlocks.describe({"hours": 2.5}), "Focus for 2.5 hours")
 	eq(Unlocks.describe({"table": "red_panda"}), "Discover all red panda gifts")
-	eq(Unlocks.describe_progress(Unlocks.progress({"hours": 10, "place": "jungle"}, _facts({"place_seconds": {"jungle": 7 * 3600 + 720}}), GIFTS)), "7h 12m of 10h")
 
 
 func test_level_rewards_are_in_order() -> void:

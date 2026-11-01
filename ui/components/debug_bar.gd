@@ -87,6 +87,7 @@ static func _clock(hour: float) -> String:
 	if hour < 0.0:
 		return Text.t("debug.time_now")
 	var minutes := int(round(hour * 60.0)) % (24 * 60)
+	@warning_ignore("integer_division")
 	return "%02d:%02d" % [minutes / 60, minutes % 60]
 
 

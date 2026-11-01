@@ -165,7 +165,7 @@ func _run() -> void:
 		# Only from the smallest window a computer allows (CI's is smaller).
 		if main.size.y >= 590:
 			check(column != null and _clear_of_shell(column.get_global_rect()),
-				"%s keeps clear of the map and arrows (%s)" % [main._names[cell], column.get_global_rect() if column else "no column"])
+				"%s keeps clear of the map and arrows (%s)" % [main._names[cell], str(column.get_global_rect()) if column else "no column"])
 		await _shot("shell_" + main._names[cell])
 	main._go_cell(Vector2i.ZERO)
 	await _wait(40)
@@ -334,9 +334,9 @@ func _run() -> void:
 			await process_frame
 			var card = info_class.showing(low_tile)
 			if card and card.modulate.a > 0.0:
-				var r: Rect2 = card.get_global_rect()
+				var cr: Rect2 = card.get_global_rect()
 				var t: Rect2 = low_tile.get_global_rect()
-				sides["above" if r.end.y <= t.position.y + 1.0 else ("below" if r.position.y >= t.end.y - 1.0 else "over")] = true
+				sides["above" if cr.end.y <= t.position.y + 1.0 else ("below" if cr.position.y >= t.end.y - 1.0 else "over")] = true
 		check(sides.size() == 1 and not sides.has("over"), "a card keeps to one side of its gift from its first visible frame (%s)" % ", ".join(sides.keys()))
 		low_tile._hover(false)
 		await _wait(25)
@@ -587,20 +587,20 @@ func _run() -> void:
 		await _wait(25)
 		check(modal_class.is_open(), "the pencil opens the customise popup")
 		await _shot("customise")
-		var editor: Node = modal_class.top()
-		check(_find(editor.header, func(n): return n is Label and n.text == "Customise") != null, "its title is above the list, not in it")
-		var parts: ScrollContainer = _find(editor.body, func(n): return n is ScrollContainer)
-		var preview: Control = _find(editor.body, func(n): return _is(n, "round_frame.gd"))
+		var customise: Node = modal_class.top()
+		check(_find(customise.header, func(n): return n is Label and n.text == "Customise") != null, "its title is above the list, not in it")
+		var parts: ScrollContainer = _find(customise.body, func(n): return n is ScrollContainer)
+		var preview: Control = _find(customise.body, func(n): return _is(n, "round_frame.gd"))
 		check(parts != null and preview != null and not preview.is_ancestor_of(parts) and not parts.is_ancestor_of(preview), "the preview sits beside the list of parts")
-		check(not editor._scroll.get_v_scroll_bar().visible, "the popup itself doesn't scroll")
+		check(not customise._scroll.get_v_scroll_bar().visible, "the popup itself doesn't scroll")
 		# Head, Body and Legs tabs over the parts; Head first.
-		var tab_names := func(): return _all(editor.body, func(n): return n is Button and n.text in ["Head", "Body", "Legs"]).map(func(b): return b.text)
+		var tab_names := func(): return _all(customise.body, func(n): return n is Button and n.text in ["Head", "Body", "Legs"]).map(func(b): return b.text)
 		check(tab_names.call() == ["Head", "Body", "Legs"], "Head, Body and Legs tabs (%s)" % [tab_names.call()])
 		var row_slots := func(): return _all(parts, func(n): return n.has_meta("slot")).map(func(n): return n.get_meta("slot"))
 		check(row_slots.call() == ["hat", "hair", "hair_tone", "face", "facial_hair"], "Head has hat, hair, hair colour, face and facial hair (%s)" % [row_slots.call()])
 		var carousels: Array = _all(parts, func(n): return _is(n, "carousel.gd"))
 		check(carousels.size() == 4, "each part is a carousel (%d)" % carousels.size())
-		check(_find(parts, func(n): return n is Button and _is(n, "carousel.gd")) == null and _find(editor.body, func(n): return n is Button and n.accessibility_name.begins_with("Previous")) == null, "no arrows")
+		check(_find(parts, func(n): return n is Button and _is(n, "carousel.gd")) == null and _find(customise.body, func(n): return n is Button and n.accessibility_name.begins_with("Previous")) == null, "no arrows")
 		# Scrolling the hair carousel changes the hair, and the name under it.
 		var hair_row: Node = _find(parts, func(n): return n.has_meta("slot") and n.get_meta("slot") == "hair")
 		var hair_carousel: Node = _find(hair_row, func(n): return _is(n, "carousel.gd"))
@@ -618,7 +618,7 @@ func _run() -> void:
 		var hat_mini = _find(parts, func(n): return n is Control and n.get("_slot") == "hat" and n._view.visible)
 		check(hat_mini != null and hat_mini._view.position != Vector2.ZERO, "each option is drawn, fitted to its box")
 		await _shot("customise_head")
-		var body_tab: Button = _find(editor.body, func(n): return n is Button and n.text == "Body")
+		var body_tab: Button = _find(customise.body, func(n): return n is Button and n.text == "Body")
 		body_tab.pressed.emit()
 		await _wait(15)
 		check(row_slots.call() == ["skin_tone", "neckwear", "top", "gloves", "walking_stick"], "Body has skin colour and the rest (%s)" % [row_slots.call()])
@@ -957,7 +957,7 @@ func _run() -> void:
 	var names: Array = chooser.project_choices().map(func(p): return p.name)
 	var rows: Array = _all(popup.body, func(n): return n.has_method("spring_back"))
 	check(rows.size() == app.state.active_projects().size(), "every ongoing project is listed (%d)" % rows.size())
-	check(rows.map(func(r): return r.content.accessibility_name) == names, "most recently worked on first (%s)" % [names])
+	check(rows.map(func(x): return x.content.accessibility_name) == names, "most recently worked on first (%s)" % [names])
 	check(_find(popup.footer, func(n): return n is Button and n.text == "New project") != null, "with New project at the bottom")
 	check(_find(popup.header, func(n): return n is Label and n.text == "Your projects") != null, "and the title stays at the top")
 	var list_area: Control = popup.body.get_child(0)
@@ -1132,7 +1132,7 @@ func _run() -> void:
 	# Late in the evening the moon is out and the stars come through.
 	walk._scenery.clock = 22.5
 	await _wait(2)
-	check(walk._scenery.is_dark() and walk._scenery.ambience() == "night", "the night chorus after dark")
+	check(walk._scenery.darkness() >= 0.5 and walk._scenery.ambience() == "night", "the night chorus after dark")
 	await _shot("walk_night")
 	walk._scenery.clock = 10.5
 
@@ -1257,7 +1257,7 @@ func _run() -> void:
 
 	# Closing the app mid-walk ends the walk: the next launch logs it up to
 	# when the app was last open, with no gift, and shows focus ended.
-	app.start_walk(app.state.projects[0].id, app.state.pets[0].id, -1, "forest")
+	app.start_walk(app.state.projects[0].id, app.state.pets[0].id, "forest")
 	app.state.active.start_unix -= 25 * 60
 	app.state.active.last_seen_unix = app.now() - 2 * 60
 	var logged: int = app.state.total_seconds()
@@ -1277,7 +1277,7 @@ func _run() -> void:
 	check(main._flows.is_empty(), "home from focus ended")
 
 	# In the jungle the leaves pass in front of you and your pet.
-	app.start_walk(app.state.projects[0].id, app.state.pets[0].id, -1, "jungle")
+	app.start_walk(app.state.projects[0].id, app.state.pets[0].id, "jungle")
 	app.go("walk", {"from": main.size * 0.5})
 	await _wait(60)
 	var jungle_walk: Node = main._flows.back().get_child(0)

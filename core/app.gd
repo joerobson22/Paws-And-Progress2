@@ -6,6 +6,7 @@ extends Node
 ## "stats"), the full-screen flows ("choose_focus", "walk", "finish",
 ## "ended"), and "home", which closes any flow and returns to the focus pane.
 ## The debug bar's time of day is being dragged: the sky follows.
+@warning_ignore("unused_signal")
 signal sky_moved
 signal navigate(screen: String, params: Dictionary)
 signal state_changed
@@ -540,15 +541,13 @@ func set_look(look: Dictionary) -> void:
 
 # --- Walks -------------------------------------------------------------------
 
-func start_walk(project_id: String, pet_id: String, goal_seconds: int = -1, biome_id: String = "") -> void:
-	if goal_seconds < 0:
-		goal_seconds = int(state.settings.get("walk_goal_seconds", 0))
+func start_walk(project_id: String, pet_id: String, biome_id: String = "") -> void:
 	if biome_id == "":
 		var p := state.pet(pet_id)
 		biome_id = pet_place(p) if p else "lake"
 	state.settings["last_project"] = project_id
 	state.settings["last_pet"] = pet_id
-	state.active = SessionClock.begin(project_id, pet_id, now(), goal_seconds, biome_id)
+	state.active = SessionClock.begin(project_id, pet_id, now(), biome_id)
 	_changed()
 
 

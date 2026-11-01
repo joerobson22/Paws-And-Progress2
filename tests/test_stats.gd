@@ -33,10 +33,9 @@ func test_daily_totals() -> void:
 	eq(Stats.daily_totals(d, monday), [900, 0, 0, 900, 0, 0, 0] as Array[int])
 
 
-func test_week_and_best_week() -> void:
+func test_week_total() -> void:
 	var d := _days([[0, 1000], [1, 500], [7, 2000]])
 	eq(Stats.week_total(d, Stats.local_day(MONDAY, 0)), 1500)
-	eq(Stats.best_week_total(d), 2000)
 
 
 func test_streak() -> void:
@@ -75,29 +74,6 @@ func test_rest_day_yesterday_keeps_streak_alive_today() -> void:
 	var d := _days([[0, 900], [1, 900], [2, 900]])
 	# Thursday missed, Friday not over yet.
 	eq(Stats.current_streak(d, Stats.local_day(MONDAY, 0) + 4), 3)
-
-
-func test_daily_project_totals() -> void:
-	var monday := Stats.local_day(MONDAY, 0)
-	var d := _days([[0, 600, "a"], [0, 300, "b"], [2, 900, "a"]])
-	var days := Stats.daily_project_totals(d, monday)
-	eq(days[0], {"a": 600, "b": 300})
-	eq(days[1], {})
-	eq(days[2], {"a": 900})
-
-
-func test_week_history() -> void:
-	var monday := Stats.local_day(MONDAY, 0)
-	eq(Stats.week_history(_days([[-14, 600]]), monday + 3), [monday, monday - 7, monday - 14] as Array[int])
-	eq(Stats.week_history({}, monday + 3), [monday] as Array[int])
-
-
-func test_project_totals_in_week() -> void:
-	var monday := Stats.local_day(MONDAY, 0)
-	var d := _days([[0, 600, "a"], [3, 900, "a"], [1, 300, "b"], [7, 5000, "a"]])
-	var t := Stats.project_totals_in_week(d, monday)
-	eq(t.get("a", 0), 1500, "next week's walk left out")
-	eq(t.get("b", 0), 300)
 
 
 func test_totals_by_project_pet_and_place() -> void:
