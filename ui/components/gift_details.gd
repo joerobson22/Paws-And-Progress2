@@ -39,7 +39,7 @@ static func open(id: String, fresh: bool = false, yours: bool = true, first: boo
 				Motion.pop(art, 0.2, 0.5))
 
 	var meta := UI.hbox(8)
-	meta.add_child(UI.tag(Content.rarity_name(rarity).to_upper(), Content.rarity_colour(rarity), UI.ON_COLOUR))
+	meta.add_child(UI.tag(Content.rarity_name(rarity).to_upper(), Content.rarity_text_colour(rarity), UI.ON_COLOUR))
 	var table_name: String = Content.table(g["table"]).get("name", "")
 	meta.add_child(UI.label(Text.t("gift.from", {"table": table_name.to_lower()}), 14, UI.INK_SOFT, false, 700))
 	m.body.add_child(meta)

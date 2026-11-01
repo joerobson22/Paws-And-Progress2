@@ -18,15 +18,15 @@ const EDGE_WIDTH := 2
 const PALETTES := {
 	"light": {
 		"BG": "#f6efe2", "SURFACE": "#fffcf5", "SURFACE_SOFT": "#efe4cf",
-		"INK": "#3d2f24", "INK_SOFT": "#7a6553", "INK_FAINT": "#a8957f",
-		"LINE": "#6e543c33", "ACCENT": "#5f8f5a", "ACCENT_SOFT": "#dde9d2",
+		"INK": "#3d2f24", "INK_SOFT": "#776251", "INK_FAINT": "#947e65",
+		"LINE": "#6e543c33", "ACCENT": "#547e4f", "ACCENT_SOFT": "#dde9d2",
 		"NEUTRAL": "#c4b49c", "SHELF": "#e0cfae",
 		"SCRIM": "#3d2f2459", "SHADOW": "#6e543c26",
 		"EDGE": "#d6cdc1", "ON_ACCENT": "#fffaf0",
 	},
 	"dark": {
 		"BG": "#1e2233", "SURFACE": "#2b3046", "SURFACE_SOFT": "#343a55",
-		"INK": "#efe6d6", "INK_SOFT": "#b9ad9a", "INK_FAINT": "#7d7566",
+		"INK": "#efe6d6", "INK_SOFT": "#b9ad9a", "INK_FAINT": "#8e8574",
 		"LINE": "#dcc8aa26", "ACCENT": "#9cc792", "ACCENT_SOFT": "#34463a",
 		"NEUTRAL": "#5a5f78", "SHELF": "#3c4260",
 		"SCRIM": "#00000099", "SHADOW": "#00000059",
@@ -39,10 +39,10 @@ static var BG := Color("#f6efe2")
 static var SURFACE := Color("#fffcf5")
 static var SURFACE_SOFT := Color("#efe4cf")
 static var INK := Color("#3d2f24")
-static var INK_SOFT := Color("#7a6553")
-static var INK_FAINT := Color("#a8957f")
+static var INK_SOFT := Color("#776251")
+static var INK_FAINT := Color("#947e65")
 static var LINE := Color("#6e543c33")
-static var ACCENT := Color("#5f8f5a")
+static var ACCENT := Color("#547e4f")
 static var ACCENT_SOFT := Color("#dde9d2")
 static var NEUTRAL := Color("#c4b49c")
 ## The plank under the gift shelf.
@@ -54,9 +54,27 @@ static var EDGE := Color("#d6cdc1")
 ## Text and icons on an ACCENT fill.
 static var ON_ACCENT := Color("#fffaf0")
 
+## Settings, Accessibility, Colour vision: the "vision" setting, one of
+## VISIONS. Any but "off" swaps the colours that mean something (go and
+## stop, the rarities, chart lines) for SAFE ones (set_dark). One set works
+## for all three kinds of colour blindness.
+const VISIONS := ["off", "protanopia", "deuteranopia", "tritanopia"]
+static var vision := "off"
+## Colours told apart with any kind of colour blindness (from Okabe and
+## Ito): blue for go and orange for stop, and the rarities sky, navy,
+## vermilion and yellow. tests/test_accessibility.gd checks them.
+const SAFE := {
+	"light": {"ACCENT": "#2b6cb0", "ACCENT_SOFT": "#d8e5f3"},
+	"dark": {"ACCENT": "#8fb8e6", "ACCENT_SOFT": "#2f3f5a"},
+	"SUCCESS": "#2b6cb0", "DANGER": "#b84f00",
+	"SERIES": ["#0072b2", "#e69f00", "#56b4e9", "#d55e00", "#009e73", "#f0e442", "#cc79a7", "#8a8a8a"],
+	# Rarity id: [colour, text colour].
+	"rarities": {"common": ["#56b4e9", "#177ab2"], "rare": ["#1b3a6b", "#1b3a6b"], "epic": ["#d55e00", "#be5400"], "legendary": ["#f0e442", "#7d750a"]},
+}
+
 # The same in both modes.
-const SUCCESS := Color("#3ba55c")
-const DANGER := Color("#e0524f")
+static var SUCCESS := Color("#30854a")
+static var DANGER := Color("#db3835")
 ## Text and icons on a coloured fill (buttons, tags, badges).
 const ON_COLOUR := Color.WHITE
 ## Text over scenery.
@@ -67,10 +85,8 @@ const FLAME := Color("#e0702b")
 ## Behind the focus complete screen's scenery: a quarter-black sheet.
 const SHEET := Color(0, 0, 0, 0.25)
 ## Colours for each project in charts, assigned in the order projects were made.
-const SERIES := [
-	Color("#2f6b4f"), Color("#e39b3b"), Color("#4d84c4"), Color("#c45b7d"),
-	Color("#7c62c9"), Color("#3aa39a"), Color("#a6763f"), Color("#8c9a3a"),
-]
+const SERIES_STANDARD := ["#2f6b4f", "#e39b3b", "#4d84c4", "#c45b7d", "#7c62c9", "#3aa39a", "#a6763f", "#8c9a3a"]
+static var SERIES: Array = SERIES_STANDARD.map(func(c): return Color(c))
 
 const RADIUS := 18
 const WIDE_BREAKPOINT := 900.0
@@ -84,7 +100,13 @@ static var _fonts: Dictionary = {}
 ## afterwards use it; the shell rebuilds what's on screen.
 static func set_dark(on: bool) -> void:
 	dark = on
-	var p: Dictionary = PALETTES["dark" if on else "light"]
+	var p: Dictionary = PALETTES["dark" if on else "light"].duplicate()
+	var safe := vision != "off"
+	if safe:
+		p.merge(SAFE["dark" if on else "light"], true)
+	SUCCESS = Color(SAFE["SUCCESS"]) if safe else Color("#30854a")
+	DANGER = Color(SAFE["DANGER"]) if safe else Color("#db3835")
+	SERIES = (SAFE["SERIES"] if safe else SERIES_STANDARD).map(func(c): return Color(c))
 	BG = Color(p["BG"])
 	SURFACE = Color(p["SURFACE"])
 	SURFACE_SOFT = Color(p["SURFACE_SOFT"])
@@ -249,17 +271,24 @@ static func button_styles(fill: Color, radius: int, shadow: bool = false) -> Dic
 				shade = Color(fill, fill.a * 0.45)
 		var sb := box(shade, Color.TRANSPARENT, radius)
 		if state == "focus":
-			sb = box(Color.TRANSPARENT, Color(ACCENT, 0.5), radius)
-			sb.draw_center = false
-			sb.expand_margin_left = 3
-			sb.expand_margin_right = 3
-			sb.expand_margin_top = 3
-			sb.expand_margin_bottom = 3
+			sb = focus_ring(radius)
 		else:
 			if shadow and state != "disabled":
 				with_shadow(sb, 0.8)
 		out[state] = sb
 	return out
+
+
+## The green ring round whatever the keyboard is on (Tab moves it). It
+## only shows when you got there with keys, not with a tap or a click.
+static func focus_ring(radius: int) -> StyleBoxFlat:
+	var sb := box(Color.TRANSPARENT, ACCENT, radius)
+	sb.draw_center = false
+	sb.expand_margin_left = 3
+	sb.expand_margin_right = 3
+	sb.expand_margin_top = 3
+	sb.expand_margin_bottom = 3
+	return sb
 
 
 ## Darkens light colours and lightens dark ones, for hover and press states.
@@ -521,6 +550,25 @@ static func button(text: String, on_press: Callable, kind: String = "primary") -
 	return b
 
 
+## Words you can tap, in green with no fill, like a link ("Privacy Policy").
+static func text_link(text: String, on_press: Callable, size: int = 15) -> Button:
+	var b := button(text, on_press, "ghost")
+	b.custom_minimum_size = Vector2.ZERO
+	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+		var sb := (b.get_theme_stylebox(state) as StyleBoxFlat).duplicate() as StyleBoxFlat
+		sb.content_margin_left = 0
+		sb.content_margin_right = 0
+		sb.content_margin_top = 2
+		sb.content_margin_bottom = 2
+		b.add_theme_stylebox_override(state, sb)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(state, ACCENT)
+	b.add_theme_font_size_override("font_size", size)
+	b.set_meta("no_grow", true)
+	return b
+
+
 ## A round button holding one icon, like the delete and complete buttons.
 static func round_button(icon: String, tip: String, on_press: Callable, fill: Color = SURFACE,
 		ink: Color = INK, diameter: int = 52, shadow: bool = true) -> Button:
@@ -549,7 +597,6 @@ static func ghost_button(icon: String, tip: String, on_press: Callable, ink: Col
 	var b := Button.new()
 	b.accessibility_name = tip
 	b.flat = true
-	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(diameter, diameter)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -557,8 +604,9 @@ static func ghost_button(icon: String, tip: String, on_press: Callable, ink: Col
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	b.expand_icon = false
 	b.mouse_default_cursor_shape = Cursor.HOVER
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 		b.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	b.add_theme_stylebox_override("focus", focus_ring(999))
 	for state in ["icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_hover_pressed_color", "icon_focus_color"]:
 		b.add_theme_color_override(state, ink)
 	b.add_theme_color_override("icon_disabled_color", Color(ink, 0.45))
@@ -572,7 +620,7 @@ static func pill_button(text: String, selected: bool, on_press: Callable, height
 	var b := button(text, on_press, "primary" if selected else "quiet")
 	b.custom_minimum_size = Vector2(0, height)
 	b.add_theme_font_size_override("font_size", 14)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 		var sb: StyleBoxFlat = b.get_theme_stylebox(state)
 		corners(sb, 999)
 		sb.content_margin_top = 4
@@ -777,6 +825,7 @@ static func place_tile(biome: Dictionary, side: int) -> PanelContainer:
 ## something laid over the bottom of the picture.
 static func character_portrait(look: Dictionary, box_size: Vector2, face_only: bool = false, fill: Color = ACCENT_SOFT, bottom_room: float = 0.0) -> Control:
 	var frame := RoundFrame.new()
+	frame.accessibility_name = Text.t("alt.face" if face_only else "alt.character")
 	frame.fill = fill
 	frame.circle = face_only
 	frame.custom_minimum_size = box_size

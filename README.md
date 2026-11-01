@@ -32,7 +32,9 @@ macOS, Windows, Linux and Steam from one project. See [ROADMAP.md](ROADMAP.md).
 The app is five screens arranged like a plus sign. Swipe between them, give
 the mouse wheel or trackpad a small flick (a list under the pointer scrolls
 first; once it's at its end, a fresh flick moves on), use
-the arrow keys on a keyboard (Esc comes back to the middle), click the big
+the arrow keys on a keyboard (Esc comes back to the middle; Tab and
+Shift+Tab step through what you can press on screen, or in the popup on top,
+and Enter or Space presses it), click the big
 faint arrows at the screen's edges (computers only: one on every side of the
 focus screen, and one back home on the others), or use the little map in the
 bottom left corner, which shows where you are. It grows up and to the right
@@ -41,6 +43,13 @@ gifts, a tick for completed, a person for your profile and a bar chart for
 stats). With a mouse it grows while the pointer is over it and shrinks a
 moment after it leaves; on phones tap it to grow it, and tap it again (or
 anywhere else) to shrink it. Pick a tile to go there.
+
+The first launch (and Log out) shows the create account screen: your name,
+where you study and your date of birth, then a box to tick agreeing to the
+Privacy Policy and Terms of Service (each name opens it) before Create
+works. Under 18, Create first asks a parent or guardian to approve, in a
+popup only Approve closes. "I have an account" logs back into one already
+on the device.
 
 On computers, Settings also picks the window's mode (windowed, maximised,
 fullscreen or exclusive fullscreen) and its size. The window can't get
@@ -107,14 +116,20 @@ smaller than 800 × 560 points, so layouts never squash.
   one with how far along it is: 10, 50, 100, 500, 1,000 and 10,000 hours
   focused, every gift found, and a set for each animal's gifts
   (`data/achievements.json`). The page never scrolls. The settings are
-  behind the gear in the top right.
+  behind the gear in the top right. Their top row is your account, with
+  Data (what the app keeps about you, a Download of it all and a Delete)
+  and Log out on the right. Accessibility has Colour vision (protanopia,
+  deuteranopia or tritanopia swap the colours that mean something for ones
+  that stay apart) and Reduce motion. The Privacy Policy, Terms of Service
+  and open source Licences are linked at the bottom (see
+  [legal/README.md](legal/README.md)).
 - **Stats** (down): this week's focus split by project (the projects scroll
   sideways under the chart), past weeks with any focus in them, your streak
   as a flame with the days beside it (a blue shield on the flame when you've
   earned a rest day: one allowed after three days in a row), and the friends
   leaderboard, which scrolls inside its card. "See full" lists everyone in a
   popup. Tap a friend's face or name for their profile: their character,
-  where they study, when they joined, their week, their gift shelf (tap a
+  when they joined (never where they study), their week, their gift shelf (tap a
   gift for a look) and their achievements. Tap yours for your profile. The
   page never scrolls. Debug builds come with sample friends (`core/friends.gd`).
 
@@ -254,6 +269,7 @@ core/            game logic, no UI
   stats.gd         weekly totals, records, streaks (from the focus time per day)
   achievements.gd  achievements and how far along each one is
   friends.gd       the leaderboard order, and sample friends for debug builds
+  legal.gd         privacy policy and terms (legal/), dates of birth, your data, licences
   collection.gd    the gifts screen's rings: discovered, gift tables, cosmetics
   display.gd       the computer window: mode, size, minimum, debug phone view
   models/          ProjectData, FocusSession resources

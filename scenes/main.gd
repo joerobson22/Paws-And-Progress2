@@ -104,6 +104,7 @@ var _wheel_free := false
 func _ready() -> void:
 	_apply_window()
 	_fit_design_size()
+	UI.vision = str(App.state.settings.get("vision", "off"))
 	UI.set_dark(App.wants_dark())
 	theme = UI.build_theme()
 	# Before the panes connect, so a palette change lands before they rebuild.
@@ -315,10 +316,12 @@ func _on_state_changed() -> void:
 
 
 ## Looks at the time of day again: the backdrop's sky, and dark colours
-## from sunset to sunrise. A new debug style changes the look the same way.
+## from sunset to sunrise. A new colour vision setting recolours the same way.
 func _on_sky_tick() -> void:
 	var want := App.wants_dark()
-	if want != UI.dark:
+	var vision := str(App.state.settings.get("vision", "off"))
+	if want != UI.dark or vision != UI.vision:
+		UI.vision = vision
 		_switch_palette(want)
 	if is_instance_valid(_backdrop):
 		_backdrop.refresh()
@@ -436,8 +439,8 @@ func _show_home(on: bool, instant: bool) -> void:
 			Motion.to(_backdrop, "look_down", down, ACCOUNT_RISE if on else Motion.SLOW)
 
 
-func _show_account(instant: bool, typed: Array = ["", ""]) -> void:
-	_account = CreateAccount.new(typed[0], typed[1], _backdrop == null)
+func _show_account(instant: bool, typed: Dictionary = {}) -> void:
+	_account = CreateAccount.new(typed, _backdrop == null)
 	_account_layer.add_child(_account)
 	if not instant:
 		_account.modulate.a = 0.0
@@ -569,7 +572,9 @@ func _maybe_ask_location() -> void:
 
 func _go_back() -> void:
 	if Modal.is_open():
-		Modal.top().close(null)
+		# (One that has to be answered stays.)
+		if Modal.top().dismissible:
+			Modal.top().close(null)
 	elif not _flows.is_empty():
 		var content: Node = _flows.back().get_child(0)
 		if content.has_method("go_back"):
@@ -651,6 +656,10 @@ func _on_wheel(turn: Vector2, pos: Vector2) -> void:
 func _input(e: InputEvent) -> void:
 	if _synthetic:
 		return
+	if e is InputEventKey and e.pressed and e.keycode == KEY_TAB:
+		get_viewport().set_input_as_handled()
+		_tab(-1 if e.shift_pressed else 1)
+		return
 	var turn := _wheel_turn(e)
 	if turn != Vector2.ZERO:
 		_on_wheel(turn, e.position)
@@ -694,6 +703,54 @@ func _input(e: InputEvent) -> void:
 		if step != Vector2i.ZERO and _can_go(_at + step):
 			get_viewport().set_input_as_handled()
 			_go_cell(_at + step)
+
+
+# --- Keyboard ----------------------------------------------------------------
+
+## Tab and Shift+Tab: the next or last thing you can press on whatever's on
+## top (an open menu, the newest popup, the create account screen, a flow,
+## or else the screen you're on), round and round, scrolling it into view.
+## Enter or Space presses it; Esc goes back; the arrow keys move screens.
+func _tab(step: int) -> void:
+	var stops := focus_stops(_focus_scope())
+	if stops.is_empty():
+		return
+	var at := stops.find(get_viewport().gui_get_focus_owner())
+	var next: Control = stops[posmod(at + step, stops.size()) if at >= 0 else (0 if step > 0 else stops.size() - 1)]
+	next.grab_focus()
+	var up := next.get_parent()
+	while up:
+		if up is ScrollContainer:
+			(up as ScrollContainer).ensure_control_visible(next)
+		up = up.get_parent()
+
+
+func _focus_scope() -> Control:
+	for layer in [_modal_layer, _account_layer, _flow_layer]:
+		for i in range(layer.get_child_count() - 1, -1, -1):
+			var c := layer.get_child(i) as Control
+			# (A popup that's closing lets the mouse through already.)
+			if c and c.visible and c.mouse_filter != Control.MOUSE_FILTER_IGNORE and not c is Toast:
+				return c
+	return self if _flows.is_empty() else _flow_layer
+
+
+## Everything in `root` that Tab stops on, in order: shown, switched on and
+## able to take the keyboard. From the shell, only the screen you're on.
+func focus_stops(root: Control) -> Array[Control]:
+	var out: Array[Control] = []
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		var c := n as Control
+		if c == null or not c.visible or (n is Pane and n != _panes[_at]):
+			continue
+		if c.focus_mode == Control.FOCUS_ALL and c.is_visible_in_tree() and not (c is BaseButton and (c as BaseButton).disabled):
+			out.append(c)
+		var kids := n.get_children()
+		kids.reverse()
+		stack.append_array(kids)
+	return out
 
 
 ## True if `pos` is on a control that a drag works by itself: a slider or

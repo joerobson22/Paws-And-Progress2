@@ -90,7 +90,7 @@ func _init(id: String) -> void:
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(title)
-	var tag := UI.tag(Content.rarity_name(rarity).to_upper(), Content.rarity_colour(rarity), UI.ON_COLOUR, 11)
+	var tag := UI.tag(Content.rarity_name(rarity).to_upper(), Content.rarity_text_colour(rarity), UI.ON_COLOUR, 11)
 	tag.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	head.add_child(tag)
 	col.add_child(head)

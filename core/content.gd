@@ -125,11 +125,15 @@ func unlock_rule(type: String, id: String) -> Dictionary:
 
 
 func rarity_colour(rarity_id: String) -> Color:
+	if UI.vision != "off" and UI.SAFE["rarities"].has(rarity_id):
+		return Color(UI.SAFE["rarities"][rarity_id][0])
 	return Color.from_string(_rarities_by_id.get(rarity_id, {}).get("colour", "#888888"), Color.GRAY)
 
 
 ## A darker shade of the rarity colour that reads as text on a light background.
 func rarity_text_colour(rarity_id: String) -> Color:
+	if UI.vision != "off" and UI.SAFE["rarities"].has(rarity_id):
+		return Color(UI.SAFE["rarities"][rarity_id][1])
 	return Color.from_string(_rarities_by_id.get(rarity_id, {}).get("text_colour", "#5e5e52"), Color.DIM_GRAY)
 
 

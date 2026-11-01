@@ -756,7 +756,7 @@ func _run() -> void:
 	check(main._arrows.values().all(func(a): return not a.visible), "the edge arrows hide while a popup is up")
 	# Computers can pick the window's mode and size; picking a size goes
 	# back to a window.
-	var pickers: Array = _all(modal_class.top().body, func(n): return _is(n, "dropdown.gd"))
+	var pickers: Array = _all(modal_class.top().body, func(n): return _is(n, "dropdown.gd") and n.accessibility_name != "Colour vision")
 	check(pickers.size() == 2 and pickers[0].text == "Windowed", "settings offer the window mode and size (%d)" % pickers.size())
 	await _shot("settings")
 	if pickers.size() == 2:
@@ -777,6 +777,7 @@ func _run() -> void:
 		# The save is shared with the app, so leave its window as it was.
 		app.state.settings.erase("window_mode")
 		app.state.settings.erase("resolution")
+	await _vision_and_data(main)
 	_close_modal()
 	await _wait(20)
 	await _accounts(main)
@@ -1713,7 +1714,7 @@ func _stats_and_friends(main: Node) -> void:
 	var popup: Node = modal_class.top() if modal_class.is_open() else null
 	check(popup != null and _find(popup, func(n): return n is Label and n.text == "Mei") != null, "it opens their profile")
 	if popup:
-		check(_find(popup, func(n): return n is Label and n.text == "University of York") != null, "with where they study")
+		check(_find(popup, func(n): return n is Label and n.text.contains("University")) == null, "never where they study")
 		var medal := func(n): return n is VBoxContainer and n.get("info") is Dictionary
 		var shown := _all(popup, medal)
 		var mei: Dictionary = app.friends.filter(func(f): return f["name"] == "Mei")[0]
@@ -1790,9 +1791,6 @@ func _accounts(main: Node) -> void:
 	if out == null:
 		modal_class.close_all()
 		return
-	var switches: Array = _all(settings.body, func(n): return _is(n, "switch.gd"))
-	if not switches.is_empty():
-		check(out.get_global_rect().position.y > (switches.back() as Control).get_global_rect().end.y, "below every setting")
 	await _tap_control(out, main)
 	await _wait(40)
 	var screen: Control = main._account
@@ -1803,13 +1801,36 @@ func _accounts(main: Node) -> void:
 	var create: Button = _find(screen, func(n): return n is Button and n.text == "Create")
 	var have: Button = _find(screen, func(n): return n is Button and n.text == "I have an account")
 	var boxes: Array = _all(screen, func(n): return n is LineEdit)
-	check(boxes.size() == 2, "it asks for a name and where you study")
-	check(create != null and create.disabled, "Create waits for both")
+	check(boxes.size() == 5, "it asks for a name, where you study and a date of birth")
+	check(create != null and create.disabled, "Create waits for them")
+	var agree: Button = _find(screen, func(n): return n is Button and n.toggle_mode)
+	check(agree != null and not agree.button_pressed, "with a box to agree to the policy and terms, not ticked")
+	var links: Array = _all(screen, func(n): return n is Button and n.text in ["Privacy Policy", "Terms of Service"])
+	check(links.size() == 2, "both named by it")
+	if links.size() == 2:
+		await _tap_control(links[0], main)
+		await _wait(25)
+		var doc: Node = modal_class.top()
+		check(doc != null and _find(doc.header, func(n): return n is Label and n.text == "Privacy Policy") != null, "the Privacy Policy opens in a popup")
+		check(doc != null and _find(doc.body, func(n): return n is RichTextLabel and n.get_parsed_text().contains("stays on your device")) != null, "with the policy in it")
+		await _shot("privacy_policy")
+		modal_class.close_all()
+		await _wait(20)
 	check(have != null and have.is_visible_in_tree(), "I have an account shows when there's one")
 	check(screen.get_global_rect().has_point(main.size * 0.5) and screen.get_global_rect().size == main.size, "it covers the screen")
 	await _wait(40)
 	check(main._backdrop == null or main._backdrop.look_down > 0.99, "the view looks down at the ground behind it")
 	await _shot("create_account")
+	# Keyboard only: Tab goes down the form, round and round.
+	(boxes[0] as LineEdit).grab_focus()
+	await _key(KEY_TAB)
+	check(main.get_viewport().gui_get_focus_owner() == boxes[1], "Tab goes from the name to where you study")
+	for i in 4:
+		await _key(KEY_TAB)
+	check(main.get_viewport().gui_get_focus_owner() == agree, "then the date of birth and the box (%s)" % main.get_viewport().gui_get_focus_owner())
+	await _key(KEY_TAB)
+	check(main.get_viewport().gui_get_focus_owner() == links[0], "then the Privacy Policy")
+	main.get_viewport().gui_release_focus()
 	await _key(KEY_DOWN)
 	await _wait(40)
 	app.go("stats")
@@ -1829,18 +1850,40 @@ func _accounts(main: Node) -> void:
 		modal_class.close_all()
 		await _wait(20)
 
-	if boxes.size() == 2:
-		(boxes[0] as LineEdit).text = "Sam"
-		(boxes[0] as LineEdit).text_changed.emit("Sam")
+	if boxes.size() == 5:
+		var type := func(i: int, t: String):
+			(boxes[i] as LineEdit).text = t
+			(boxes[i] as LineEdit).text_changed.emit(t)
+		type.call(0, "Sam")
 		await _wait(5)
 		check(create.disabled, "a name alone isn't enough")
-		(boxes[1] as LineEdit).text = "University of York"
-		(boxes[1] as LineEdit).text_changed.emit("University of York")
+		type.call(1, "University of York")
+		type.call(2, "31")
+		type.call(3, "02")
+		type.call(4, "2012")
+		await _wait(5)
+		check(create.disabled and _find(screen, func(n): return n is Label and n.text == "That date doesn't look right." and n.is_visible_in_tree()) != null, "a date that can't be right says so")
+		type.call(2, "14")
+		type.call(3, "03")
+		await _wait(5)
+		check(create.disabled, "nor without agreeing")
+		agree.button_pressed = true
 		await _wait(5)
 		check(not create.disabled, "then it's ready")
 		await _shot("create_account_ready")
 		await _tap_control(create, main)
-		await _wait(60)
+		await _wait(40)
+		var parent: Node = modal_class.top()
+		check(parent != null and _find(parent.body, func(n): return n is Label and n.text == "Ask a parent or guardian") != null and app.needs_account(), "under 18, a parent or guardian is asked first")
+		if parent:
+			check(_find(parent, func(n): return n is Button and n.accessibility_name == "Close") == null, "with no way to close it")
+			await _key(KEY_ESCAPE)
+			await _wait(20)
+			check(modal_class.top() == parent, "not even Esc")
+			await _shot("create_account_parent")
+			var approve: Button = _find(parent.body, func(n): return n is Button and n.text == "Approve")
+			await _tap_control(approve, main)
+			await _wait(60)
 	var new_slot: String = app.slot
 	check(new_slot != home_slot and not app.needs_account(), "Create makes a new account")
 	if main._backdrop:
@@ -1848,6 +1891,7 @@ func _accounts(main: Node) -> void:
 		await _wait(100)
 		check(main._backdrop.look_down < 0.01, "all the way")
 	check(app.state.profile["username"] == "Sam" and app.state.profile["institution"] == "University of York", "with that name and place")
+	check(app.state.profile["dob"] == "2012-03-14" and app.state.profile["agreed_unix"] > 0, "and date of birth, and when they agreed")
 	check(main._at == Vector2i.ZERO and main._account == null, "and goes to the focus screen")
 	check(app.friends.is_empty(), "a new account has no friends")
 	check(app.state.projects.is_empty() and app.state.days.is_empty() and app.state.inventory.is_empty(), "and nothing else either")
@@ -1895,6 +1939,76 @@ func _accounts(main: Node) -> void:
 	# run wants them whichever slot it's in.
 	app.friends = _class("res://core/friends.gd").sample()
 	app.state_changed.emit()
+
+
+## Settings, Accessibility, Colour vision recolours the app at once, and
+## Data (beside Log out) lists what's kept, with Download and Delete.
+func _vision_and_data(main: Node) -> void:
+	var app := _app()
+	var modal_class := _class("res://ui/modal.gd")
+	var ui := _class("res://ui/ui.gd")
+	var settings: Node = modal_class.top()
+	var vision: Node = _find(settings.body, func(n): return _is(n, "dropdown.gd") and n.accessibility_name == "Colour vision")
+	check(vision != null and vision.text == "Standard", "settings have a colour vision picker, on Standard")
+	check(_find(settings.body, func(n): return n is Label and n.text == "ACCESSIBILITY") != null, "under Accessibility")
+	if vision:
+		await settings.scroll_to(vision)
+		await _wait(30)
+		vision.pressed.emit()
+		await _wait(10)
+		await _tap_menu(vision, "Deuteranopia")
+		await _wait(40)
+		check(app.state.settings.get("vision") == "deuteranopia" and ui.ACCENT == Color(ui.SAFE["light" if not ui.dark else "dark"]["ACCENT"]), "picking one swaps in the safe colours")
+		check(modal_class.top() == settings and _find(settings.body, func(n): return _is(n, "dropdown.gd") and n.text == "Deuteranopia") != null, "and settings stay open, in them")
+		await _shot("settings_vision")
+		var again: Node = _find(settings.body, func(n): return _is(n, "dropdown.gd") and n.accessibility_name == "Colour vision")
+		again.pressed.emit()
+		await _wait(10)
+		await _tap_menu(again, "Standard")
+		await _wait(40)
+		check(app.state.settings.get("vision") == "off" and ui.ACCENT == Color(ui.PALETTES["light" if not ui.dark else "dark"]["ACCENT"]), "Standard puts them back")
+
+	var licences: Button = _find(settings.body, func(n): return n is Button and n.text == "Licences")
+	check(licences != null, "settings link the licences")
+	if licences:
+		var started := Time.get_ticks_msec()
+		await _tap_control(licences, main)
+		await _wait(25)
+		var shown: Node = modal_class.top()
+		check(shown != settings and _find(shown.body, func(n): return n is RichTextLabel and n.get_parsed_text().contains("SIL Open Font License")) != null,
+			"which list Godot's and the fonts' (%d ms)" % (Time.get_ticks_msec() - started))
+		await _shot("licences")
+		_close_modal()
+		await _wait(20)
+
+	var head: Node = settings.body
+	var out: Button = _find(head, func(n): return n is Button and n.text == "Log out")
+	var data: Button = _find(head, func(n): return n is Button and n.text == "Data")
+	check(out != null and data != null and data.get_global_rect().end.x < out.get_global_rect().position.x, "Data sits left of Log out")
+	var first_switch: Control = _find(head, func(n): return _is(n, "switch.gd"))
+	if out and first_switch:
+		check(out.get_global_rect().end.y < first_switch.get_global_rect().position.y, "both in the account row at the top")
+	if data == null:
+		return
+	await settings.scroll_to(data)
+	await _wait(20)
+	await _tap_control(data, main)
+	await _wait(25)
+	var popup: Node = modal_class.top()
+	check(popup != settings and _find(popup.header, func(n): return n is Label and n.text == "Your data") != null, "Data opens what's kept about you")
+	if popup != settings:
+		check(_find(popup.footer, func(n): return n is Button and n.text == "Download") != null and _find(popup.footer, func(n): return n is Button and n.text == "Delete") != null, "with Download and Delete")
+		await _shot("data")
+		var del: Button = _find(popup.footer, func(n): return n is Button and n.text == "Delete")
+		await _tap_control(del, main)
+		await _wait(25)
+		check(modal_class.top() != popup, "Delete asks first")
+		await _shot("data_delete")
+		_close_modal(false)
+		await _wait(20)
+		check(modal_class.top() == popup and app.state.profile["username"] == "Joe", "and No keeps everything")
+		_close_modal()
+		await _wait(20)
 
 
 ## Taps `c`, scrolling it into view first. In the CI's tiny window it may

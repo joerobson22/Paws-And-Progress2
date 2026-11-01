@@ -34,6 +34,10 @@ static func default_profile() -> Dictionary:
 	return {
 		"username": "",
 		"institution": "",
+		# Date of birth, "YYYY-MM-DD" ("" for accounts made before it was asked).
+		"dob": "",
+		# When the privacy policy and terms were agreed to (0 = before they were asked).
+		"agreed_unix": 0,
 		"created_unix": 0,
 		"skin_tone": 0,
 		"hair_tone": 0,
@@ -55,6 +59,8 @@ static func default_settings() -> Dictionary:
 		"sound": true,
 		"ambience": true,
 		"reduce_motion": false,
+		# UI.VISIONS: colours for colour blindness.
+		"vision": "off",
 		"keep_screen_on": true,
 		# 0 = open-ended walk.
 		"walk_goal_seconds": 0,

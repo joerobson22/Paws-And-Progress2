@@ -329,7 +329,6 @@
 		"edit_field": "Edit {field}"
 	},
 	"friend": {
-		"school_empty": "Not added yet",
 		"joined_unknown": "Recently",
 		"no_achievements": "No achievements yet"
 	},
@@ -402,7 +401,18 @@
 		"weather": "Local sunrise and weather",
 		"weather_note": "Walks follow the real sky where you are, from your rough location (worked out from your internet connection).",
 		"weather_now": "Now: {place}, {weather}.",
-		"about": "Paws & Progress {version}  ·  Fonts: Fraunces and Quicksand (SIL Open Font License)"
+		"about": "{app} {version}",
+		"accessibility": "Accessibility",
+		"vision": "Colour vision",
+		"vision_note": "Recolours the app so colours that look alike come apart.",
+		"visions": {
+			"off": "Standard",
+			"protanopia": "Protanopia",
+			"deuteranopia": "Deuteranopia",
+			"tritanopia": "Tritanopia"
+		},
+		"data": "Data",
+		"data_name": "Your data"
 	},
 	"window": {
 		"title": "Window",
@@ -540,7 +550,26 @@
 		"name": "Your name",
 		"school": "Where you study",
 		"create": "Create",
-		"have_account": "I have an account"
+		"have_account": "I have an account",
+		"dob": "Date of birth",
+		"dob_day": "DD",
+		"dob_month": "MM",
+		"dob_year": "YYYY",
+		"dob_day_name": "Day of birth",
+		"dob_month_name": "Month of birth",
+		"dob_year_name": "Year of birth",
+		"dob_invalid": "That date doesn't look right.",
+		"agree": "I agree to the",
+		"agree_and": "and",
+		"agree_name": "I agree to the Privacy Policy and Terms of Service",
+		"parent_title": "Ask a parent or guardian",
+		"parent_body": "You're under 18, so a parent or guardian needs to approve your account. Please show them this screen.",
+		"parent_points": [
+			"Everything stays on this device.",
+			"Friends will never see where {name} studies or their date of birth.",
+			"You can see, download or delete the data at any time in Settings, Data."
+		],
+		"parent_approve": "Approve"
 	},
 	"accounts": {
 		"title": "Your accounts",
@@ -564,5 +593,51 @@
 		"kind_rehomed": "{kind} · rehomed",
 		"top_projects": "Top projects",
 		"top_pets": "Top pets"
+	},
+	"data": {
+		"title": "Your data",
+		"where": "This is everything the app keeps about you. It all stays on this device, and nothing is sent to us.",
+		"profile": "Your account",
+		"profile_detail": "Your name, where you study, your date of birth, when you joined and your character.",
+		"projects": "Projects and pets",
+		"projects_detail": {
+			"one": "{n} project and {pets}, with their names, grades and colours.",
+			"other": "{n} projects and {pets}, with their names, grades and colours."
+		},
+		"focus": "Focus time",
+		"focus_detail": {
+			"one": "How long you focused on {n} day, by project, pet and place.",
+			"other": "How long you focused on each of {n} days, by project, pet and place."
+		},
+		"gifts": "Gifts",
+		"gifts_detail": {
+			"one": "{n} gift, your gift shelf and your XP.",
+			"other": "{n} gifts, your gift shelf and your XP."
+		},
+		"settings": "Settings",
+		"settings_detail": "Your choices in Settings, and your rough location if Local sunrise and weather is on.",
+		"download": "Download",
+		"delete": "Delete",
+		"delete_title": "Delete your data?",
+		"delete_body": "{name}'s account, projects, pets, focus time and gifts are deleted from this device for good. This can't be undone.",
+		"saved": "Saved to {where}",
+		"saved_phone": "Files, in the app's folder",
+		"save_failed": "Couldn't save the file",
+		"pets": {
+			"one": "{n} pet",
+			"other": "{n} pets"
+		}
+	},
+	"legal": {
+		"privacy": "Privacy Policy",
+		"terms": "Terms of Service",
+		"licences": "Licences",
+		"licence": "Licence: {licence}",
+		"weather_credit": "Weather data by Open-Meteo.com, under the Creative Commons Attribution 4.0 licence (CC BY 4.0). Rough location by GeoJS (geojs.io)."
+	},
+	"alt": {
+		"character": "Character, head to toe",
+		"face": "Character's face",
+		"chart": "Focus time, {period}: {time}"
 	}
 }
