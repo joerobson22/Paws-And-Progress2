@@ -17,8 +17,10 @@ const CHUNK := 384.0
 
 var layer: Dictionary
 var index: int
-## Used when drawn on its own (in the editor); the walk's scenery passes
-## its own instead.
+## The walk's Scenery this draws for, which gives the screen size, time,
+## path and lights; null when drawn on its own (in the editor), which uses
+## the settings below instead.
+var scenery: Node
 var view_size := Vector2(1280, 720)
 var clock_time := 0.0
 var path_line := -1.0
@@ -35,27 +37,29 @@ const DEAD_WOOD := Color("#4a3f3a")
 
 
 func _view() -> Vector2:
-	return view_size
+	return scenery.size if scenery else view_size
 
 
 func _now() -> float:
-	return clock_time
+	return scenery.time() if scenery else clock_time
 
 
 func _path() -> float:
+	if scenery:
+		return scenery.path_y()
 	return path_line if path_line >= 0.0 else _view().y * 0.8
 
 
 func _lit() -> bool:
-	return lights_on
+	return scenery._lights_on if scenery else lights_on
 
 
 func _gap() -> Vector2:
-	return keep_clear
+	return scenery.front_gap if scenery else keep_clear
 
 
 func _holiday() -> HolidayLook:
-	return holiday_look
+	return scenery._holiday if scenery else holiday_look
 
 
 ## A rounded box with the app's hand-cut corners (as UI.box draws them),

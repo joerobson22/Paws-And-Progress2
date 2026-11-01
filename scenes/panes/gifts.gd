@@ -1,4 +1,3 @@
-class_name GiftsPane
 extends Pane
 ## Gifts, to the left of the focus screen. At the top, three rings for how
 ## your collection's coming along: gifts discovered, animals whose whole gift

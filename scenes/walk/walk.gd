@@ -148,7 +148,7 @@ func _intro() -> void:
 ## to speed, the time drops in, then the encouragement types itself out,
 ## while the buttons fade in where they are.
 func _set_off() -> void:
-	App.start_walk(_project.id, _pet.id, -1, str(_scenery.biome.get("id", "")))
+	App.start_walk(_project.id, _pet.id, str(_scenery.biome.get("id", "")))
 	_arriving = false
 	_walker.walking = true
 	_animal.walking = true
@@ -370,6 +370,7 @@ func _quote_key_now() -> int:
 	var clock := App.state.active
 	if clock == null:
 		return _quote_key
+	@warning_ignore("integer_division")
 	return clock.start_unix + clock.elapsed(App.now()) / (Motion.style.quote_every * 60)
 
 

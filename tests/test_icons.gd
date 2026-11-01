@@ -35,6 +35,8 @@ func test_named_icons_exist() -> void:
 func test_tinting_keeps_the_shape() -> void:
 	var tex := Icons.texture("close", 24, Color.RED)
 	var img := tex.get_image()
-	var middle := img.get_pixel(img.get_width() / 2, img.get_height() / 2)
+	@warning_ignore("integer_division")
+	var half := img.get_size() / 2
+	var middle := img.get_pixel(half.x, half.y)
 	check(middle.a > 0.9 and middle.is_equal_approx(Color.RED), "the cross is red where it's drawn")
-	check(img.get_pixel(1, img.get_height() / 2).a < 0.05, "and clear around it")
+	check(img.get_pixel(1, half.y).a < 0.05, "and clear around it")

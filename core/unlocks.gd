@@ -84,21 +84,6 @@ static func describe(rule: Dictionary) -> String:
 	return Text.t("unlock.start")
 
 
-## How far along, in words: "Level 2 of 3", "7h 12m of 10h", "5 of 8 gifts found".
-static func describe_progress(p: Dictionary) -> String:
-	match str(p["kind"]):
-		"level":
-			return Text.t("unlock.progress_level", {"have": p["have"], "goal": p["goal"]})
-		"hours":
-			var goal := Text.t("unlock.hours_short", {"hours": _hours(int(p["goal"]) / 3600.0)})
-			return Text.t("unlock.progress_hours", {"have": Stats.format_duration(int(p["have"])), "goal": goal})
-		"holiday":
-			return Text.t("unlock.progress_hours", {"have": Stats.format_duration(int(p["have"])), "goal": Stats.format_duration(int(p["goal"]))})
-		"table", "all_tables":
-			return Text.t("unlock.progress_gifts", {"have": p["have"], "goal": p["goal"]})
-	return ""
-
-
 ## The level a rule unlocks at, or 0 if it isn't a level rule (1 for from
 ## the start), for laying out the level rewards.
 static func level_of(rule: Dictionary) -> int:

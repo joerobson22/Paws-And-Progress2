@@ -56,6 +56,6 @@ static func from_dict(d: Dictionary) -> PetData:
 	p.rehomed_unix = int(d.get("rehomed_unix", 0))
 	var got = d.get("places", {})
 	if got is Dictionary:
-		for id in got:
-			p.places[str(id)] = int(got[id])
+		for key in got:
+			p.places[str(key)] = int(got[key])
 	return p

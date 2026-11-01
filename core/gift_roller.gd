@@ -73,15 +73,6 @@ static func chances(seconds: int, table: Dictionary) -> Dictionary:
 	return out
 
 
-## The chances as whole percentages.
-static func percentages_for(seconds: int, table: Dictionary) -> Dictionary:
-	var c := chances(seconds, table)
-	var out := {}
-	for r in RARITIES:
-		out[r] = roundi(100.0 * float(c[r]))
-	return out
-
-
 static func is_pity_ready(seconds: int, walks_since_epic: int, table: Dictionary) -> bool:
 	return seconds >= int(table.get("pity_min_seconds", 1800)) \
 		and walks_since_epic >= int(table.get("pity_walks", 8))

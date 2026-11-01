@@ -306,9 +306,9 @@ func _ways_from(cell: Vector2i) -> Array[Vector2i]:
 ## The edge arrows show (computers only) once you've arrived on a screen,
 ## and hide while moving, during walks and while a popup is up.
 func _process(_delta: float) -> void:
-	var show := not App.phone_layout() and not _moving and not _swiping \
+	var arrows_on := not App.phone_layout() and not _moving and not _swiping \
 		and _flows.is_empty() and not Modal.is_open() and not _locked
-	var ways: Array[Vector2i] = _ways_from(_at) if show else ([] as Array[Vector2i])
+	var ways: Array[Vector2i] = _ways_from(_at) if arrows_on else ([] as Array[Vector2i])
 	for dir in _arrows:
 		_arrows[dir].appear(ways.has(dir))
 	if is_instance_valid(_backdrop):
@@ -367,7 +367,7 @@ func _give_holiday_present() -> void:
 	GiftDetails.open(gift_id, true, true, true, Text.t("holiday.present." + App.holiday()))
 
 
-## Swaps light and dark (or the style) without anything moving: the screen on show is
+## Swaps light and dark without anything moving: the screen on show is
 ## rebuilt in the new colours exactly as it was (same layout, scroll and
 ## text, no entry animations), under a picture of the old colours that
 ## then fades away. What a pane keeps through a rebuild (the orb, the

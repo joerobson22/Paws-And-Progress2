@@ -142,8 +142,8 @@ func _tint_rig() -> void:
 		_paint_limbs(_rig)
 	var parts: Array = Content.animal(animal_id).get("parts", [])
 	for i in 3:
-		var name: String = parts[i] if i < parts.size() else ""
-		_material.set_shader_parameter(["colour_r", "colour_g", "colour_b"][i], _part(name, Color.WHITE))
+		var part: String = parts[i] if i < parts.size() else ""
+		_material.set_shader_parameter(["colour_r", "colour_g", "colour_b"][i], _part(part, Color.WHITE))
 
 
 func _paint_limbs(node: Node) -> void:

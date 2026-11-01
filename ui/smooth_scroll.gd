@@ -167,7 +167,7 @@ func _bar_under(pos: Vector2, axis: int, along: float) -> ScrollBar:
 		if sc == null or not sc.is_visible_in_tree() or not sc.get_global_rect().has_point(pos):
 			continue
 		var mode := sc.horizontal_scroll_mode if axis == 0 else sc.vertical_scroll_mode
-		var bar: ScrollBar = sc.get_h_scroll_bar() if axis == 0 else sc.get_v_scroll_bar()
+		var bar: ScrollBar = [sc.get_h_scroll_bar(), sc.get_v_scroll_bar()][axis]
 		if mode == ScrollContainer.SCROLL_MODE_DISABLED or bar.max_value - bar.page <= bar.min_value:
 			continue
 		var most := bar.max_value - bar.page
@@ -224,8 +224,8 @@ func _on_input(e: InputEvent, sc: ScrollContainer) -> void:
 			sideways = true
 		_:
 			return
-	var v_bar := sc.get_v_scroll_bar()
-	var h_bar := sc.get_h_scroll_bar()
+	var v_bar: ScrollBar = sc.get_v_scroll_bar()
+	var h_bar: ScrollBar = sc.get_h_scroll_bar()
 	var can_down := sc.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED and v_bar.visible
 	var can_across := sc.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED and h_bar.visible
 	if not sideways and ((can_across and mb.shift_pressed) or not can_down):

@@ -249,7 +249,7 @@ func quote(key: int) -> String:
 ## time of day, otherwise an anytime line. On a holiday (an id from
 ## data/holidays.json) it's always one of that holiday's lines, if it has
 ## any. Lines needing a name are skipped when there isn't one.
-func greeting(hour: int, username: String, rng: RandomNumberGenerator, holiday := "") -> String:
+func greeting(hour: int, username: String, rng: RandomNumberGenerator, holiday_id := "") -> String:
 	var part := "night"
 	if hour >= 5 and hour < 12:
 		part = "morning"
@@ -258,7 +258,7 @@ func greeting(hour: int, username: String, rng: RandomNumberGenerator, holiday :
 	elif hour >= 17 and hour < 22:
 		part = "evening"
 	var pool: Array = Text.list("greetings." + part) if rng.randf() < 0.5 else Text.list("greetings.anytime")
-	var festive: Array = Text.list("greetings.holidays." + holiday) if holiday != "" else []
+	var festive: Array = Text.list("greetings.holidays." + holiday_id) if holiday_id != "" else []
 	festive = festive.filter(func(l): return username != "" or not str(l).contains("{name}"))
 	if not festive.is_empty():
 		pool = festive

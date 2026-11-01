@@ -182,9 +182,6 @@ func _dress() -> void:
 			n.free()
 	_dressing.clear()
 	var skin := _tone_material(_skin())
-	var head_sprites: Array = []
-	if _limbs.has("Head"):
-		head_sprites = (_limbs["Head"]["node"] as Node).find_children("*", "Sprite2D", false, false)
 	for sprite in _body:
 		sprite.material = skin
 		# Seen on their own, items hide the body, head and all: hair, a face
@@ -203,23 +200,23 @@ func _dress() -> void:
 		var id := str(item.get("id", ""))
 		if id == "":
 			continue
-		var material: ShaderMaterial = null
+		var tint: ShaderMaterial = null
 		if slot == "hair":
-			material = _tone_material(_hair())
+			tint = _tone_material(_hair())
 		elif item.has("colour") and not item.has("rarity"):
-			material = _tone_material(Color.from_string(item["colour"], Color.WHITE))
+			tint = _tone_material(Color.from_string(item["colour"], Color.WHITE))
 		for limb in _limbs:
 			var stem: String = LIMBS[limb]
 			var dir: String = art_root + "cosmetics/" + id + "/"
 			var above: Texture2D = _texture(dir + stem + "_sad") if sad > 0.5 else null
 			if above == null:
 				above = _texture(dir + stem)
-			_attach(limb, above, false, material)
-			_attach(limb, _texture(dir + stem + "_behind"), true, material)
+			_attach(limb, above, false, tint)
+			_attach(limb, _texture(dir + stem + "_behind"), true, tint)
 	_animate()
 
 
-func _attach(limb: String, tex: Texture2D, behind: bool, material: Material) -> void:
+func _attach(limb: String, tex: Texture2D, behind: bool, tint: Material) -> void:
 	if tex == null:
 		return
 	var node: Node2D = _limbs[limb]["node"]
@@ -230,7 +227,7 @@ func _attach(limb: String, tex: Texture2D, behind: bool, material: Material) -> 
 	# moves, so lay the canvas back where it was when the limb was at rest.
 	sprite.offset = Vector2(-tex.get_width() * 0.5, -tex.get_height())
 	sprite.transform = (_limbs[limb]["rest"] as Transform2D).affine_inverse()
-	sprite.material = material
+	sprite.material = tint
 	node.add_child(sprite)
 	if behind:
 		sprite.show_behind_parent = true
@@ -256,7 +253,7 @@ func _process_rig(delta: float) -> void:
 	if sad > 0.0:
 		_sigh += delta
 	var drop := 4.0 * sad + (sin(_sigh * 1.3) * 0.5 + 0.5) * 1.5 * sad if sad > 0.0 else 0.0
-	_rig.position = _rig_base + Vector2(0, 0 if face_only else drop)
+	_rig.position = _rig_base + Vector2(0, 0.0 if face_only else drop)
 	var marker := _rig.find_child("Hand", true, false) as Node2D
 	if marker and is_inside_tree():
 		hand = global_transform.affine_inverse() * marker.global_position
@@ -573,7 +570,7 @@ func _draw_neckwear(bob: float) -> void:
 			draw_circle(Vector2(9, y + 6), 3, colour.lightened(0.3), true, -1.0, true)
 
 
-func _draw_head(h: Vector2, skin: Color, hair_tone: Color, with_hat: bool = true) -> void:
+func _draw_head(h: Vector2, skin: Color, hair_tone: Color) -> void:
 	var colour := _hair_colour(hair_tone)
 	_draw_hair(h, colour, true)
 	draw_circle(h, 16, skin, true, -1.0, true)
@@ -581,8 +578,7 @@ func _draw_head(h: Vector2, skin: Color, hair_tone: Color, with_hat: bool = true
 	_draw_face(h)
 	_draw_facial_hair(h, colour)
 	_draw_hair(h, colour, false)
-	if with_hat:
-		_draw_hat(h)
+	_draw_hat(h)
 
 
 ## The hair's colour: the player's, or a hair gift's own.

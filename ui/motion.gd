@@ -113,14 +113,14 @@ static func shake(control: Control, distance: float = 10.0) -> Tween:
 
 ## A quick rock from side to side about its centre, for "that's locked" or
 ## "not yet" on things that sit in a layout (which a shake would fight).
-static func wiggle(control: Control, degrees: float = 7.0) -> Tween:
+static func wiggle(control: Control) -> Tween:
 	control.pivot_offset = control.size * 0.5
 	var t := tween(control, "wiggle")
 	if reduced() or still:
 		t.tween_property(control, "rotation", 0.0, 0.01)
 		return t
 	for i in 4:
-		var a := deg_to_rad(degrees * (1.0 - i * 0.22) * (1.0 if i % 2 == 0 else -1.0))
+		var a := deg_to_rad(7.0 * (1.0 - i * 0.22) * (1.0 if i % 2 == 0 else -1.0))
 		t.tween_property(control, "rotation", a, 0.06)
 	t.tween_property(control, "rotation", 0.0, 0.06)
 	return t

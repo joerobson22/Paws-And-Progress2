@@ -16,8 +16,8 @@ func test_no_gift_under_ten_minutes() -> void:
 
 
 func test_legendary_only_from_45_minutes() -> void:
-	eq(GiftRoller.percentages_for(2699, table)["legendary"], 0)
-	check(GiftRoller.percentages_for(2700, table)["legendary"] > 0)
+	eq(GiftRoller.chances(2699, table)["legendary"], 0.0)
+	check(GiftRoller.chances(2700, table)["legendary"] > 0.0)
 
 
 func test_gift_matches_table_and_rarity() -> void:

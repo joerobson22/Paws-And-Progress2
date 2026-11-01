@@ -71,7 +71,7 @@ var _look: Dictionary = {}
 var _flash := 0.0
 var _bolt := -1
 var _thunder_for := -1
-## One entry per layer: {data, node, chunks: {index: _Chunk}, animated}.
+## One entry per layer: {data, node, chunks: {index: SceneryPainter}, animated}.
 var _layers: Array = []
 var _sky: _Sky
 var _clouds: _Clouds
@@ -346,10 +346,6 @@ func darkness() -> float:
 	return float(_light.get("dark", 0.0))
 
 
-func is_dark() -> bool:
-	return darkness() >= 0.5
-
-
 func time() -> float:
 	return _time
 
@@ -384,9 +380,9 @@ func _place_chunks() -> void:
 				chunks[i].queue_free()
 				chunks.erase(i)
 		for i in range(first, last + 1):
-			var chunk: _Chunk = chunks.get(i)
+			var chunk: SceneryPainter = chunks.get(i)
 			if chunk == null:
-				chunk = _Chunk.new()
+				chunk = SceneryPainter.new()
 				chunk.scenery = self
 				chunk.layer = layer["data"]
 				chunk.index = i
@@ -460,29 +456,6 @@ static func _noise(t: float, sd: float) -> float:
 ## Stable pseudo-random 0..1 for an integer slot.
 static func _hash(i: int, sd: float) -> float:
 	return SceneryPainter._hash(i, sd)
-
-
-## One stretch of one layer, drawn in its own space: x runs 0..CHUNK across it.
-class _Chunk extends SceneryPainter:
-	var scenery: Scenery
-
-	func _view() -> Vector2:
-		return scenery.size
-
-	func _now() -> float:
-		return scenery.time()
-
-	func _path() -> float:
-		return scenery.path_y()
-
-	func _lit() -> bool:
-		return scenery._lights_on
-
-	func _gap() -> Vector2:
-		return scenery.front_gap
-
-	func _holiday() -> HolidayLook:
-		return scenery._holiday
 
 
 ## Snow piling up along the bottom of the screen as you walk at Christmas:

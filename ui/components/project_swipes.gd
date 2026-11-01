@@ -17,32 +17,32 @@ static func row(panel: Control, p: ProjectData) -> SwipeRow:
 	return r
 
 
-## Acts on a swipe of `row` (project `id`) in `direction` (+1 right, -1
+## Acts on a swipe of row `swipe` (project `id`) in `direction` (+1 right, -1
 ## left), playing its animation first. `keep_ongoing` / `keep_completed`
 ## say whether the row stays in its list once the project is ongoing /
 ## completed; otherwise its gap closes up. Await it: it returns once the
 ## project has changed.
-static func act(direction: int, row: SwipeRow, id: String, keep_ongoing: bool, keep_completed: bool) -> void:
+static func act(direction: int, swipe: SwipeRow, id: String, keep_ongoing: bool, keep_completed: bool) -> void:
 	var p := App.state.project(id)
 	if p == null:
-		row.spring_back()
+		swipe.spring_back()
 		return
 	if direction > 0:
 		var at := App.state.projects.find(p)
-		await row.vanish()
+		await swipe.vanish()
 		App.delete_project(id)
 		Toast.show_action(Text.t("projects.deleted", {"project": p.name}), "bin", Text.t("common.undo"), func():
 			App.restore_project(p, at))
 	elif p.is_complete():
-		row.spring_back()
+		swipe.spring_back()
 		if not keep_ongoing:
-			await row.collapse()
+			await swipe.collapse()
 		App.reopen_project(id)
 		Toast.show_text(Text.t("projects.reopened", {"project": p.name}), "hourglass")
 	else:
 		Audio.play("project_complete")
-		await row.celebrate()
+		await swipe.celebrate()
 		if not keep_completed:
-			await row.collapse()
+			await swipe.collapse()
 		App.complete_project(id)
 		Toast.show_text(Text.t("projects.completed_toast", {"project": p.name}), "check")
