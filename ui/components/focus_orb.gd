@@ -7,6 +7,9 @@ extends Control
 ## Under the pointer it eases a little bigger and a shade deeper, and it dips
 ## when pressed. Tapping it is how a focus session starts: it swells to fill
 ## the screen alongside the choose focus screen's opening circle.
+## On a holiday it takes the holiday's colours instead (HolidayLook's
+## orb_colours: a rainbow on your birthday, reds and oranges at Halloween),
+## each blob drifting through them in turn, easing over when the day changes.
 
 signal tapped
 
@@ -54,6 +57,17 @@ var _grow := 1.0
 var _shade := 0.0
 ## Swelling to fill the screen after a tap.
 var _filling := false
+## The holiday colours shown (empty for the usual greens and blues), the
+## ones before them, and how far it has eased from those to these (0 to 1).
+var _palette := PackedColorArray()
+var _old_palette := PackedColorArray()
+var _blend := 1.0
+## How much more solidly a holiday's colours are drawn than the usual ones.
+const PALETTE_SOLID := 1.8
+## How long it takes to ease into a holiday's colours.
+const PALETTE_EASE := 1.2
+## False until its first frame.
+var _drawn := false
 
 
 func _init() -> void:
@@ -64,7 +78,56 @@ func _init() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta * (0.4 if Motion.reduced() else 1.0)
+	var look := App.holiday_look()
+	var want := look.orb_colours if look else PackedColorArray()
+	if want != _palette:
+		_old_palette = _palette
+		_palette = want
+		# Easing over, unless it's its first frame or it's out of sight.
+		_blend = 0.0 if _drawn and is_visible_in_tree() else 1.0
+	_drawn = true
+	_blend = minf(1.0, _blend + delta / PALETTE_EASE)
 	queue_redraw()
+
+
+## Blob `k`'s colour at `time` from `palette` (empty: the usual drift
+## between greens and blues). Each blob starts further along the palette and
+## they all drift through it, once round every TINT_PERIOD seconds.
+static func blob_colour(k: int, time: float, palette: PackedColorArray) -> Color:
+	if palette.is_empty():
+		var tint := tint_at(time)
+		return Color.from_string(BLOBS[k][0], Color.WHITE).lerp(Color.from_string(BLUES[k], Color.WHITE), tint)
+	var n := palette.size()
+	var at := fposmod(float(k) * n / BLOBS.size() + time / TINT_PERIOD * n, float(n))
+	var i := floori(at)
+	return palette[i % n].lerp(palette[(i + 1) % n], smoothstep(0.0, 1.0, at - i))
+
+
+## The faint halo's colour.
+static func halo_colour(time: float, palette: PackedColorArray) -> Color:
+	if palette.is_empty():
+		return Color(0.38, 0.65, 0.52).lerp(Color(0.36, 0.55, 0.74), tint_at(time))
+	var sum := Color(0, 0, 0, 0)
+	for c in palette:
+		sum += c
+	return sum / float(palette.size())
+
+
+## Blob `k`'s colour now, eased over from the old palette.
+func _colour(k: int) -> Color:
+	var c := _shown(k, _palette)
+	if _blend < 1.0:
+		c = _shown(k, _old_palette).lerp(c, smoothstep(0.0, 1.0, _blend))
+	return c
+
+
+func _shown(k: int, palette: PackedColorArray) -> Color:
+	var c := blob_colour(k, _time, palette)
+	if not UI.dark and palette.is_empty():
+		# Richer by day, so it doesn't wash out against a bright sky (a
+		# holiday's colours are already as rich as they should be).
+		c = Color.from_hsv(c.h, minf(1.0, c.s * LIGHT_SATURATE), c.v * (1.0 - LIGHT_DEPTH))
+	return c
 
 
 func radius() -> float:
@@ -75,9 +138,13 @@ func _draw() -> void:
 	var c := size * 0.5
 	var base := radius() * _grow
 	var breathe := 1.0 + 0.045 * sin(_time * 0.55) + 0.02 * sin(_time * 1.27 + 1.0)
-	var tint := tint_at(_time)
+	# A holiday's colours are drawn more solidly: mixed see-through, unlike
+	# colours (red over green) turn muddy.
+	var solid := lerpf(1.0 if _old_palette.is_empty() else PALETTE_SOLID, 1.0 if _palette.is_empty() else PALETTE_SOLID, smoothstep(0.0, 1.0, _blend))
 	# A faint halo so the orb sits softly on the page.
-	var halo := Color(0.38, 0.65, 0.52).lerp(Color(0.36, 0.55, 0.74), tint)
+	var halo := halo_colour(_time, _palette)
+	if _blend < 1.0:
+		halo = halo_colour(_time, _old_palette).lerp(halo, smoothstep(0.0, 1.0, _blend))
 	for i in 6:
 		draw_circle(c, base * breathe * (1.02 + i * 0.035), Color(halo, 0.035), true, -1.0, true)
 	for k in BLOBS.size():
@@ -85,12 +152,9 @@ func _draw() -> void:
 		var angle: float = b[5] + _time * b[4]
 		var wobble := 1.0 + 0.035 * sin(_time * 0.9 + b[5] * 2.0)
 		var p: Vector2 = c + Vector2(cos(angle), sin(angle)) * base * b[3] * breathe
-		var colour := Color.from_string(b[0], Color.WHITE).lerp(Color.from_string(BLUES[k], Color.WHITE), tint)
-		if not UI.dark:
-			# Richer by day, so it doesn't wash out against a bright sky.
-			colour = Color.from_hsv(colour.h, minf(1.0, colour.s * LIGHT_SATURATE), colour.v * (1.0 - LIGHT_DEPTH))
+		var colour := _colour(k)
 		colour = colour.darkened(HOVER_SHADE * _shade)
-		draw_circle(p, base * b[2] * breathe * wobble, Color(colour, minf(1.0, b[1] * DEPTH)), true, -1.0, true)
+		draw_circle(p, base * b[2] * breathe * wobble, Color(colour, minf(1.0, b[1] * DEPTH * solid)), true, -1.0, true)
 
 
 ## How far towards blue the colours are at `time` seconds: 0 green, 1 blue,

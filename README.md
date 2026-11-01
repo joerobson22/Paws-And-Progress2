@@ -348,7 +348,7 @@ names on the left alone.
   achievements stay with the rest of their details in the other `data/` files.
 
 In code, `Text.t("profile.title")` gets a line,
-`Text.t("choose_focus.say_hello", {"pet": name})` fills one in,
+`Text.t("choose_focus.rehomed", {"pet": name})` fills one in,
 `Text.count("stats.days", n)` picks one or many, and `Text.list("quotes")`
 gets a list. The unit tests check that every key the code uses is in the file.
 

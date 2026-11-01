@@ -75,7 +75,7 @@ func _run() -> void:
 	# The map sits in the bottom left corner. With a mouse it grows up and to
 	# the right while the pointer is over it (an icon fading in on each
 	# screen's tile), stays big while the pointer moves over its tiles, and
-	# shrinks a moment after the pointer leaves. Clicking a tile goes there.
+	# shrinks as soon as the pointer leaves. Clicking a tile goes there.
 	var map: Control = main._minimap
 	var small: Vector2 = map.size
 	check(map.mouse_default_cursor_shape == Control.CURSOR_CAN_DROP, "the map shows the open hand")
@@ -100,10 +100,9 @@ func _run() -> void:
 	await _wait(40)
 	check(main._at == Vector2i(0, 1) and map.open, "clicking the stats tile goes there, and the map stays big under the pointer")
 	await _point(main.size * Vector2(0.6, 0.4))
-	await _wait(10)
-	check(map.open, "it lingers a moment after the pointer leaves...")
-	await _wait(30)
-	check(not map.open and map._grow < 0.01, "...then shrinks")
+	check(not map.open, "it starts shrinking the moment the pointer leaves")
+	await _wait(20)
+	check(map._grow < 0.01, "and is small again a moment later")
 	await _key(KEY_ESCAPE)
 	await _wait(30)
 
@@ -908,17 +907,17 @@ func _run() -> void:
 	check(times == sorted_times, "sorting by focus time puts the most walked first")
 	var level: int = app.level()
 	check(level > 1 and level < 15, "sample player is part way up (level %d)" % level)
-	var first_pet: Resource = chooser._current_pet()
+	# The place only changes when you pick one: swiping between pets keeps it.
+	check(chooser._scenery.biome["id"] == app.focus_place(), "it opens where you last focused (%s)" % chooser._scenery.biome["id"])
 	chooser._pick_place("beach")
 	await _wait(50)
-	check(first_pet.place == "beach" and chooser._scenery.biome["id"] == "beach", "picking an unlocked place sends this pet there")
+	check(chooser._scenery.biome["id"] == "beach", "picking an unlocked place goes there")
 	chooser._pets.go_to(1)
 	await _wait(50)
-	var second_pet: Resource = chooser._current_pet()
-	check(chooser._scenery.biome["id"] == app.pet_place(second_pet), "the next pet stands in its own place (%s)" % chooser._scenery.biome["id"])
+	check(chooser._scenery.biome["id"] == "beach" and chooser._stack.size() == 1, "the next pet stays at the beach")
 	chooser._pets.go_to(0)
 	await _wait(50)
-	check(chooser._scenery.biome["id"] == "beach", "and the first is still at the beach")
+	check(chooser._scenery.biome["id"] == "beach", "and so does the first")
 	await _shot("choose_beach")
 	# Picking places quickly: each fades in from wherever the last had got
 	# to, and the highlight slides along in the same time.
@@ -952,7 +951,7 @@ func _run() -> void:
 	await _wait(50)
 	chooser._pick_place("moon")
 	await _wait(30)
-	check(first_pet.place == "beach", "a locked place can't be picked")
+	check(chooser._place_id() == "beach", "a locked place can't be picked")
 	check(not modal_class.is_open(), "it opens no popup")
 	chooser._pick_place("moon")
 	await _wait(2)
@@ -1085,6 +1084,8 @@ func _run() -> void:
 	check(app.state.pets.size() == count + 1, "adopting adds a pet")
 	check(app.state.pets.back().name == "Bramble", "adopting keeps the pet's name")
 	check(chooser._current_pet() == app.state.pets.back(), "and the new pet is in the middle")
+	var new_home := str(_content().animal(app.state.pets.back().animal_id).get("home", ""))
+	check(not app.can_walk_in(new_home) or chooser._place_id() == new_home, "and the place switches to its home (%s)" % new_home)
 	await _wait(150 if _shots_dir != "" else 10)
 	# Rehoming takes the pet out of the list but keeps it on its projects.
 	var leaving: PetData = chooser._current_pet()
@@ -1100,15 +1101,19 @@ func _run() -> void:
 	# set off and the clock start. Then the time drops in and the
 	# encouragement types itself out.
 	var setting_off: PetData = chooser._current_pet()
+	var setting_place: String = chooser._place_id()
 	app.state.settings["last_project"] = app.state.projects[1].id
 	chooser._start_walk(chooser._pets.index)
+	await _wait(2)
+	check(main._prepared != null and main._prepared.get_child(0)._scenery.biome["id"] == setting_place,
+		"the walk is built underneath while the pet steps over")
 	await _wait(25)
 	check(chooser._top.modulate.a < 0.5 and chooser._bottom.modulate.a < 0.5, "the screen's buttons fade away")
 	await _shot("set_off_pet_to_path")
 	await _wait(60)
 	var arriving: Node = main._flows.back().get_child(0)
 	check(arriving.get("_arriving") == true and app.state.active == null, "the walk opens with you walking in, before the clock starts")
-	check(arriving._animal.animal_id == setting_off.animal_id and arriving._scenery.biome["id"] == app.pet_place(setting_off), "with that pet, in its place")
+	check(arriving._animal.animal_id == setting_off.animal_id and arriving._scenery.biome["id"] == setting_place, "with that pet, in the place picked")
 	await _wait(30)
 	await _shot("set_off_walking_in")
 	check(arriving._walker.position.x < arriving._animal.position.x - 100.0, "you walk in from the left")
@@ -1433,7 +1438,7 @@ func _holidays(main: Node) -> void:
 			await _shot("holiday_%s_present" % id)
 			_close_modal()
 			await _wait(30)
-			check(app.claim_holiday_gift() == "", "only once a year")
+			check(app.claim_holiday_gift().is_empty(), "only once a year")
 		check((main._decor_layer.get_child_count() > 0) == (look.menu_scene != null), "%s's decorations hang over the screens" % id)
 		var greeting: String = main._panes[Vector2i.ZERO]._greeting.text
 		var lines: Array = _class("res://core/text.gd").list("greetings.holidays." + id).map(
@@ -1453,6 +1458,18 @@ func _holidays(main: Node) -> void:
 				var me: Node = _class("res://ui/components/character_view.gd").new()
 				check(me._item("hat").get("id", "") == "party_hat", "your party hat stays on on your birthday")
 				me.free()
+				# The hats can't be changed: held on the party hat.
+				var dressing: Node = _class("res://scenes/customise/customise.gd").open()
+				await _wait(25)
+				var hats: Node = _find(dressing.body, func(n): return _is(n, "carousel.gd") and n.locked)
+				check(hats != null and hats.items[hats.index].accessibility_name == "Party Hat", "the hats are held on the party hat")
+				if hats:
+					hats.go_to(0)
+					await _wait(10)
+					check(hats.items[hats.index].accessibility_name == "Party Hat", "and can't be scrolled")
+				await _shot("holiday_birthday_hats")
+				_close_modal()
+				await _wait(20)
 		app.go("profile")
 		await _wait(50)
 		await _shot("holiday_%s_profile" % id)
@@ -1675,7 +1692,6 @@ func _fill_sample_data() -> void:
 		pet.animal_id = animals[i]
 		pet.colours = content.animal_default_colours(animals[i])
 		pet.adopted_unix = now - (34 - i) * 86400
-		pet.place = places[i]
 		app.add_pet(pet)
 	for i in names.size():
 		var p := ProjectData.new()
@@ -1992,10 +2008,43 @@ func _accounts(main: Node) -> void:
 			await _wait(60)
 	var new_slot: String = app.slot
 	check(new_slot != home_slot and not app.needs_account(), "Create makes a new account")
+	# Arriving home: while the view tilts up only the debug switches show;
+	# then the orb grows from nothing, the greeting drops in and types
+	# itself out, "Tap to focus" rises in, and last the map and the arrows.
+	var home_pane: Node = main._panes[Vector2i.ZERO]
+	check(home_pane._orb.scale.x < 0.05 and home_pane._greeting.modulate.a < 0.05 and home_pane._hint.modulate.a < 0.05,
+		"arriving home, the orb and the words wait for the view")
+	check(main._minimap.modulate.a < 0.05 and main._arriving, "and so do the map and the arrows")
+	check(home_pane._debug == null or home_pane._debug.is_visible_in_tree(), "but the debug switches are there")
 	if main._backdrop:
 		check(main._backdrop.look_down > 0.0 and main._backdrop.look_down < 1.0, "and the view tilts up to the sky (%.2f)" % main._backdrop.look_down)
 		await _wait(100)
 		check(main._backdrop.look_down < 0.01, "all the way")
+	for i in 60:
+		if home_pane._orb.scale.x > 0.99:
+			break
+		await _wait(3)
+	check(home_pane._orb.scale.x > 0.99 and main._minimap.modulate.a < 0.05, "the orb grows in once the view's up")
+	await _wait(20)
+	check(home_pane._greeting.modulate.a > 0.5 and home_pane._greeting.visible_characters >= 0 and home_pane._greeting.visible_characters < home_pane._greeting.text.length(),
+		"then the greeting types itself out (%d of %d)" % [home_pane._greeting.visible_characters, home_pane._greeting.text.length()])
+	await _shot("arriving_greeting")
+	check(home_pane._greeting.text.contains("Sam") or not home_pane._greeting.text.contains("{"), "greeting you by your new name")
+	for i in 120:
+		if not main._arriving:
+			break
+		await _wait(5)
+	check(not main._arriving and home_pane._hint.modulate.a > 0.99 and home_pane._greeting.visible_characters == -1, "then Tap to focus rises in")
+	await _wait(50)
+	check(main._minimap.modulate.a > 0.99 and home_pane._home.modulate.a > 0.99, "and last the map and the home icon")
+	# With no pets and no projects there's only up and down.
+	check(not main._can_go(Vector2i(-1, 0)) and not main._can_go(Vector2i(1, 0)) and main._can_go(Vector2i(0, 1)), "no pets or projects: only up and down")
+	check(main._minimap.cells.size() == 3 and not main._minimap.cells.has(Vector2i(1, 0)), "the map shows just those")
+	check(main._minimap.size.x < main._minimap.size.y * 0.6, "in a map one tile wide")
+	await _key(KEY_RIGHT)
+	await _wait(30)
+	check(main._at == Vector2i.ZERO, "and the arrow keys can't go sideways")
+	await _shot("arriving_home")
 	check(app.state.profile["username"] == "Sam" and app.state.profile["institution"] == "University of York", "with that name and place")
 	check(app.state.profile["dob"] == "2012-03-14" and app.state.profile["agreed_unix"] > 0, "and date of birth, and when they agreed")
 	check(main._at == Vector2i.ZERO and main._account == null, "and goes to the focus screen")
@@ -2039,6 +2088,11 @@ func _accounts(main: Node) -> void:
 	if home_card:
 		await _tap_control(home_card, main)
 		await _wait(60)
+		# (A slow machine can take a moment longer to switch.)
+		for i in 20:
+			if not app.needs_account() and not modal_class.is_open():
+				break
+			await _wait(6)
 	check(app.slot == home_slot and app.state.profile["username"] == "Joe" and not app.needs_account() and not modal_class.is_open(), "tapping its card logs back in")
 	check(main._at == Vector2i.ZERO and main._account == null and not app.state.projects.is_empty(), "on the focus screen, as it was left")
 	# Debug builds only give the first slot sample friends; the rest of the

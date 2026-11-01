@@ -14,10 +14,19 @@ static var _looks := {}
 ## `list` (Content.holidays) in order, the first that matches; "" for none.
 ## `dob` is your date of birth, "YYYY-MM-DD" ("" for not given).
 static func on(t: Dictionary, list: Array, dob: String) -> String:
+	var all := all_on(t, list, dob)
+	return all[0] if not all.is_empty() else ""
+
+
+## Every holiday on at `t`, in `list`'s order: on your birthday at
+## Christmas the app dresses for your birthday (the first), but both
+## presents are given.
+static func all_on(t: Dictionary, list: Array, dob: String) -> Array[String]:
+	var out: Array[String] = []
 	for h in list:
 		if is_on(h, t, dob):
-			return str(h["id"])
-	return ""
+			out.append(str(h["id"]))
+	return out
 
 
 static func is_on(h: Dictionary, t: Dictionary, dob: String) -> bool:

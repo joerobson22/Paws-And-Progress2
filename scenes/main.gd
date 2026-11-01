@@ -59,6 +59,10 @@ var _at := Vector2i.ZERO
 var _moving := false
 var _flow_layer := Control.new()
 var _flows: Array[CircleReveal] = []
+## A flow built out of sight under the one showing (App.prepare()), and
+## which screen it is.
+var _prepared: CircleReveal
+var _prepared_for := ""
 var _modal_layer := Control.new()
 ## Holds the picture of the old colours while it fades out.
 var _fade_layer := Control.new()
@@ -74,10 +78,11 @@ const BACKDROP := "res://art/home/backdrop.tscn"
 const SKY_EVERY := 20.0
 ## The window settings last put in place, so only a change to them moves it.
 var _window_applied := ""
-## How long the view takes to tilt up from the ground after creating an account.
-const ACCOUNT_RISE := 1.6
 ## True while the create account screen is up (App.needs_account()).
 var _locked := false
+## True while arriving home after making an account (the focus screen's
+## intro): the map and the arrows wait till it's done.
+var _arriving := false
 ## Holds the create account screen, over flows and under popups.
 var _account_layer := Control.new()
 var _account: CreateAccount
@@ -155,7 +160,7 @@ func _ready() -> void:
 		_arrows[dir] = arrow
 	_minimap = Minimap.new()
 	_minimap.hover_grow = not App.phone_layout()
-	_minimap.cells = _names
+	_minimap.cells = _names.duplicate()
 	_minimap.picked.connect(_go_cell)
 	add_child(_minimap)
 
@@ -174,12 +179,14 @@ func _ready() -> void:
 	add_child(_phone_frame)
 
 	App.navigate.connect(_open)
+	App.prepare_screen.connect(_prepare_flow)
 	get_viewport().size_changed.connect(_fit_design_size)
 	resized.connect(_layout)
 	_layout()
 	_panes[_at].show_pane()
 	_minimap.show_cell(_at, true)
 	_sync_lock(true)
+	_sync_map_cells()
 	_dress_screens()
 	_give_holiday_present.call_deferred()
 
@@ -308,8 +315,8 @@ func _ways_from(cell: Vector2i) -> Array[Vector2i]:
 ## and hide while moving, during walks and while a popup is up.
 func _process(_delta: float) -> void:
 	var arrows_on := not App.phone_layout() and not _moving and not _swiping \
-		and _flows.is_empty() and not Modal.is_open() and not _locked
-	var ways: Array[Vector2i] = _ways_from(_at) if arrows_on else ([] as Array[Vector2i])
+		and _flows.is_empty() and not Modal.is_open() and not _locked and not _arriving
+	var ways: Array[Vector2i] = _ways_from(_at).filter(func(d: Vector2i): return _can_go(_at + d)) if arrows_on else ([] as Array[Vector2i])
 	for dir in _arrows:
 		_arrows[dir].appear(ways.has(dir))
 	if is_instance_valid(_backdrop):
@@ -325,6 +332,7 @@ func _on_state_changed() -> void:
 	_apply_window()
 	_fit_design_size()
 	_sync_lock()
+	_sync_map_cells()
 	_on_sky_tick()
 
 
@@ -364,10 +372,14 @@ func _dress_screens() -> void:
 func _give_holiday_present() -> void:
 	if _locked or not _flows.is_empty() or Modal.is_open():
 		return
-	var gift_id := App.claim_holiday_gift()
-	if gift_id == "":
+	var present := App.claim_holiday_gift()
+	if present.is_empty():
 		return
-	GiftDetails.open(gift_id, true, true, true, Text.t("holiday.present." + App.holiday()))
+	GiftDetails.open(present["gift"], true, true, true, Text.t("holiday.present." + str(present["holiday"])))
+	# Your birthday at Christmas: the next present once this one's put away.
+	var shown := Modal.top()
+	if shown:
+		shown.closed.connect(func(_r): _give_holiday_present.call_deferred())
 
 
 ## Swaps light and dark without anything moving: the screen on show is
@@ -447,7 +459,6 @@ func _sync_lock(instant: bool = false) -> void:
 		_show_account(instant)
 		_show_home(false, instant)
 		return
-	_show_home(true, instant)
 	if _at != Vector2i.ZERO:
 		_at = Vector2i.ZERO
 		_minimap.show_cell(_at, true)
@@ -455,6 +466,8 @@ func _sync_lock(instant: bool = false) -> void:
 		_panes[_at].visible = true
 		_panes[_at].show_pane()
 		_hide_others()
+	# (Once the focus screen's on, as it plays its intro.)
+	_show_home(true, instant)
 	var going := _account
 	_account = null
 	if going:
@@ -467,11 +480,20 @@ func _sync_lock(instant: bool = false) -> void:
 ## Fades the screens and the minimap in or out, leaving the hilltop view:
 ## the create account screen sits straight on it.
 func _show_home(on: bool, instant: bool) -> void:
+	_arriving = on and not instant
+	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE if _arriving else Control.MOUSE_FILTER_STOP
 	for item: CanvasItem in [_world, _minimap]:
 		if instant:
 			item.modulate.a = 1.0 if on else 0.0
-		else:
+		elif not (_arriving and item == _minimap):
 			Motion.fade(item, 1.0 if on else 0.0, Motion.NORMAL)
+	if _arriving:
+		# The focus screen plays its intro as the view tilts up, then the
+		# map and the arrows come in.
+		var focus: Node = _panes[Vector2i.ZERO]
+		if not focus.intro_done.is_connected(_on_arrived):
+			focus.intro_done.connect(_on_arrived)
+		focus.intro(Motion.style.account_rise)
 	# The create account screen looks down at the hilltop under your feet;
 	# once it's done the view tilts up to the forest and the sky.
 	if is_instance_valid(_backdrop):
@@ -479,7 +501,17 @@ func _show_home(on: bool, instant: bool) -> void:
 		if instant:
 			_backdrop.look_down = down
 		else:
-			Motion.to(_backdrop, "look_down", down, ACCOUNT_RISE if on else Motion.SLOW)
+			Motion.to(_backdrop, "look_down", down, Motion.style.account_rise if on else Motion.SLOW)
+
+
+## The focus screen's intro is done: the map fades in (the arrows follow
+## by themselves, see _process).
+func _on_arrived() -> void:
+	if not _arriving:
+		return
+	_arriving = false
+	_minimap.mouse_filter = Control.MOUSE_FILTER_STOP
+	Motion.fade(_minimap, 1.0, Motion.style.home_ui_fade)
 
 
 func _show_account(instant: bool, typed: Dictionary = {}) -> void:
@@ -490,10 +522,28 @@ func _show_account(instant: bool, typed: Dictionary = {}) -> void:
 		Motion.fade(_account, 1.0, Motion.NORMAL)
 
 
-## True if you can go to `cell`: anywhere, unless a new save slot is
-## keeping you on the profile screen.
+## True if you can go to `cell`: anywhere, unless the create account screen
+## is up. Until you've a pet or a project, only up and down (see
+## _sideways_open()).
 func _can_go(cell: Vector2i) -> bool:
-	return _panes.has(cell) and not _locked
+	return _panes.has(cell) and not _locked and (cell.x == 0 or _sideways_open())
+
+
+## The screens to either side (gifts and projects) open once you have a pet
+## or a project; before then there's only your profile and your stats.
+func _sideways_open() -> bool:
+	return not (App.state.active_pets().is_empty() and App.state.projects.is_empty())
+
+
+## The map shows only the screens you can go to (and the one you're on).
+func _sync_map_cells() -> void:
+	var cells := {}
+	for cell in _names:
+		if cell == _at or cell.x == 0 or _sideways_open():
+			cells[cell] = _names[cell]
+	if cells.keys() != _minimap.cells.keys():
+		_minimap.cells = cells
+		_minimap.queue_redraw()
 
 func _open(screen: String, params: Dictionary) -> void:
 	if PANES.has(screen):
@@ -525,6 +575,7 @@ func _slide_to(cell: Vector2i, seconds: float = Motion.NORMAL + 0.06) -> void:
 		pane.show_pane()
 	_at = cell
 	_minimap.show_cell(cell)
+	_sync_map_cells()
 	_moving = true
 	await Motion.to(_world, "position", -Vector2(cell) * size, seconds).finished
 	_moving = false
@@ -541,7 +592,27 @@ func _hide_others() -> void:
 				_panes[c].hide_pane()
 
 
-func _open_flow(screen: String, params: Dictionary, instant: bool = false) -> void:
+## Builds a flow fully open under the one showing (hidden behind it), so
+## its first frame is already drawn when it takes over: the walk is made
+## while your pet steps over to the path, so the scene never blinks empty.
+func _prepare_flow(screen: String, params: Dictionary) -> void:
+	_drop_prepared()
+	if not FLOWS.has(screen) or _flows.is_empty():
+		return
+	_prepared = _make_flow(screen, params)
+	_prepared_for = screen
+	_flow_layer.move_child(_prepared, 0)
+	_prepared.open(true)
+
+
+func _drop_prepared() -> void:
+	if is_instance_valid(_prepared):
+		_prepared.queue_free()
+	_prepared = null
+	_prepared_for = ""
+
+
+func _make_flow(screen: String, params: Dictionary) -> CircleReveal:
 	var content: Control = load(FLOWS[screen]).new()
 	content.set("params", params)
 	content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -549,6 +620,24 @@ func _open_flow(screen: String, params: Dictionary, instant: bool = false) -> vo
 	reveal.origin = params.get("from", size * 0.5)
 	reveal.add_child(content)
 	_flow_layer.add_child(reveal)
+	return reveal
+
+
+func _open_flow(screen: String, params: Dictionary, instant: bool = false) -> void:
+	var reveal: CircleReveal
+	if is_instance_valid(_prepared) and _prepared_for == screen:
+		# Already built (and drawn) underneath: it comes to the top and
+		# carries on from there.
+		reveal = _prepared
+		_prepared = null
+		_prepared_for = ""
+		_flow_layer.move_child(reveal, -1)
+		var content: Node = reveal.get_child(0)
+		if content.has_method("begin"):
+			content.begin()
+	else:
+		_drop_prepared()
+		reveal = _make_flow(screen, params)
 	var below := _flows.duplicate()
 	_flows.append(reveal)
 	_minimap.shrink(true)
@@ -567,6 +656,7 @@ func _open_flow(screen: String, params: Dictionary, instant: bool = false) -> vo
 
 ## Back to the focus screen from any flow, shrinking the circle away.
 func _close_flows() -> void:
+	_drop_prepared()
 	if _flows.is_empty():
 		return
 	var top: CircleReveal = _flows.back()

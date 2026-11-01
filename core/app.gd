@@ -9,6 +9,8 @@ extends Node
 @warning_ignore("unused_signal")
 signal sky_moved
 signal navigate(screen: String, params: Dictionary)
+## A full-screen flow to build out of sight, ready for App.go() (see prepare()).
+signal prepare_screen(screen: String, params: Dictionary)
 signal state_changed
 
 var state: GameState
@@ -36,7 +38,7 @@ var _facts := {}
 var _facts_key := ""
 var _changes := 0
 ## The holiday last worked out, and for which minute and save (see holiday()).
-var _holiday := ""
+var _holidays: Array[String] = []
 var _holiday_key := ""
 
 
@@ -123,6 +125,13 @@ func save() -> void:
 
 func go(screen: String, params: Dictionary = {}) -> void:
 	navigate.emit(screen, params)
+
+
+## Builds a full-screen flow under the one showing, out of sight, so it's
+## fully drawn the moment App.go() opens it with the same screen (the
+## params given here are the ones it opens with).
+func prepare(screen: String, params: Dictionary = {}) -> void:
+	prepare_screen.emit(screen, params)
 
 
 # --- Save slots --------------------------------------------------------------
@@ -361,19 +370,16 @@ func free_pet_name(animal_id: String) -> String:
 	return pick
 
 
-## Where a pet walks: the place last picked for it, else its animal's home.
-func pet_place(p: PetData) -> String:
-	if p.place != "":
-		return p.place
-	return str(Content.animal(p.animal_id).get("home", "lake"))
+## Where you last focused: the place the choose focus screen opens on
+## (lakeside before your first walk, or if that place is locked again).
+func focus_place() -> String:
+	var id := str(state.settings.get("walk_biome", "lake"))
+	return id if can_walk_in(id) else "lake"
 
 
-## The place a pet walks from now on.
-func set_pet_place(id: String, place_id: String) -> void:
-	var p := state.pet(id)
-	if p and p.place != place_id:
-		p.place = place_id
-		_changed()
+## True if `id` is a place you can walk in now.
+func can_walk_in(id: String) -> bool:
+	return id != "" and Content.biome(id).get("id", "") == id and is_unlocked("place", id)
 
 
 ## `grade_ref` is "<scale>/<grade>" from data/grades.json, or "" for none.
@@ -531,15 +537,24 @@ func debug_add_minutes(minutes: int) -> void:
 ## ordinary day. Debug builds can try one out from the debug bar
 ## ("debug_holiday": an id, or "none" for an ordinary day whatever the date).
 func holiday() -> String:
+	var all := holidays()
+	return all[0] if not all.is_empty() else ""
+
+
+## Every holiday on now, the one the app dresses for first (your birthday
+## beats the others): each gives its present. Debug builds can force one.
+func holidays() -> Array[String]:
 	if OS.is_debug_build():
 		var forced := str(state.settings.get("debug_holiday", ""))
-		if forced == "none" or not Content.holiday(forced).is_empty():
-			return "" if forced == "none" else forced
+		if forced == "none":
+			return []
+		if not Content.holiday(forced).is_empty():
+			return [forced]
 	var key := "%d:%d:%d" % [floori(now() / 60.0), state.get_instance_id(), _changes]
 	if key != _holiday_key:
 		_holiday_key = key
-		_holiday = Holidays.on(Time.get_datetime_dict_from_system(), Content.holidays, str(state.profile.get("dob", "")))
-	return _holiday
+		_holidays = Holidays.all_on(Time.get_datetime_dict_from_system(), Content.holidays, str(state.profile.get("dob", "")))
+	return _holidays
 
 
 ## How the holiday on now looks (HolidayLook), or null.
@@ -554,25 +569,27 @@ func holiday_hat() -> String:
 	return look.hat if look and not Content.cosmetic(look.hat).is_empty() else ""
 
 
-## Your present for opening the app on a holiday, given once a year: the
-## gift's id, or "" if there's nothing to give (no holiday, no account yet,
-## or already given this year).
-func claim_holiday_gift() -> String:
-	var id := holiday()
-	var gift_id := str(Content.holiday(id).get("gift", ""))
-	if gift_id == "" or Content.gift(gift_id).is_empty() or needs_account():
-		return ""
+## Your present for opening the app on a holiday, given once a year:
+## {holiday, gift} (ids), or {} if there's nothing to give (no holiday, no
+## account yet, or already given this year). With two on at once (your
+## birthday at Christmas), each call gives the next.
+func claim_holiday_gift() -> Dictionary:
+	if needs_account():
+		return {}
 	var year := int(Time.get_date_dict_from_system()["year"])
 	var given = state.profile.get("holiday_gifts", {})
 	if not given is Dictionary:
 		given = {}
-	if int(given.get(id, 0)) == year:
-		return ""
-	given[id] = year
-	state.profile["holiday_gifts"] = given
-	state.inventory[gift_id] = state.gift_count(gift_id) + 1
-	_changed()
-	return gift_id
+	for id in holidays():
+		var gift_id := str(Content.holiday(id).get("gift", ""))
+		if gift_id == "" or Content.gift(gift_id).is_empty() or int(given.get(id, 0)) == year:
+			continue
+		given[id] = year
+		state.profile["holiday_gifts"] = given
+		state.inventory[gift_id] = state.gift_count(gift_id) + 1
+		_changed()
+		return {"holiday": id, "gift": gift_id}
+	return {}
 
 
 # --- Gifts -------------------------------------------------------------------
@@ -617,10 +634,11 @@ func set_look(look: Dictionary) -> void:
 
 func start_walk(project_id: String, pet_id: String, biome_id: String = "") -> void:
 	if biome_id == "":
-		var p := state.pet(pet_id)
-		biome_id = pet_place(p) if p else "lake"
+		biome_id = focus_place()
 	state.settings["last_project"] = project_id
 	state.settings["last_pet"] = pet_id
+	# Where the choose focus screen opens next time.
+	state.settings["walk_biome"] = biome_id
 	state.active = SessionClock.begin(project_id, pet_id, now(), biome_id)
 	_changed()
 

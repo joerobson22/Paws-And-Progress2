@@ -5,6 +5,10 @@ extends Pane
 ## in the top left marks it, as each screen's icon does. Behind it all is
 ## the hilltop view (HomeBackdrop, drawn by the app shell). Debug builds
 ## also get small switches beside the home icon (DebugBar).
+## Arriving home after making an account plays an intro (see intro()).
+
+## The first arrival's done: the shell brings in the map and the arrows.
+signal intro_done
 
 ## Room above the orb for the greeting, whose words sit at the bottom of it.
 const GREETING_BOX := 160.0
@@ -24,6 +28,9 @@ var _line := ""
 var _line_walks := -1
 ## The holiday it was picked for: a holiday brings its own lines.
 var _line_holiday := ""
+## True while the first arrival plays (see intro()), and how far it's got.
+var _intro := false
+var _intro_stage := 4
 
 
 func build() -> void:
@@ -51,6 +58,86 @@ func build() -> void:
 		add_child(_sky_debug)
 	_update_hint()
 	_place()
+	# Rebuilt mid-intro: the new words start where the intro has got to.
+	if _intro:
+		_set_stage(_intro_stage, true)
+
+
+## Arriving home for the first time, after making an account. Everything
+## but the debug switches is hidden while the view tilts up from the
+## hilltop (`wait` seconds); then the orb grows from nothing, the greeting
+## drops in and types itself out (as a walk's encouragement does), and
+## "Tap to focus" rises into place. Then the home icon fades in, as the
+## shell brings in the map and the arrows (intro_done).
+func intro(wait: float) -> void:
+	if not is_instance_valid(_greeting):
+		rebuild()
+	# A greeting with your new name in it.
+	_line = ""
+	_pick_line()
+	_greeting.text = _line
+	_set_stage(0)
+	# One tween on the screen itself, which a rebuild doesn't free; each
+	# step works on the words there are when it comes.
+	var t := Motion.tween(self, "intro")
+	t.tween_interval(Motion.time(wait))
+	t.tween_callback(_set_stage.bind(1))
+	t.tween_interval(Motion.time(Motion.style.orb_grow))
+	t.tween_callback(_set_stage.bind(2))
+	t.tween_interval(maxf(Motion.time(Motion.SLOW), _typing_time(_line)))
+	t.tween_callback(_set_stage.bind(3))
+	t.tween_interval(Motion.time(Motion.SLOW))
+	t.tween_callback(_set_stage.bind(4))
+
+
+## How long typing out `text` takes (Motion.type_out), or 0 when it isn't typed.
+static func _typing_time(text: String) -> float:
+	if Motion.reduced():
+		return 0.0
+	var total := 0.0
+	for ch in text:
+		total += Motion.style.type_letter + (Motion.style.type_space if ch == " " else 0.0)
+	return Motion.time(total)
+
+
+## The intro's steps: 0 nothing but the debug switches, 1 the orb grows in,
+## 2 the greeting drops in typing itself out, 3 "Tap to focus" rises in, 4
+## done (the home icon fades in, and the shell brings the map and arrows).
+## `rebuilt`: the words were just made again mid-way, so they're put
+## straight where this step has them.
+func _set_stage(stage: int, rebuilt: bool = false) -> void:
+	_intro = stage < 4
+	_intro_stage = stage
+	_greeting.visible_characters = 0 if stage < 2 else -1
+	_greeting.modulate.a = 0.0 if stage < 2 else 1.0
+	_hint.modulate.a = 0.0 if stage < 3 else 1.0
+	_home.modulate.a = 0.0 if stage < 4 else 1.0
+	match stage:
+		0:
+			Motion.tween(_orb, "intro").kill()
+			_orb.scale = Vector2.ZERO
+		1:
+			var t := Motion.tween(_orb, "intro")
+			if not Motion.reduced():
+				# A little overshoot, as it pops into being.
+				t.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			t.tween_property(_orb, "scale", Vector2.ONE, Motion.time(Motion.style.orb_grow))
+		2:
+			if not rebuilt:
+				_greeting.visible_characters = 0
+				Motion.enter(_greeting, 0.0, -Motion.style.drop, Motion.SLOW)
+				Motion.type_out(_greeting, _line, false)
+		3:
+			if not rebuilt:
+				Motion.enter(_hint, 0.0, Motion.style.hint_rise, Motion.SLOW)
+		4:
+			if not rebuilt:
+				_home.modulate.a = 0.0
+				Motion.fade(_home, 1.0, Motion.style.home_ui_fade)
+			intro_done.emit()
+	if stage >= 2:
+		Motion.tween(_orb, "intro").kill()
+		_orb.scale = Vector2.ONE
 
 
 ## The orb keeps drifting through a rebuild (it doesn't take its colours
@@ -88,6 +175,8 @@ func _place() -> void:
 	var d := minf(size.x * 0.7, size.y * 0.5)
 	_orb.size = Vector2(d, d)
 	_orb.position = (size - _orb.size) * 0.5 + Vector2(0, size.y * 0.02)
+	# (It grows from its middle when it first appears.)
+	_orb.pivot_offset = _orb.size * 0.5
 	_hint.size = Vector2(d, _hint.get_combined_minimum_size().y)
 	_hint.position = Vector2(_orb.position.x, _orb.position.y + d + 20)
 	# The home icon sits where the other screens' title icons do.
@@ -149,7 +238,7 @@ func _on_resized() -> void:
 func _on_shown() -> void:
 	if is_instance_valid(_orb):
 		_orb.running = true
-	if is_instance_valid(_greeting) and (int(App.state.profile.get("walks", 0)) != _line_walks or App.holiday() != _line_holiday):
+	if is_instance_valid(_greeting) and not _intro and (int(App.state.profile.get("walks", 0)) != _line_walks or App.holiday() != _line_holiday):
 		_pick_line()
 		_greeting.text = _line
 		_place()

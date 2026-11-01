@@ -213,8 +213,7 @@
 		],
 		"colour_name": "{role} colour",
 		"scroll_animals": "Scroll for more animals",
-		"animal_locked": "{rule}",
-		"say_hello": "Say hello to {pet}"
+		"animal_locked": "{rule}"
 	},
 	"pet": {
 		"your_kind": "your {kind}",

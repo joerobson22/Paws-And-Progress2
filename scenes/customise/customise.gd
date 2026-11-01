@@ -45,6 +45,7 @@ static func open() -> Modal:
 	preview.size_flags_vertical = Control.SIZE_FILL
 	row.add_child(preview)
 	var view: CharacterView = preview.get_child(0)
+	view.holiday_hat = true
 
 	var side := UI.vbox(12)
 	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -164,6 +165,12 @@ static func _slot_row(slot: String, draft: Dictionary, view: CharacterView) -> C
 	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(cap)
 	var options := Content.cosmetic_options(slot, App.state.inventory)
+	# A holiday hat (your party hat on your birthday) is worn whatever's
+	# picked: the hats are held on it, greyed out, till the day's over. The
+	# hat you'd picked stays saved for tomorrow.
+	var held := App.holiday_hat() if slot == "hat" else ""
+	if held != "" and not options.any(func(o): return o["id"] == held):
+		options.append(Content.cosmetic(held))
 	var carousel := Carousel.new()
 	carousel.spacing = SPACING
 	carousel.side_scale = 0.72
@@ -184,16 +191,23 @@ static func _slot_row(slot: String, draft: Dictionary, view: CharacterView) -> C
 	called.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(called)
 	var start := options.find(_current(draft, slot, options))
+	if held != "":
+		for i in options.size():
+			if options[i]["id"] == held:
+				start = i
+		carousel.locked = true
+		# The others fade right back, so only the hat you're wearing reads.
+		carousel.side_alpha = 0.18
 	carousel.set_items(items, maxi(start, 0))
 	called.text = str(options[carousel.index].get("name", "")) if not options.is_empty() else ""
 	carousel.changed.connect(func(i: int):
 		draft["cosmetics"][slot] = options[i]["id"]
 		called.text = str(options[i].get("name", ""))
 		view.refresh())
-	# A holiday hat (your party hat on your birthday) is worn whatever's
-	# picked here; the pick still saves for tomorrow.
-	if slot == "hat" and App.holiday_hat() != "":
-		var note := UI.label(Text.t("holiday.hat_locked", {"hat": str(Content.cosmetic(App.holiday_hat()).get("name", "")).to_lower()}), 13, UI.INK_SOFT, false, 700)
+	if held != "":
+		var why := Text.t("holiday.hat_locked", {"hat": str(Content.cosmetic(held).get("name", "")).to_lower()})
+		carousel.accessibility_name = why
+		var note := UI.label(why, 13, UI.INK_SOFT, false, 700)
 		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(note)
 	return v

@@ -11,7 +11,7 @@ extends Control
 ## the sides across it, curving in so it lands where you can see it). Your
 ## pet runs after it, behind anything standing nearer, wading if it lands in
 ## water, and brings it back. You can take it again once they're home.
-## params: {"session", "gift", "scene": {biome, scroll, clock, walker, animal, unit}}
+## params: {"session", "gift", "scene": {biome, scroll, clock, walker, animal, unit, facing}}
 
 var params := {}
 
@@ -106,7 +106,9 @@ func _ready() -> void:
 		_rest = scene.get("animal", Vector2(size.x * 0.38 + 170.0 * _unit, feet + 4.0 * _unit))
 		_rest_scale = _unit
 		_animal.position = _rest
-		_animal.scale = Vector2(_unit, _unit)
+		# Facing the way it was on the walk (towards you, after fetching a
+		# gift from the bush), so it doesn't turn away and back again.
+		_animal.scale = Vector2(_unit * (-1.0 if float(scene.get("facing", 1.0)) < 0.0 else 1.0), _unit)
 		_scenery.add_child(_animal)
 		_stand_actors()
 		_glow.radius = Motion.style.glow_radius * _unit
@@ -400,9 +402,12 @@ func _stand_actors() -> void:
 	_scenery.stand(_animal, _animal.position.y)
 	_scenery.stand(_glow, _animal.position.y - 0.5)
 	if is_instance_valid(_fly) and _fly.get_parent():
-		# A touch nearer than where it'll land, so it leaves your hand in
-		# front of your pet rather than behind it.
-		_scenery.stand(_fly, _ground_y(_fly_state["z"]) + 6.0 * _unit)
+		# It leaves your hand a touch nearer than your pet, so it's in front
+		# of it, and comes down at exactly the depth your pet runs out to:
+		# behind whatever your pet goes behind as it fetches it, and over
+		# your pet (stood after it) when it's picked up.
+		var lift := 6.0 * _unit * (1.0 - clampf(float(_fly_state["t"]) / maxf(float(_fly_state["time"]), 0.001), 0.0, 1.0))
+		_scenery.stand(_fly, _ground_y(_fly_state["z"]) + lift)
 	if is_instance_valid(_ripple):
 		_scenery.stand(_ripple, _ripple.position.y - 1.0)
 

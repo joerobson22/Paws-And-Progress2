@@ -24,7 +24,6 @@ func _sample() -> GameState:
 	pet.name = "Biscuit"
 	pet.animal_id = "dog1"
 	pet.colours = [Color("#112233"), Color("#445566"), Color("#778899")]
-	pet.place = "jungle"
 	pet.adopted_unix = 400
 	pet.rehomed_unix = 900
 	pet.places = {"jungle": 1234, "lake": 66}
@@ -48,7 +47,6 @@ func test_round_trip() -> void:
 	eq(back.projects[0].places, {"jungle": 1234, "lake": 66})
 	eq(back.pets[0].name, "Biscuit")
 	eq(back.pets[0].colours[1].to_html(false), "445566")
-	eq(back.pets[0].place, "jungle")
 	eq(back.pets[0].adopted_unix, 400)
 	eq(back.pets[0].places, {"jungle": 1234, "lake": 66})
 	check(back.pets[0].is_rehomed(), "a rehomed pet stays rehomed")
