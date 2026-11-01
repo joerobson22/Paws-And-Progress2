@@ -20,7 +20,8 @@ const MOUTHS := {
 	"sheep": Vector2(62, -50), "pig": Vector2(68, -40), "tortoise": Vector2(56, -16),
 	"frog": Vector2(40, -24), "elephant": Vector2(78, -38), "giraffe": Vector2(70, -158),
 	"snake": Vector2(62, -18), "lizard": Vector2(56, -12), "spider": Vector2(34, -14),
-	"rhino": Vector2(80, -40),
+	"rhino": Vector2(80, -40), "skeleton": Vector2(70, -54), "reindeer": Vector2(70, -56),
+	"egg": Vector2(34, -30), "cake": Vector2(36, -30),
 }
 ## Where each shape's lead clips on, before any bounce in its step.
 const NECKS := {
@@ -29,6 +30,7 @@ const NECKS := {
 	"pig": Vector2(34, -44), "tortoise": Vector2(36, -18), "frog": Vector2(22, -26),
 	"elephant": Vector2(40, -78), "giraffe": Vector2(32, -96), "snake": Vector2(40, -14),
 	"lizard": Vector2(30, -12), "spider": Vector2(14, -18), "rhino": Vector2(40, -62),
+	"egg": Vector2(16, -40), "cake": Vector2(18, -44), "reindeer": Vector2(34, -58),
 }
 
 @export var animal_id: String = "dog1":
@@ -272,6 +274,14 @@ func _draw() -> void:
 			_draw_spider()
 		"rhino":
 			_draw_rhino()
+		"skeleton":
+			_draw_skeleton()
+		"reindeer":
+			_draw_reindeer()
+		"egg":
+			_draw_egg()
+		"cake":
+			_draw_cake()
 		_:
 			_draw_dog()
 	_draw_over(self, str(data.get("shape", "dog")))
@@ -698,3 +708,115 @@ func _draw_rhino() -> void:
 	draw_colored_polygon(PackedVector2Array([Vector2(56, -56 - bob) + d, Vector2(62, -66 - bob) + d, Vector2(64, -54 - bob) + d]), horn)
 	draw_colored_polygon(PackedVector2Array([Vector2(36, -64 - bob) + d, Vector2(38, -78 - bob) + d + Vector2(4, 6) * sad, Vector2(44, -64 - bob) + d]), body.darkened(0.1))
 	_eye(Vector2(50, -56 - bob) + d, 2.2, body)
+
+
+## A dog made of bones: a skull, a spine with ribs, bony legs, over a dark
+## shadow of a body so the bones show up on anything.
+func _draw_skeleton() -> void:
+	var legs := _part("Legs", Color("#efe8d8"))
+	var bones := _part("Bones", Color("#f6f1e4"))
+	var shadow := _part("Shadow", Color("#2b2523"))
+	var bob := _bob()
+	_ellipse(Vector2(0, -42 - bob), Vector2(44, 19), Color(shadow, 0.85))
+	for i in 4:
+		var x: float = [-30, -18, 18, 30][i]
+		var swing := sin(_phase + PI * (i % 2)) * 0.35 * _stride() if walking else 0.0
+		var hip := Vector2(x, -40 - bob)
+		var foot := hip + Vector2(0, 40).rotated(swing)
+		draw_line(hip, foot, Color(shadow, 0.85), 8, true)
+		draw_line(hip, foot, legs, 4, true)
+		draw_circle(hip.lerp(foot, 0.5), 3.5, legs, true, -1.0, true)
+		_ellipse(foot + Vector2(3, 0), Vector2(6, 3), legs)
+	var tail_tip := Vector2(-60, -64 - bob + sin(_phase * 2.0) * 4.0).lerp(Vector2(-56, -26), sad)
+	draw_line(Vector2(-40, -48 - bob), tail_tip, bones, 3, true)
+	draw_line(Vector2(-40, -48 - bob), Vector2(36, -54 - bob), bones, 5, true)
+	for k in 5:
+		var x := -22.0 + 11.0 * k
+		draw_arc(Vector2(x, -38 - bob), 13, PI * 1.05, PI * 1.95, 10, bones, 3, true)
+	_ellipse(Vector2(-34, -46 - bob), Vector2(10, 7), bones)
+	var d := _droop()
+	_ellipse(Vector2(48, -62 - bob) + d, Vector2(17, 14), bones)
+	_ellipse(Vector2(62, -56 - bob) + d, Vector2(10, 6), bones)
+	draw_colored_polygon(PackedVector2Array([Vector2(36, -70 - bob) + d, Vector2(40, -84 - bob) + d, Vector2(46, -72 - bob) + d]), bones)
+	draw_circle(Vector2(50, -65 - bob) + d, 4.5, shadow, true, -1.0, true)
+	draw_circle(Vector2(68, -58 - bob) + d, 2.5, shadow, true, -1.0, true)
+	for k in 3:
+		draw_line(Vector2(56 + 4 * k, -53 - bob) + d, Vector2(56 + 4 * k, -49 - bob) + d, shadow, 1.5, true)
+
+
+## A reindeer: a deer's long legs and neck, antlers and a red nose.
+func _draw_reindeer() -> void:
+	var legs := _part("Legs", Color("#5a3b28"))
+	var body := _part("Body", Color("#8a5a3a"))
+	var antlers := _part("Antlers", Color("#d9c6a8"))
+	var bob := _bob()
+	_legs([-30, -20, 20, 30], -34 - bob, 34, 7, legs)
+	draw_line(Vector2(-40, -54 - bob), Vector2(-48, -60 - bob + sin(_phase * 2.0) * 3.0), body.lightened(0.3), 6, true)
+	_ellipse(Vector2(0, -48 - bob), Vector2(42, 18), body)
+	_ellipse(Vector2(4, -40 - bob), Vector2(24, 8), body.lightened(0.25))
+	var d := _droop()
+	draw_line(Vector2(30, -56 - bob), Vector2(42, -70 - bob) + d, body, 14, true)
+	_ellipse(Vector2(50, -72 - bob) + d, Vector2(15, 11), body)
+	for side in [0.0, 8.0]:
+		var base := Vector2(42 + side, -80 - bob) + d
+		var top := base + Vector2(-8, -22)
+		draw_line(base, top, antlers, 3.5, true)
+		draw_line(base.lerp(top, 0.5), base.lerp(top, 0.5) + Vector2(8, -6), antlers, 3.0, true)
+		draw_line(base.lerp(top, 0.8), base.lerp(top, 0.8) + Vector2(-8, -4), antlers, 2.5, true)
+	_ellipse(Vector2(40, -78 - bob) + d, Vector2(4, 7), body.darkened(0.2), -0.6)
+	_eye(Vector2(52, -75 - bob) + d, 2.5, body)
+	draw_circle(Vector2(64, -70 - bob) + d, 4.5, Color("#d8332a"), true, -1.0, true)
+
+
+## An Easter egg out for a walk on two thin legs.
+func _draw_egg() -> void:
+	var legs := _part("Legs", Color("#e2a615"))
+	var shell := _part("Shell", Color("#f6d6e4"))
+	var stripes := _part("Stripes", Color("#8fc7e8"))
+	var bob := _bob(3.0)
+	var tilt := sin(_phase) * 0.08 if walking else 0.0
+	for i in 2:
+		var swing := sin(_phase + PI * i) * 0.45 * _stride() if walking else 0.0
+		var hip := Vector2(-6 + 12 * i, -16 - bob)
+		var foot := hip + Vector2(0, 16).rotated(swing)
+		draw_line(hip, foot, legs, 3, true)
+		draw_line(foot, foot + Vector2(7, 0), legs, 3, true)
+	# Leaning side to side as it waddles (on top of the animal's size).
+	var s := float(Content.animal(animal_id).get("size", 1.0))
+	draw_set_transform(Vector2(0, -38 - bob) * s, tilt, Vector2(s, s))
+	_ellipse(Vector2.ZERO, Vector2(19, 25), shell)
+	var zig := PackedVector2Array()
+	for k in 9:
+		zig.append(Vector2(-18 + 4.5 * k, 2 + (4.0 if k % 2 == 0 else -4.0)))
+	draw_polyline(zig, stripes, 4, true)
+	draw_circle(Vector2(-8, 13), 3, stripes, true, -1.0, true)
+	draw_circle(Vector2(5, 15), 3, stripes, true, -1.0, true)
+	var d := _droop() * 0.3
+	_eye(Vector2(8, -10) + d, 2.5, shell)
+	draw_arc(Vector2(10, -4) + d, 4, 0.3 + 0.6 * sad, PI - 0.3 - 0.6 * sad, 8, UI.INK, 1.5, true)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2(s, s))
+
+
+## A birthday cake on two legs, with a candle on top.
+func _draw_cake() -> void:
+	var legs := _part("Legs", Color("#e2a615"))
+	var sponge := _part("Sponge", Color("#e8c690"))
+	var icing := _part("Icing", Color("#f7a8c8"))
+	var bob := _bob(2.5)
+	for i in 2:
+		var swing := sin(_phase + PI * i) * 0.45 * _stride() if walking else 0.0
+		var hip := Vector2(-10 + 20 * i, -14 - bob)
+		var foot := hip + Vector2(0, 14).rotated(swing)
+		draw_line(hip, foot, legs, 3.5, true)
+		draw_line(foot, foot + Vector2(7, 0), legs, 3.5, true)
+	draw_style_box(UI.box(sponge, Color.TRANSPARENT, 6), Rect2(-24, -48 - bob, 48, 36))
+	draw_rect(Rect2(-24, -32 - bob, 48, 4), icing.darkened(0.1))
+	draw_style_box(UI.box(icing, Color.TRANSPARENT, 6), Rect2(-25, -50 - bob, 50, 10))
+	for k in 4:
+		_ellipse(Vector2(-17 + 11 * k, -40 - bob), Vector2(3.5, 5 + 2 * (k % 2)), icing)
+	var d := _droop() * 0.4
+	draw_rect(Rect2(-2, -64 - bob, 4, 14), Color("#8fc7e8"))
+	if sad < 0.5:
+		_ellipse(Vector2(0, -69 - bob + sin(_phase * 3.0)), Vector2(3, 5), Color("#ffb347"))
+	_eye(Vector2(10, -24 - bob) + d, 2.5, sponge)
+	draw_arc(Vector2(13, -18 - bob) + d, 4, 0.3 + 0.6 * sad, PI - 0.3 - 0.6 * sad, 8, UI.INK, 1.5, true)

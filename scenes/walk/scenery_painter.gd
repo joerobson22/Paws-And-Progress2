@@ -9,6 +9,8 @@ extends Node2D
 ## shows what it looks like while you change it.
 ## A painter on its own draws for a screen `view_size`, still (time 0, unless
 ## set), with the path from `path_line` and the street lights off.
+## A holiday's look (HolidayLook) can change it: dead trees, snow on the
+## trees and the ground, lights in some trees, pumpkins or eggs in the grass.
 
 ## How wide each stretch is.
 const CHUNK := 384.0
@@ -24,6 +26,14 @@ var clock_time := 0.0
 var path_line := -1.0
 var lights_on := false
 var keep_clear := Vector2.ZERO
+## The holiday's look to draw with, or null for none.
+var holiday_look: HolidayLook
+
+## The kinds that are trees: a holiday can kill them, snow on them or hang
+## lights in them.
+const TREES := ["trees", "pines", "broadleaf", "canopy", "palms", "acacias", "blossoms"]
+const SNOW := Color(0.95, 0.97, 1.0)
+const DEAD_WOOD := Color("#4a3f3a")
 
 
 func _view() -> Vector2:
@@ -46,6 +56,10 @@ func _lit() -> bool:
 
 func _gap() -> Vector2:
 	return scenery.front_gap if scenery else keep_clear
+
+
+func _holiday() -> HolidayLook:
+	return scenery._holiday if scenery else holiday_look
 
 
 ## A rounded box with the app's hand-cut corners (as UI.box draws them),
@@ -79,12 +93,24 @@ func _draw() -> void:
 	var h := size.y * float(layer["height"])
 	var sd := float(layer.get("seed", 0))
 	var spacing := float(layer.get("spacing", 70))
-	var snow := bool(layer.get("snow", false))
+	var look := _holiday()
+	var snowy := look != null and look.snow
+	var snow := bool(layer.get("snow", false)) or snowy
 	# World x where this chunk starts, in the layer's own scrolling space.
 	var x0 := index * CHUNK
-	match str(layer["kind"]):
+	var kind := str(layer["kind"])
+	if snowy and kind in ["hills", "fields", "ground", "mesas"]:
+		colour = colour.lerp(SNOW, 0.45)
+	if TREES.has(kind):
+		var share: Array = {"trees": [0.25, 0.6, 0.6], "pines": [0.2, 0.55, 0.6], "broadleaf": [0.3, 0.7, 0.4], "canopy": [0.0, 0.75, 0.35],
+			"palms": [0.35, 0.7, 0.4], "acacias": [0.3, 0.7, 0.4], "blossoms": [0.15, 0.7, 0.4]}[kind]
+		_slots(x0, spacing, sd, share[0], func(x, r, i): _any_tree(kind, x, y, h * (share[1] + share[2] * r), colour, r, i, sd, snow))
+		return
+	match kind:
 		"hills":
 			_hills(x0, y, h, float(layer.get("wavelength", 400)), sd, colour, size)
+			if snowy:
+				_snow_line(x0, y, h, float(layer.get("wavelength", 400)), sd)
 		"water":
 			_water(x0, y, h, sd, colour)
 		"ground":
@@ -93,16 +119,6 @@ func _draw() -> void:
 			_slots(x0, spacing, sd, 0.35, func(x, r, _i): _reed_tuft(x, y, h * r, colour, r, size))
 		"fronds":
 			_slots(x0, spacing, sd, 0.3, func(x, r, _i): _frond(x, h * (0.6 + 0.6 * r), colour, r, size))
-		"trees":
-			_slots(x0, spacing, sd, 0.25, func(x, r, i): _tree(x, y, h * (0.6 + 0.6 * r), colour.darkened(0.1 * _hash(i + 3, sd))))
-		"pines":
-			_slots(x0, spacing, sd, 0.2, func(x, r, i): _pine(x, y, h * (0.55 + 0.6 * r), colour.darkened(0.12 * _hash(i + 3, sd)), snow))
-		"broadleaf":
-			_slots(x0, spacing, sd, 0.3, func(x, r, i): _broadleaf(x, y, h * (0.7 + 0.4 * r), colour.darkened(0.12 * _hash(i + 5, sd))))
-		"canopy":
-			_slots(x0, spacing, sd, 0.0, func(x, r, i): _canopy(x, y, h * (0.75 + 0.35 * r), colour, i, sd))
-		"palms":
-			_slots(x0, spacing, sd, 0.35, func(x, r, _i): _palm(x, y, h * (0.7 + 0.4 * r), colour, r))
 		"mountains":
 			_slots(x0, spacing, sd, 0.0, func(x, r, i): _mountain(x, y, h * (0.6 + 0.5 * r), spacing * (0.9 + 0.6 * _hash(i + 9, sd)), colour.darkened(0.08 * _hash(i + 2, sd)), snow))
 		"mesas":
@@ -119,6 +135,8 @@ func _draw() -> void:
 			_slots(x0, spacing, sd, float(layer.get("skip", 0.4)), func(x, r, i): _stalk(x, y, h * (0.7 + 0.4 * r), colour.darkened(0.1 * _hash(i + 6, sd)), r))
 		"fields":
 			_fields(x0, y, h, float(layer.get("wavelength", 400)), sd, colour, size)
+			if snowy:
+				_snow_line(x0, y, h, float(layer.get("wavelength", 400)), sd)
 		"barns":
 			_slots(x0, spacing, sd, 0.25, func(x, r, i): _barn(x, y, h * (0.75 + 0.35 * r), colour, i))
 		"fences":
@@ -127,10 +145,6 @@ func _draw() -> void:
 			_slots(x0, spacing, sd, 0.0, func(x, r, i): _building(x, y, h * (0.35 + 0.65 * r), spacing * (0.7 + 0.25 * _hash(i + 9, sd)), colour.darkened(0.12 * _hash(i + 2, sd)), i, sd))
 		"lamps":
 			_slots(x0, spacing, sd, 0.0, func(x, _r, _i): _lamp(x, y, h, colour))
-		"acacias":
-			_slots(x0, spacing, sd, 0.3, func(x, r, _i): _acacia(x, y, h * (0.7 + 0.4 * r), colour, r))
-		"blossoms":
-			_slots(x0, spacing, sd, 0.15, func(x, r, i): _blossom(x, y, h * (0.7 + 0.4 * r), colour.darkened(0.1 * _hash(i + 5, sd)), i, sd))
 
 ## Calls `item(x, r, i)` for each slot starting in this chunk, skipping
 ## a share `skip` of them; `r` is the slot's random 0..1. An item belongs
@@ -204,11 +218,43 @@ func _ground(x0: float, y: float, h: float, sd: float, colour: Color, size: Vect
 			draw_circle(Vector2.ZERO, 10.0 + 22.0 * r, colour.darkened(0.12), true, -1.0, true)
 			draw_circle(Vector2(0, 3), 8.0 + 18.0 * r, colour.darkened(0.2), true, -1.0, true)
 			draw_set_transform(Vector2.ZERO)
+	var look := _holiday()
+	if look and look.snow:
+		path_colour = path_colour.lerp(SNOW, 0.35)
+		draw_rect(Rect2(-1.0, py - h * 0.1, CHUNK + 2.0, h * 0.2), path_colour)
+		var edge := PackedVector2Array()
+		for k in pts.size() - 2:
+			edge.append(pts[k] + Vector2(0, 3.0))
+		draw_polyline(edge, SNOW, clampf(h * 0.05, 4.0, 10.0), true)
 	# Pebbles on the path so movement reads even with flat placeholder art.
 	var spacing := 54.0
 	for i in range(floori(x0 / spacing), floori((x0 + CHUNK) / spacing) + 1):
 		var r := _hash(i, sd + 11.0)
 		draw_circle(Vector2(i * spacing - x0 + 20.0 * r, py - h * 0.08 + h * 0.16 * _hash(i, sd + 5.0)), 2.0 + 3.0 * r, path_colour.darkened(0.15))
+	if look and not look.ground_props.is_empty():
+		_props(x0, y, py, h, sd, look, size)
+
+
+## A holiday's pictures (pumpkins, eggs) dotted in the grass either side of
+## the path, never on it.
+func _props(x0: float, top: float, py: float, h: float, sd: float, look: HolidayLook, size: Vector2) -> void:
+	var k := size.y / 720.0
+	var spacing := maxf(look.prop_spacing * k, 24.0)
+	for i in range(floori(x0 / spacing), floori((x0 + CHUNK) / spacing) + 1):
+		if _hash(i, sd + 41.0) < 0.15:
+			continue
+		var tex := look.ground_props[int(_hash(i, sd + 42.0) * look.ground_props.size()) % look.ground_props.size()]
+		if tex == null:
+			continue
+		var tall := look.prop_height * k * (0.8 + 0.4 * _hash(i, sd + 43.0))
+		var wide := tall * tex.get_width() / maxf(1.0, tex.get_height())
+		# Mostly on the bank behind the path; now and then just in front of
+		# it (any lower and the plants at the bottom would hide it).
+		var behind := _hash(i, sd + 44.0) < 0.75
+		var foot := lerpf(top + tall * 0.6, py - h * 0.1, _hash(i, sd + 45.0)) if behind \
+			else py + h * 0.1 + tall * (1.1 + 0.6 * _hash(i, sd + 45.0))
+		var x := i * spacing - x0 + spacing * 0.6 * _hash(i, sd + 46.0)
+		draw_texture_rect(tex, Rect2(x - wide * 0.5, foot - tall, wide, tall), false)
 
 func _reed_tuft(x: float, top: float, h: float, colour: Color, r: float, size: Vector2) -> void:
 	var sway := sin(_now() * 1.2 + r * 6.0) * 6.0
@@ -225,6 +271,109 @@ func _frond(x: float, h: float, colour: Color, r: float, size: Vector2) -> void:
 		var mid := Vector2(x, size.y).lerp(tip, 0.55)
 		var side := Vector2(-sin(angle), cos(angle)) * h * 0.16
 		draw_colored_polygon(PackedVector2Array([Vector2(x, size.y), mid + side, tip, mid - side]), colour.darkened(0.08 * k))
+
+## Any kind of tree (TREES), as a holiday has it: bare and dead, or with
+## snow on top and, now and then, lights strung through it.
+func _any_tree(kind: String, x: float, y: float, th: float, colour: Color, r: float, i: int, sd: float, snow: bool) -> void:
+	var look := _holiday()
+	if look and look.dead_trees:
+		_dead_tree(x, y, th, i, sd)
+		return
+	match kind:
+		"trees":
+			_tree(x, y, th, colour.darkened(0.1 * _hash(i + 3, sd)))
+		"pines":
+			_pine(x, y, th, colour.darkened(0.12 * _hash(i + 3, sd)), snow)
+		"broadleaf":
+			_broadleaf(x, y, th, colour.darkened(0.12 * _hash(i + 5, sd)))
+		"canopy":
+			_canopy(x, y, th, colour, i, sd)
+		"palms":
+			_palm(x, y, th, colour, r)
+		"acacias":
+			_acacia(x, y, th, colour, r)
+		"blossoms":
+			_blossom(x, y, th, colour.darkened(0.1 * _hash(i + 5, sd)), i, sd)
+	if look == null:
+		return
+	var crown := _crown(kind, x, y, th, r, i, sd)
+	if look.snow and kind not in ["pines", "palms"]:
+		if kind == "trees":
+			var half := th * 0.38 * 0.5
+			draw_colored_polygon(PackedVector2Array([Vector2(x - half * 0.4, y - th * 0.68), Vector2(x, y - th), Vector2(x + half * 0.4, y - th * 0.68)]), SNOW)
+		else:
+			# Snow lying on top of the leaves: thickest in the middle,
+			# thinning out down either side.
+			var c := crown.get_center()
+			var radius := Vector2(crown.size.x * 0.44, crown.size.y * 0.5)
+			var thick := clampf(th * 0.08, 3.0, 16.0)
+			var cap := PackedVector2Array()
+			for k in 11:
+				var a := PI * (1.2 + 0.6 * k / 10.0)
+				cap.append(c + Vector2(cos(a) * radius.x, sin(a) * radius.y - 1.0))
+			for k in range(9, 0, -1):
+				var a := PI * (1.2 + 0.6 * k / 10.0)
+				cap.append(c + Vector2(cos(a) * radius.x, sin(a) * radius.y + thick * sin(PI * k / 10.0)))
+			draw_colored_polygon(cap, SNOW)
+	if look.lit_trees > 0.0 and _hash(i, sd + 50.0) < look.lit_trees:
+		var bulb := clampf(th * 0.022, 1.6, 4.0)
+		var pointed := kind in ["trees", "pines"]
+		for k in 2:
+			var row := crown.position.y + crown.size.y * ((0.5 + 0.28 * k) if pointed else (0.38 + 0.32 * k))
+			# A pointed tree narrows to the top, so its upper strand is shorter.
+			var reach := crown.size.x * ((0.2 + 0.16 * k) if pointed else 0.42)
+			Festoon.swag(self, Vector2(crown.get_center().x - reach, row - crown.size.y * 0.08), Vector2(crown.get_center().x + reach, row + crown.size.y * 0.04),
+				crown.size.y * 0.1, Festoon.Kind.LIGHTS, look.light_colours, bulb * 4.0, bulb, Color("#2b2523"), 0.0, i)
+
+
+## Roughly where a tree's leaves are, for snow and lights.
+func _crown(kind: String, x: float, y: float, th: float, r: float, i: int, sd: float) -> Rect2:
+	match kind:
+		"trees":
+			return Rect2(x - th * 0.19, y - th, th * 0.38, th * 0.8)
+		"pines":
+			return Rect2(x - th * 0.21, y - th * 1.09, th * 0.42, th * 0.97)
+		"broadleaf":
+			return Rect2(x - th * 0.35, y - th * 1.02, th * 0.7, th * 0.5)
+		"canopy":
+			return Rect2(x - th * 0.4, y - th * 1.04, th * 0.8, th * 0.46)
+		"palms":
+			return Rect2(x + (r - 0.5) * th * 0.25 - th * 0.36, y - th * 1.1, th * 0.72, th * 0.3)
+		"acacias":
+			var top := Vector2(x + (r - 0.5) * th * 0.2, y - th * 0.78)
+			return Rect2(top.x - th * 0.42, top.y - th * 0.2, th * 0.84, th * 0.24)
+		"blossoms":
+			var fork := Vector2(x + (_hash(i, sd + 8.0) - 0.5) * th * 0.18, y - th * 0.5)
+			return Rect2(fork.x - th * 0.33, fork.y - th * 0.48, th * 0.66, th * 0.4)
+	return Rect2(x - th * 0.3, y - th, th * 0.6, th * 0.6)
+
+
+## A bare, dead tree: a crooked trunk with forking branches reaching up.
+func _dead_tree(x: float, y: float, th: float, i: int, sd: float) -> void:
+	var wood := DEAD_WOOD.darkened(0.15 * _hash(i + 3, sd))
+	var lean := (_hash(i, sd + 8.0) - 0.5) * th * 0.16
+	var top := Vector2(x + lean, y - th * 0.9)
+	var width := maxf(2.0, th * 0.06)
+	draw_line(Vector2(x, y + 2.0), top, wood, width, true)
+	for k in 5:
+		var along := 0.35 + 0.13 * k
+		var from := Vector2(x, y).lerp(top, along)
+		var side := -1.0 if (k + i) % 2 == 0 else 1.0
+		var length := th * (0.32 - 0.04 * k) * (0.8 + 0.4 * _hash(i * 7 + k, sd))
+		var tip := from + Vector2(side * length * 0.8, -length * 0.65)
+		draw_line(from, tip, wood, maxf(1.5, width * (0.7 - 0.08 * k)), true)
+		draw_line(from.lerp(tip, 0.6), from.lerp(tip, 0.6) + Vector2(side * length * 0.1, -length * 0.4), wood, maxf(1.0, width * 0.35), true)
+
+
+## Snow along the top of a stretch of hills (as _hills draws them).
+func _snow_line(x0: float, y: float, h: float, wavelength: float, sd: float) -> void:
+	var pts := PackedVector2Array()
+	var x := -1.0
+	while x <= CHUNK + 17.0:
+		pts.append(Vector2(x, y - h * (0.5 + 0.5 * _noise((x0 + x) / wavelength, sd)) + 2.0))
+		x += 16.0
+	draw_polyline(pts, SNOW, clampf(h * 0.12, 4.0, 14.0), true)
+
 
 func _tree(x: float, y: float, th: float, colour: Color) -> void:
 	var w := th * 0.38

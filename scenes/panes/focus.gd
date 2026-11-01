@@ -22,6 +22,8 @@ var _line := ""
 ## How many walks there had been when the greeting was picked: a new line
 ## each time you come home from one.
 var _line_walks := -1
+## The holiday it was picked for: a holiday brings its own lines.
+var _line_holiday := ""
 
 
 func build() -> void:
@@ -59,12 +61,23 @@ func keeps() -> Array[Node]:
 
 func _pick_line() -> void:
 	var walks := int(App.state.profile.get("walks", 0))
-	if _line != "" and walks == _line_walks:
+	var holiday := App.holiday()
+	if _line != "" and walks == _line_walks and holiday == _line_holiday:
 		return
 	_line_walks = walks
+	_line_holiday = holiday
 	# The time of day the sky shows (the debug slider can move it).
 	var hour := int(App.day_hour())
-	_line = Content.greeting(hour, str(App.state.profile.get("username", "")), App.rng)
+	_line = Content.greeting(hour, str(App.state.profile.get("username", "")), App.rng, holiday)
+
+
+## A fresh line when a holiday starts or ends (main calls this).
+func holiday_changed() -> void:
+	if not is_instance_valid(_greeting) or App.holiday() == _line_holiday:
+		return
+	_pick_line()
+	_greeting.text = _line
+	_place()
 
 
 func _place() -> void:
@@ -136,7 +149,7 @@ func _on_resized() -> void:
 func _on_shown() -> void:
 	if is_instance_valid(_orb):
 		_orb.running = true
-	if is_instance_valid(_greeting) and int(App.state.profile.get("walks", 0)) != _line_walks:
+	if is_instance_valid(_greeting) and (int(App.state.profile.get("walks", 0)) != _line_walks or App.holiday() != _line_holiday):
 		_pick_line()
 		_greeting.text = _line
 		_place()

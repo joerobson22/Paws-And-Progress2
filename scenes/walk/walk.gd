@@ -257,8 +257,14 @@ func _build_hud() -> void:
 
 
 ## The weather to walk in: the real weather (when you've let the app look
-## it up) or any kind, remembered for next time.
+## it up) or any kind, remembered for next time. A holiday that pins the
+## weather (snow at Christmas) shows it, and it can't be changed.
 func _weather_picker() -> Dropdown:
+	var look := App.holiday_look()
+	if look and look.weather in Weather.KINDS:
+		var pinned := Dropdown.new([[look.weather, Weather.look(look.weather, Content.weathers)["name"]]], look.weather, false, Text.t("walk.weather"), false).on_scenery()
+		pinned.disabled = true
+		return pinned
 	var options := []
 	if Outdoors.enabled():
 		options.append(["real", Text.t("walk.weather_real")])

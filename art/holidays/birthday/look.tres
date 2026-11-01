@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="HolidayLook" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/holiday_look.gd" id="1"]
+[ext_resource type="PackedScene" path="res://art/holidays/birthday/menu.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+menu_scene = ExtResource("2")
+hat = "party_hat"

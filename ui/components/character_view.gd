@@ -272,6 +272,9 @@ func _look() -> Dictionary:
 func _item(slot: String) -> Dictionary:
 	var cosmetics: Dictionary = _look().get("cosmetics", {})
 	var id := str(cosmetics.get(slot, ""))
+	# Your own hat on a holiday that picks it (the party hat on your birthday).
+	if slot == "hat" and look.is_empty() and App.holiday_hat() != "":
+		id = App.holiday_hat()
 	var item := Content.cosmetic(id) if id != "" else {}
 	return item if not item.is_empty() else Content.default_cosmetic(slot)
 
@@ -285,8 +288,10 @@ static func _style(item: Dictionary) -> String:
 static func part_rect(slot: String, item: Dictionary) -> Rect2:
 	match slot:
 		"hat":
-			var tops := {"witch": 48, "bunny_ears": 44, "pot": 38, "alpine": 36, "tophat": 34, "feather_cap": 32, "ears": 28, "beanie": 26, "nest": 26}
+			var tops := {"witch": 48, "party": 48, "bunny_ears": 44, "antlers": 42, "pot": 38, "alpine": 36, "tophat": 34, "feather_cap": 32, "ears": 28, "beanie": 26, "nest": 26}
 			var top := float(tops.get(_style(item), 22))
+			if _style(item) == "pumpkin":
+				return Rect2(HEAD.x - 25, HEAD.y - 28, 50, 52)
 			return Rect2(HEAD.x - 24, HEAD.y - top, 50, top + 2)
 		"hair":
 			return Rect2(HEAD.x - 21, HEAD.y - 25, 42, 50 if _style(item) == "long" else 30)
@@ -455,6 +460,20 @@ func _draw_top_flat(top: Dictionary, skin: Color) -> void:
 			draw_line(Vector2(3, -108), Vector2(3, -98), UI.SURFACE, 1.5, true)
 		"tee":
 			draw_arc(Vector2(0, -110), 5, 0, PI, 10, body.darkened(0.15), 2.0, true)
+		"tree":
+			_tree_costume(Vector2.ZERO, body)
+
+
+## A Christmas tree costume: three tiers of branches over the body, hung
+## with baubles.
+func _tree_costume(at: Vector2, colour: Color) -> void:
+	for k in 3:
+		var top := -116.0 + 20.0 * k
+		var half := 13.0 + 6.0 * k
+		draw_colored_polygon(PackedVector2Array([at + Vector2(-half, top + 28), at + Vector2(0, top), at + Vector2(half, top + 28)]), colour.darkened(0.08 * (2 - k)))
+	var baubles := [[Vector2(-6, -94), "#e8483c"], [Vector2(7, -82), "#f2c53d"], [Vector2(-10, -66), "#4a8fd9"], [Vector2(9, -60), "#e8483c"], [Vector2(0, -74), "#f2c53d"]]
+	for b in baubles:
+		draw_circle(at + b[0], 2.6, Color(b[1]), true, -1.0, true)
 
 
 ## Trousers laid flat: a waistband and two legs a little apart (shorts stop
@@ -482,6 +501,8 @@ func _draw_torso(top: Dictionary, sleeve: Color, bob: float) -> void:
 			draw_line(Vector2(6, -104 - bob), Vector2(7, -92 - bob), UI.SURFACE, 1.5, true)
 		"tee":
 			draw_rect(Rect2(-14, -108 - bob, 28, 4), sleeve.darkened(0.1))
+		"tree":
+			_tree_costume(Vector2(0, -bob), sleeve)
 
 
 ## The walking stick, if they carry one, held in `hand`.
@@ -694,6 +715,32 @@ func _draw_hat(h: Vector2) -> void:
 		"tophat":
 			draw_rect(Rect2(h.x - 20, h.y - 16, 40, 5), c)
 			draw_rect(Rect2(h.x - 12, h.y - 34, 24, 18), c)
+		"party":
+			var tip := h + Vector2(3, -46)
+			draw_colored_polygon(PackedVector2Array([h + Vector2(-12, -12), tip, h + Vector2(14, -12)]), c)
+			for k in 2:
+				var t := 0.35 + 0.3 * k
+				draw_line(h + Vector2(-12, -12).lerp(tip - h, t), h + Vector2(14, -12).lerp(tip - h, t), c.lightened(0.45), 3.0, true)
+			draw_circle(tip, 4.5, Color("#f2c53d"), true, -1.0, true)
+		"antlers":
+			draw_arc(h, 16, PI * 1.12, TAU * 0.94, 16, c.darkened(0.2), 3.0, true)
+			for side in [-1.0, 1.0]:
+				var base := h + Vector2(9 * side, -14)
+				var top := base + Vector2(7 * side, -26)
+				draw_line(base, top, c, 3.5, true)
+				draw_line(base.lerp(top, 0.45), base.lerp(top, 0.45) + Vector2(9 * side, -6), c, 3.0, true)
+				draw_line(base.lerp(top, 0.75), base.lerp(top, 0.75) + Vector2(-5 * side, -8), c, 2.5, true)
+		"pumpkin":
+			# The whole head inside a carved pumpkin.
+			var at := h + Vector2(0, 2)
+			_ellipse(at + Vector2(-9, 0), Vector2(14, 21), c.darkened(0.12))
+			_ellipse(at + Vector2(9, 0), Vector2(14, 21), c.darkened(0.12))
+			_ellipse(at, Vector2(15, 22), c)
+			draw_line(at + Vector2(1, -21), at + Vector2(4, -29), Color("#5b7a34"), 4.0, true)
+			var glow := Color("#ffd25e")
+			draw_colored_polygon(PackedVector2Array([at + Vector2(-1, -9), at + Vector2(4, -14), at + Vector2(6, -7)]), glow)
+			draw_colored_polygon(PackedVector2Array([at + Vector2(9, -9), at + Vector2(14, -14), at + Vector2(15, -6)]), glow)
+			draw_colored_polygon(PackedVector2Array([at + Vector2(-2, 5), at + Vector2(17, 4), at + Vector2(12, 11), at + Vector2(3, 11)]), glow)
 
 
 func _cap_dome(h: Vector2, c: Color) -> void:

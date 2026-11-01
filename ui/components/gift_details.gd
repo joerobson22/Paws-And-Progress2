@@ -8,14 +8,17 @@ extends RefCounted
 
 ## `fresh` celebrates a gift that's just arrived from a trade, and `first`
 ## marks it NEW beside its name: one you'd never had before. `yours` off
-## leaves out how many you have, for a friend's gift.
-static func open(id: String, fresh: bool = false, yours: bool = true, first: bool = false) -> void:
+## leaves out how many you have, for a friend's gift. `message` is a line
+## above it all ("Happy Halloween! Here's a present.").
+static func open(id: String, fresh: bool = false, yours: bool = true, first: bool = false, message: String = "") -> void:
 	var g := Content.gift(id)
 	if g.is_empty():
 		return
 	var count := App.state.gift_count(id)
 	var rarity: String = g["rarity"]
 	var m := Modal.open(400)
+	if message != "":
+		m.body.add_child(UI.label(message, 15, UI.ACCENT, false, 800))
 	var head := m.heading_row(g["name"])
 	if first:
 		# The name keeps only the room it needs, so NEW sits right after it.

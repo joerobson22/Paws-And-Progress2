@@ -35,6 +35,9 @@ var signed_out := false
 var _facts := {}
 var _facts_key := ""
 var _changes := 0
+## The holiday last worked out, and for which minute and save (see holiday()).
+var _holiday := ""
+var _holiday_key := ""
 
 
 ## How often a running walk notes that the app is still open, in seconds.
@@ -425,7 +428,11 @@ func facts() -> Dictionary:
 		var found := {}
 		for id in state.inventory:
 			found[id] = true
-		_facts = {"level": level(), "total_seconds": state.total_seconds(), "place_seconds": state.place_seconds(), "found": found}
+		var holiday_seconds := {}
+		for h in Content.holidays:
+			holiday_seconds[h["id"]] = Holidays.best_seconds(h, state.days, str(state.profile.get("dob", "")))
+		_facts = {"level": level(), "total_seconds": state.total_seconds(), "place_seconds": state.place_seconds(),
+			"found": found, "holiday_seconds": holiday_seconds}
 	return _facts
 
 
@@ -472,8 +479,12 @@ func phone_layout() -> bool:
 # --- Time of day -------------------------------------------------------------
 
 ## The local time as hours past midnight: the real time, or the debug
-## bar's time of day while it's set (debug builds only).
+## bar's time of day while it's set (debug builds only). A holiday can pin
+## it (it's always midnight on Halloween).
 func day_hour() -> float:
+	var look := holiday_look()
+	if look and look.hour >= 0.0:
+		return look.hour
 	var forced := float(state.settings.get("debug_hour", -1.0))
 	if OS.is_debug_build() and forced >= 0.0:
 		return forced
@@ -512,6 +523,56 @@ func debug_add_minutes(minutes: int) -> void:
 		return
 	state.active.start_unix -= minutes * 60
 	_changed()
+
+
+# --- Holidays ----------------------------------------------------------------
+
+## The holiday on now (see Holidays and data/holidays.json), or "" on an
+## ordinary day. Debug builds can try one out from the debug bar
+## ("debug_holiday": an id, or "none" for an ordinary day whatever the date).
+func holiday() -> String:
+	if OS.is_debug_build():
+		var forced := str(state.settings.get("debug_holiday", ""))
+		if forced == "none" or not Content.holiday(forced).is_empty():
+			return "" if forced == "none" else forced
+	var key := "%d:%d:%d" % [floori(now() / 60.0), state.get_instance_id(), _changes]
+	if key != _holiday_key:
+		_holiday_key = key
+		_holiday = Holidays.on(Time.get_datetime_dict_from_system(), Content.holidays, str(state.profile.get("dob", "")))
+	return _holiday
+
+
+## How the holiday on now looks (HolidayLook), or null.
+func holiday_look() -> HolidayLook:
+	return Holidays.look(holiday())
+
+
+## The hat a holiday has you wear whatever you've picked (your party hat on
+## your birthday), or "".
+func holiday_hat() -> String:
+	var look := holiday_look()
+	return look.hat if look and not Content.cosmetic(look.hat).is_empty() else ""
+
+
+## Your present for opening the app on a holiday, given once a year: the
+## gift's id, or "" if there's nothing to give (no holiday, no account yet,
+## or already given this year).
+func claim_holiday_gift() -> String:
+	var id := holiday()
+	var gift_id := str(Content.holiday(id).get("gift", ""))
+	if gift_id == "" or Content.gift(gift_id).is_empty() or needs_account():
+		return ""
+	var year := int(Time.get_date_dict_from_system()["year"])
+	var given = state.profile.get("holiday_gifts", {})
+	if not given is Dictionary:
+		given = {}
+	if int(given.get(id, 0)) == year:
+		return ""
+	given[id] = year
+	state.profile["holiday_gifts"] = given
+	state.inventory[gift_id] = state.gift_count(gift_id) + 1
+	_changed()
+	return gift_id
 
 
 # --- Gifts -------------------------------------------------------------------
