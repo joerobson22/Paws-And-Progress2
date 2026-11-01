@@ -73,4 +73,3 @@ These are optional. Without them the app uses the one-colour icon.
 | `place_moon` | The Moon button. |
 | `place_safari` | The Safari button. |
 | `place_tundra` | The Tundra button. |
-| `arrow_right`, `forward`, `board`, `moon_fill`, `shirt`, `trade` | Spare: not used right now. |

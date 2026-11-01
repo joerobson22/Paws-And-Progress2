@@ -16,8 +16,8 @@ extends Control
 @export_range(0.0, 1.0) var night_brightness := 0.45
 ## How much of the app's background colour lies over the view.
 @export_range(0.0, 1.0) var wash := 0.35
-## How much wider than the screen the layers are drawn, so panning and
-## drifting never show an edge. The pan is scaled down so the nearest
+## How much wider than the screen the layers are drawn, so panning
+## never shows an edge. The pan is scaled down so the nearest
 ## layer, a whole screen away, just uses up this spare.
 @export var spare := 0.18
 ## Where the sun and moon set, from the top (0) to the bottom (1).
@@ -47,7 +47,6 @@ var _colours: Array[Color] = []
 var _wash: ColorRect
 ## Under each layer, ground in its colour, for when panning lifts it.
 var _skirts: Array[ColorRect] = []
-var _age := 0.0
 
 
 func _ready() -> void:
@@ -79,8 +78,7 @@ func _all_pictures() -> Array[TextureRect]:
 	return out
 
 
-func _process(dt: float) -> void:
-	_age += dt
+func _process(_dt: float) -> void:
 	visible = not covered
 	if visible:
 		_layout()
@@ -116,9 +114,8 @@ func _layout() -> void:
 	var travel := _travel()
 	for i in _layers.size():
 		var l := _layers[i]
-		var sway := sin(_age * 0.12 + l.get_index() * 1.7) * l.drift
 		var lift := look_down * view.y * (LOOK_BASE + l.parallax * 2.0)
-		_cover(l, view, pan * l.parallax * travel + Vector2(sway, -lift))
+		_cover(l, view, pan * l.parallax * travel + Vector2(0, -lift))
 		# Ground in the layer's colour below its bottom edge, down to the
 		# screen's, for when looking down lifts it.
 		var gap := view.y - (l.position.y + l.size.y)

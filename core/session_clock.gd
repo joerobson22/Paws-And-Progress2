@@ -10,20 +10,17 @@ var start_unix: int = 0
 var paused_total: int = 0
 ## 0 while running.
 var pause_started_unix: int = 0
-## How long the player meant to walk; 0 for an open-ended walk.
-var goal_seconds: int = 0
 var biome_id: String = "lake"
 ## The last moment the app was known to be open during this walk (kept up
 ## to date while it runs); 0 if never recorded.
 var last_seen_unix: int = 0
 
 
-static func begin(p_project_id: String, p_pet_id: String, now: int, p_goal_seconds: int = 0, p_biome_id: String = "lake") -> SessionClock:
+static func begin(p_project_id: String, p_pet_id: String, now: int, p_biome_id: String = "lake") -> SessionClock:
 	var c := SessionClock.new()
 	c.project_id = p_project_id
 	c.pet_id = p_pet_id
 	c.start_unix = now
-	c.goal_seconds = p_goal_seconds
 	c.biome_id = p_biome_id
 	return c
 
@@ -66,7 +63,6 @@ func to_dict() -> Dictionary:
 		"start_unix": start_unix,
 		"paused_total": paused_total,
 		"pause_started_unix": pause_started_unix,
-		"goal_seconds": goal_seconds,
 		"biome_id": biome_id,
 		"last_seen_unix": last_seen_unix,
 	}
@@ -79,7 +75,6 @@ static func from_dict(d: Dictionary) -> SessionClock:
 	c.start_unix = int(d.get("start_unix", 0))
 	c.paused_total = int(d.get("paused_total", 0))
 	c.pause_started_unix = int(d.get("pause_started_unix", 0))
-	c.goal_seconds = int(d.get("goal_seconds", 0))
 	c.biome_id = str(d.get("biome_id", "lake"))
 	c.last_seen_unix = int(d.get("last_seen_unix", 0))
 	return c

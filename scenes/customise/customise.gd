@@ -69,32 +69,8 @@ static func open() -> Modal:
 	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	room.add_child(rows)
 
-	var state := {"section": str(Content.cosmetic_sections[0]["id"]) if not Content.cosmetic_sections.is_empty() else ""}
-	# Remade when the tab changes. Held in an array so the tabs can call it.
-	var fill: Array[Callable] = []
-	fill.append(func():
-		for c in tabs.get_children():
-			tabs.remove_child(c)
-			c.queue_free()
-		for section in Content.cosmetic_sections:
-			var id: String = section["id"]
-			var tab := _tab(section["name"], id == state["section"], func():
-				if state["section"] != id:
-					state["section"] = id
-					fill[0].call())
-			if narrow:
-				tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			tabs.add_child(tab)
-		for c in rows.get_children():
-			rows.remove_child(c)
-			c.queue_free()
-		list.scroll_vertical = 0
-		for section in Content.cosmetic_sections:
-			if section["id"] != state["section"]:
-				continue
-			for part in section["rows"]:
-				rows.add_child(_part_row(str(part), draft, view, rows, narrow)))
-	fill[0].call()
+	var first := str(Content.cosmetic_sections[0]["id"]) if not Content.cosmetic_sections.is_empty() else ""
+	_show_section(first, tabs, rows, list, draft, view, narrow)
 
 	# As tall as the popup allows without the whole body scrolling, up to
 	# the height of the tallest section, so switching tabs never resizes it.
@@ -111,6 +87,27 @@ static func open() -> Modal:
 	m.resized.connect(fit)
 	fit.call()
 	return m
+
+
+## Fills the tabs (with `section` open) and the rows of that section.
+## Picking another tab calls this again.
+static func _show_section(section: String, tabs: Control, rows: Control, list: ScrollContainer,
+		draft: Dictionary, view: CharacterView, narrow: bool) -> void:
+	for c in tabs.get_children() + rows.get_children():
+		c.get_parent().remove_child(c)
+		c.queue_free()
+	list.scroll_vertical = 0
+	for s in Content.cosmetic_sections:
+		var id: String = s["id"]
+		var tab := _tab(s["name"], id == section, func():
+			if id != section:
+				_show_section(id, tabs, rows, list, draft, view, narrow))
+		if narrow:
+			tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tabs.add_child(tab)
+		if id == section:
+			for part in s["rows"]:
+				rows.add_child(_part_row(str(part), draft, view, rows, narrow))
 
 
 ## The row for one entry in a section: a colour row or a part's carousel.

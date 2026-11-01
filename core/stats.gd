@@ -51,53 +51,11 @@ static func daily_totals(days: Dictionary, week_start_day: int) -> Array[int]:
 	return totals
 
 
-## Seven {project_id: seconds} dictionaries, Monday first: each day's bar split by project.
-static func daily_project_totals(days: Dictionary, week_start_day: int) -> Array[Dictionary]:
-	var out: Array[Dictionary] = [{}, {}, {}, {}, {}, {}, {}]
-	for i in 7:
-		var d: Dictionary = days.get(week_start_day + i, {})
-		for id in d.get("projects", {}):
-			out[i][id] = int(d["projects"][id])
-	return out
-
-
 static func week_total(days: Dictionary, week_start_day: int) -> int:
 	var total := 0
 	for t in daily_totals(days, week_start_day):
 		total += t
 	return total
-
-
-## {week_start_day: seconds} for every week that has any focus.
-static func weekly_totals(days: Dictionary) -> Dictionary:
-	var weeks := {}
-	for day in days:
-		var w := week_start(int(day))
-		weeks[w] = int(weeks.get(w, 0)) + _day_total(days, int(day))
-	return weeks
-
-
-## Week start days from this week back to the first week with any focus (or
-## `since_day`, whichever is earlier), newest first, at most `limit` weeks.
-static func week_history(days: Dictionary, today: int, since_day: int = 0, limit: int = 104) -> Array[int]:
-	var first := week_start(today)
-	for w in weekly_totals(days):
-		first = mini(first, w)
-	if since_day > 0:
-		first = mini(first, week_start(since_day))
-	var out: Array[int] = []
-	var w := week_start(today)
-	while w >= first and out.size() < limit:
-		out.append(w)
-		w -= 7
-	return out
-
-
-static func best_week_total(days: Dictionary) -> int:
-	var best := 0
-	for total in weekly_totals(days).values():
-		best = maxi(best, total)
-	return best
 
 
 # --- Weeks, months and years ------------------------------------------------
@@ -203,7 +161,7 @@ static func period_sums(days: Dictionary, period: String) -> Dictionary:
 
 ## Period starts from the current one back to the first with any focus (or
 ## `since_day`'s, whichever is earlier), newest first, at most `limit`.
-static func period_history(days: Dictionary, today: int, period: String, since_day: int = 0, limit: int = 104) -> Array[int]:
+static func period_history(days: Dictionary, today: int, period: String, since_day: int = 0) -> Array[int]:
 	var first := period_start(today, period)
 	for start in period_sums(days, period):
 		first = mini(first, start)
@@ -211,18 +169,9 @@ static func period_history(days: Dictionary, today: int, period: String, since_d
 		first = mini(first, period_start(since_day, period))
 	var out: Array[int] = []
 	var start := period_start(today, period)
-	while start >= first and out.size() < limit:
+	while start >= first and out.size() < 104:
 		out.append(start)
 		start = period_before(start, period)
-	return out
-
-
-## {project_id: seconds} for the week beginning `week_start_day`.
-static func project_totals_in_week(days: Dictionary, week_start_day: int) -> Dictionary:
-	var out := {}
-	for d in daily_project_totals(days, week_start_day):
-		for id in d:
-			out[id] = int(out.get(id, 0)) + int(d[id])
 	return out
 
 
@@ -246,8 +195,8 @@ static func _day_total(days: Dictionary, day: int) -> int:
 ## it until it's over, and one missed day is forgiven (a rest day) when the
 ## REST_DAY_AFTER days before it were all work days. Rest days don't add to
 ## the count.
-static func current_streak(days: Dictionary, today: int, min_seconds: int = STREAK_MIN_SECONDS) -> int:
-	var work := work_days(days, min_seconds)
+static func current_streak(days: Dictionary, today: int) -> int:
+	var work := work_days(days)
 	var day := today if work.has(today) else today - 1
 	var streak := 0
 	while true:
@@ -261,8 +210,8 @@ static func current_streak(days: Dictionary, today: int, min_seconds: int = STRE
 
 ## True when a rest day is banked: the run of work days ending today (or
 ## yesterday, if today has nothing yet) is long enough to forgive a miss.
-static func rest_day_ready(days: Dictionary, today: int, min_seconds: int = STREAK_MIN_SECONDS) -> bool:
-	var work := work_days(days, min_seconds)
+static func rest_day_ready(days: Dictionary, today: int) -> bool:
+	var work := work_days(days)
 	var day := today if work.has(today) else today - 1
 	return _run_ending(work, day) >= REST_DAY_AFTER
 
