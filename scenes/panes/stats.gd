@@ -210,7 +210,7 @@ func _history(today: int) -> Control:
 	else:
 		list = UI.hbox(8)
 	for w in starts:
-		var b := _period_button(w, int(totals.get(w, 0)), best, today)
+		var b := _period_button(w, int(totals.get(w, 0)), best)
 		list.add_child(b)
 		_periods[w] = b
 	if _columns:
@@ -253,7 +253,7 @@ func _period_name(start: int, short: bool) -> String:
 			return Text.t("stats.week_of", {"day": Stats.format_day(start)})
 
 
-func _period_button(w: int, seconds: int, best: int, today: int) -> Button:
+func _period_button(w: int, seconds: int, best: int) -> Button:
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(0 if _columns else 132, 70)
 	# The words clip, not the button, or its shadow would be cut off.
@@ -288,7 +288,7 @@ func _select(start: int, animate: bool = true) -> void:
 	if start == Stats.period_start(today, period):
 		now_index = int(Stats.day_date(today)["month"]) - 1 if period == "year" else today - start
 	_chart.split = split
-	_chart.set_bars(buckets, _labels(start, buckets.size()), now_index, animate)
+	_chart.set_bars(buckets, _labels(buckets.size()), now_index, animate)
 	# The chart's words for a screen reader; the chips under it say who.
 	_chart.accessibility_name = Text.t("alt.chart", {"period": _chart_title.text, "time": _chart_total.text})
 
@@ -304,7 +304,7 @@ func _select(start: int, animate: bool = true) -> void:
 
 ## The words under the bars: day names for a week, every seventh date for a
 ## month (1, 8, 15...), month names for a year.
-func _labels(start: int, count: int) -> Array:
+func _labels(count: int) -> Array:
 	var out := []
 	for i in count:
 		match _period():

@@ -7,7 +7,6 @@
 		"save": "Save",
 		"done": "Done",
 		"delete": "Delete",
-		"complete": "Complete",
 		"home": "Home",
 		"sort_by": "Sort by",
 		"labelled": "{label}: {value}",
@@ -136,10 +135,6 @@
 		"up": "Go up",
 		"down": "Go down"
 	},
-	"theme": {
-		"to_light": "Switch to light mode",
-		"to_dark": "Switch to dark mode"
-	},
 	"weather_prompt": {
 		"title": "Bring your weather along?",
 		"body": "Your walks can follow the real sunrise, sunset and weather where you are. Your rough location comes from your internet connection and is only used to look those up. You can change this in settings.",
@@ -186,7 +181,6 @@
 	"pet": {
 		"your_kind": "your {kind}",
 		"your_kind_start": "Your {kind}",
-		"name_and_kind": "{name} · {kind}",
 		"fallback": "your pet",
 		"fallback_start": "Your pet"
 	},
@@ -371,11 +365,7 @@
 		"hours": "Focus for {hours} hours",
 		"hours_in": "Focus for {hours} hours {where}",
 		"table": "Discover all {table} gifts",
-		"all_tables": "Discover every gift",
-		"progress_level": "Level {have} of {goal}",
-		"progress_hours": "{have} of {goal}",
-		"hours_short": "{hours}h",
-		"progress_gifts": "{have} of {goal} gifts found"
+		"all_tables": "Discover every gift"
 	},
 	"level_bar": {
 		"caption": "Level {level}  ·  {xp} / {needed} XP"

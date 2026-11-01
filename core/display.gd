@@ -88,6 +88,7 @@ static func _resize(window: Window, px: Vector2i) -> void:
 		return
 	var screen := DisplayServer.screen_get_usable_rect(window.current_screen)
 	window.size = px
+	@warning_ignore("integer_division")
 	window.position = screen.position + (screen.size - px) / 2
 
 

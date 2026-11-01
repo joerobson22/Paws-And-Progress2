@@ -26,10 +26,10 @@ var _have: Button
 var _col: VBoxContainer
 
 
-## `typed`: what was typed before the screen was rebuilt (typed()).
+## `kept`: what was typed before the screen was rebuilt (typed()).
 ## `own_backdrop`: draw the app's background colour behind it; otherwise it
 ## sits on the hilltop view the app keeps behind every screen.
-func _init(typed: Dictionary = {}, own_backdrop: bool = true) -> void:
+func _init(kept: Dictionary = {}, own_backdrop: bool = true) -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	if own_backdrop:
@@ -61,13 +61,13 @@ func _init(typed: Dictionary = {}, own_backdrop: bool = true) -> void:
 	col.add_child(card)
 	var form := UI.vbox(6)
 	card.add_child(form)
-	_name = _field(form, Text.t("create.name"), Text.t("profile.username_placeholder"), 24, typed.get("name", ""))
+	_name = _field(form, Text.t("create.name"), Text.t("profile.username_placeholder"), 24, kept.get("name", ""))
 	form.add_child(_gap(2))
-	_school = _field(form, Text.t("create.school"), Text.t("profile.school_placeholder"), 60, typed.get("school", ""))
+	_school = _field(form, Text.t("create.school"), Text.t("profile.school_placeholder"), 60, kept.get("school", ""))
 	form.add_child(_gap(2))
-	form.add_child(_birth_row(typed.get("dob", ["", "", ""])))
+	form.add_child(_birth_row(kept.get("dob", ["", "", ""])))
 	form.add_child(_gap(2))
-	form.add_child(_agree_row(typed.get("agreed", false)))
+	form.add_child(_agree_row(kept.get("agreed", false)))
 	form.add_child(_gap(2))
 	_create = UI.button(Text.t("create.create"), _submit, "accent")
 	form.add_child(_create)

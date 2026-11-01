@@ -185,8 +185,15 @@ it, then flick it. Your pet will fetch it, wading in if it lands in the water.
 2. In the project manager, **Import** and pick this folder's `project.godot`.
 3. Press **F5**. Resize the window narrow and tall to see the phone layout.
 
-On first launch on desktop, a save from the original app
-(`…/app_userdata/Paws-And-Progress/gamedata.save`) is imported automatically.
+## Renaming the app
+
+The app's name is set in one place: **Project → Project Settings →
+Application → Config → Name** (`config/name` in `project.godot`). The window
+title, the iPhone home screen name and any `{app}` in `data/text.json` all
+follow it. Two things don't, on purpose: the iOS bundle ID (changing it makes
+a new App Store app) and this repo's file names. Godot also keeps desktop
+save data in a folder named after the app, so a rename starts a fresh save
+on computers.
 
 ## Running it on an iPhone
 

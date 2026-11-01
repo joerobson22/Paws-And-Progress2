@@ -62,8 +62,6 @@ static func default_settings() -> Dictionary:
 		# UI.VISIONS: colours for colour blindness.
 		"vision": "off",
 		"keep_screen_on": true,
-		# 0 = open-ended walk.
-		"walk_goal_seconds": 0,
 		"walk_biome": "lake",
 	}
 

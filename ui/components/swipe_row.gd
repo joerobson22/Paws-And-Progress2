@@ -148,9 +148,9 @@ func _draw() -> void:
 
 
 ## Springs home, flashes `colour` over the panel and throws confetti.
-func celebrate(colour: Color = UI.SUCCESS) -> void:
+func celebrate() -> void:
 	spring_back()
-	_flash.colour = colour
+	_flash.colour = UI.SUCCESS
 	var t := Motion.tween(_flash, "flash")
 	t.tween_property(_flash, "strength", 0.55, Motion.time(0.12))
 	t.tween_property(_flash, "strength", 0.0, Motion.time(0.5))

@@ -31,33 +31,33 @@ var _placed := false
 var _above := true
 
 
-## Shows the card for `id` over `tile`, replacing any other.
-static func show_for(tile: Control, id: String) -> GiftInfo:
+## Shows the card for `id` over `target`, replacing any other.
+static func show_for(target: Control, id: String) -> GiftInfo:
 	if is_instance_valid(_shown):
-		if _shown.tile == tile:
+		if _shown.tile == target:
 			return _shown
 		_shown.dismiss()
 	var info := GiftInfo.new(id)
-	info.tile = tile
-	_overlay_for(tile).add_child(info)
+	info.tile = target
+	_overlay_for(target).add_child(info)
 	_shown = info
 	info._appear()
 	return info
 
 
 ## The layer the cards draw on, made the first time one shows.
-static func _overlay_for(tile: Control) -> CanvasLayer:
+static func _overlay_for(target: Control) -> CanvasLayer:
 	if not is_instance_valid(_overlay):
 		_overlay = CanvasLayer.new()
 		_overlay.name = "GiftInfoLayer"
 		_overlay.layer = LAYER
-		tile.get_tree().root.add_child(_overlay)
+		target.get_tree().root.add_child(_overlay)
 	return _overlay
 
 
-## The card showing over `tile`, if any.
-static func showing(tile: Control) -> GiftInfo:
-	return _shown if is_instance_valid(_shown) and _shown.tile == tile and not _shown._going else null
+## The card showing over `target`, if any.
+static func showing(target: Control) -> GiftInfo:
+	return _shown if is_instance_valid(_shown) and _shown.tile == target and not _shown._going else null
 
 
 ## Hides whichever card is showing.
@@ -107,9 +107,9 @@ func _init(id: String) -> void:
 	gap.custom_minimum_size.y = 2
 	col.add_child(gap)
 	if full:
-		var call := UI.label(Text.t(_call_key(), {"cost": cost, "a_rarity": UI.a(Content.rarity_name(next).to_lower())}), 13, Content.rarity_text_colour(next), false, 800)
-		call.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		col.add_child(call)
+		var prompt := UI.label(Text.t(_call_key(), {"cost": cost, "a_rarity": UI.a(Content.rarity_name(next).to_lower())}), 13, Content.rarity_text_colour(next), false, 800)
+		prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		col.add_child(prompt)
 	var foot := UI.hbox(10)
 	_bar = _Bar.new()
 	_bar.fraction = clampf(float(count) / float(cost), 0.0, 1.0)

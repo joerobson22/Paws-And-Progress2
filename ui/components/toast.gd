@@ -13,11 +13,11 @@ static func show_text(text: String, icon: String = "check") -> void:
 	_make(text, icon)
 
 
-## A toast with a button after the words ("Undo"). It stays for `seconds`,
+## A toast with a button after the words ("Undo"). It stays for 4 seconds,
 ## and pressing the button calls `on_press` and closes it.
-static func show_action(text: String, icon: String, action: String, on_press: Callable, seconds: float = 4.0) -> void:
+static func show_action(text: String, icon: String, action: String, on_press: Callable) -> void:
 	var t := _make(text, icon)
-	t._wait = seconds
+	t._wait = 4.0
 	t.mouse_filter = Control.MOUSE_FILTER_STOP
 	var b := UI.button(action, Callable(), "ghost")
 	UI.style_button(b, Color.TRANSPARENT, UI.ACCENT_SOFT)

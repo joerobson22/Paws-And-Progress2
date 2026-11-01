@@ -82,8 +82,6 @@ const ON_DARK := Color("#f4f7f5")
 const ON_DARK_SOFT := Color(0.957, 0.969, 0.961, 0.66)
 ## The streak flame.
 const FLAME := Color("#e0702b")
-## Behind the focus complete screen's scenery: a quarter-black sheet.
-const SHEET := Color(0, 0, 0, 0.25)
 ## Colours for each project in charts, assigned in the order projects were made.
 const SERIES_STANDARD := ["#2f6b4f", "#e39b3b", "#4d84c4", "#c45b7d", "#7c62c9", "#3aa39a", "#a6763f", "#8c9a3a"]
 static var SERIES: Array = SERIES_STANDARD.map(func(c): return Color(c))
@@ -245,15 +243,11 @@ static func corners(b: StyleBoxFlat, radius: int) -> StyleBoxFlat:
 	return b
 
 
+## A soft shadow under `b`, deeper with `strength`.
 static func with_shadow(b: StyleBoxFlat, strength: float = 1.0) -> StyleBoxFlat:
-	return shadow(b, 14 * strength, Vector2(0, 4 * strength), strength)
-
-
-## A soft shadow under `b`, `blur` wide and moved down by `offset`.
-static func shadow(b: StyleBoxFlat, blur: float, offset: Vector2, strength: float = 1.0) -> StyleBoxFlat:
 	b.shadow_color = Color(SHADOW, SHADOW.a * strength)
-	b.shadow_size = int(blur)
-	b.shadow_offset = offset
+	b.shadow_size = int(14 * strength)
+	b.shadow_offset = Vector2(0, 4 * strength)
 	return b
 
 
@@ -437,12 +431,13 @@ static func scroll_area(sideways: bool = false) -> ScrollContainer:
 
 
 ## A scroll_area() for a list of cards that lets their shadows show: the
-## scrolling part reaches `room` past the holder's edges (into the screen's
+## scrolling part reaches 16px past the holder's edges (into the screen's
 ## gutter), with the same room inside it round `content`, so the cards line
 ## up with everything above them yet aren't cut off flat at the sides. Put
 ## the returned holder in the layout; `content` goes inside it, and the
 ## ScrollContainer is the holder's only child.
-static func shadow_scroll(content: Control, room: int = 16) -> Control:
+static func shadow_scroll(content: Control) -> Control:
+	var room := 16
 	var holder := Control.new()
 	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -472,49 +467,13 @@ static func shadow_scroll(content: Control, room: int = 16) -> Control:
 	return holder
 
 
-## A soft fade into the card's colour along the top and bottom of `sc` (a
-## list without a scrollbar), each showing only while there's more to
-## scroll that way. Add it over the list, filling the same rect.
-static func scroll_fade(sc: ScrollContainer, height: float = 22.0, colour: Color = SURFACE) -> Control:
-	var fade := _ScrollFade.new()
-	fade.sc = sc
-	fade.height = height
-	fade.colour = colour
-	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	sc.get_v_scroll_bar().value_changed.connect(func(_v): fade.queue_redraw())
-	sc.get_v_scroll_bar().changed.connect(fade.queue_redraw)
-	return fade
-
-
-class _ScrollFade extends Control:
-	var sc: ScrollContainer
-	var height := 22.0
-	var colour := Color.WHITE
-
-	func _draw() -> void:
-		if not is_instance_valid(sc):
-			return
-		var bar := sc.get_v_scroll_bar()
-		var above := bar.value > 0.5
-		var below := bar.value < bar.max_value - bar.page - 0.5
-		var clear := Color(colour, 0.0)
-		if above:
-			draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0), Vector2(size.x, height), Vector2(0, height)]),
-				PackedColorArray([colour, colour, clear, clear]))
-		if below:
-			var y := size.y - height
-			draw_polygon(PackedVector2Array([Vector2(0, y), Vector2(size.x, y), Vector2(size.x, size.y), Vector2(0, size.y)]),
-				PackedColorArray([clear, clear, colour, colour]))
-
-
 ## Keeps `content` (a MarginContainer inside `sc`) clear of `sc`'s scrollbar:
 ## while the bar shows, `gap` more room on its side (the right for a list
 ## that scrolls down, the bottom for a sideways strip), so nothing touches
 ## it; none when everything fits.
 static func clear_of_bar(sc: ScrollContainer, content: MarginContainer, gap: int = 10) -> void:
 	var sideways := sc.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED
-	var bar: ScrollBar = sc.get_h_scroll_bar() if sideways else sc.get_v_scroll_bar()
+	var bar: ScrollBar = [sc.get_v_scroll_bar(), sc.get_h_scroll_bar()][int(sideways)]
 	var side := "margin_bottom" if sideways else "margin_right"
 	var fit := func():
 		content.add_theme_constant_override(side, gap if bar.visible else 0)
@@ -777,9 +736,9 @@ static func series_colour(id: String, kind: String = "projects") -> Color:
 # --- Pictures ----------------------------------------------------------------
 
 ## An animal standing in a fixed-size box (for panels and lists).
-static func animal_portrait(animal_id: String, colours: Array[Color], box_size: Vector2, fill: Color = ACCENT_SOFT, radius: int = 18) -> Control:
+static func animal_portrait(animal_id: String, colours: Array[Color], box_size: Vector2) -> Control:
 	var frame := PanelContainer.new()
-	var fb := box(fill, Color.TRANSPARENT, radius)
+	var fb := box(ACCENT_SOFT, Color.TRANSPARENT, 18)
 	fb.set_content_margin_all(0)
 	frame.add_theme_stylebox_override("panel", fb)
 	frame.custom_minimum_size = box_size
