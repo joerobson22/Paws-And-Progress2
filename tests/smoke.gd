@@ -187,6 +187,17 @@ func _run() -> void:
 	root.push_input(over, true)
 	await _wait(20)
 	check(hovered._grow < 1.01, "and shrinks back")
+	check(hovered._shade < 0.01, "and its shade goes")
+
+	# Dragging the debug time slider never swipes to another screen.
+	var slider: Control = _find(main._panes[Vector2i.ZERO], func(n): return n is HSlider)
+	if slider:
+		var sr: Rect2 = slider.get_global_rect()
+		await _drag(sr.position + Vector2(sr.size.x * 0.2, sr.size.y * 0.5), sr.position + Vector2(sr.size.x * 0.9, sr.size.y * 0.5) + Vector2(main.size.x * 0.3, 0))
+		await _wait(30)
+		check(main._at == Vector2i.ZERO, "dragging the time slider stays on the focus screen")
+		app.set_setting("debug_hour", -1.0)
+		await _wait(10)
 
 	# Debug builds get an unlock-everything switch in the top left.
 	var debug: Node = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "debug_bar.gd"))
@@ -308,6 +319,27 @@ func _run() -> void:
 			check(_find(info, func(n): return n is Label and n.text == str(_content().rarity_name(g["rarity"])).to_upper()) != null, "and its rarity")
 			check(info.get_global_rect().end.y <= first_tile.get_global_rect().position.y + 1.0 or info.get_global_rect().position.y >= first_tile.get_global_rect().end.y - 1.0,
 				"the card sits clear of the gift")
+			var layer: CanvasLayer = info.get_parent() as CanvasLayer
+			check(layer != null and layer.layer > 1, "on a layer over everything else")
+		first_tile._hover(false)
+		await _wait(25)
+		# From the first frame it shows, it stays on one side of the gift
+		# (above, where there's room): never below, then snapping up.
+		var low_tile: Control = grid_tiles[min(9, grid_tiles.size() - 1)]
+		low_tile._hover(true)
+		var sides := {}
+		for f in 10:
+			await process_frame
+			var card = info_class.showing(low_tile)
+			if card and card.modulate.a > 0.0:
+				var r: Rect2 = card.get_global_rect()
+				var t: Rect2 = low_tile.get_global_rect()
+				sides["above" if r.end.y <= t.position.y + 1.0 else ("below" if r.position.y >= t.end.y - 1.0 else "over")] = true
+		check(sides.size() == 1 and not sides.has("over"), "a card keeps to one side of its gift from its first visible frame (%s)" % ", ".join(sides.keys()))
+		low_tile._hover(false)
+		await _wait(25)
+		first_tile._hover(true)
+		await _wait(25)
 		check(first_tile.scale.x > 1.05, "and the gift grows (%.2f)" % first_tile.scale.x)
 		await _shot("gifts_popup")
 		first_tile._hover(false)
@@ -750,6 +782,16 @@ func _run() -> void:
 		await _shot("stats_strip_dragged")
 		legend_strip.scroll_horizontal = 0
 		await _wait(5)
+	# Pills (the project chips, dropdowns) shade under the pointer rather
+	# than grow, so the strip never cuts them off.
+	var chip: Button = _find(legend_strip, func(n): return n is Button and n.text != "")
+	if chip:
+		await _point(chip.get_global_rect().get_center())
+		await _wait(20)
+		check(is_equal_approx(chip.scale.x, 1.0), "a chip doesn't grow under the pointer (%.2f)" % chip.scale.x)
+		check(_class("res://ui/hover_grow.gd").is_pill(chip), "it counts as a pill")
+		await _point(Vector2(4, 4))
+		await _wait(5)
 	main._panes[Vector2i(0, 1)]._show_piece(app.state.projects[0].id, 0)
 	await _wait(25)
 	await _shot("stats_popup")
@@ -1185,8 +1227,8 @@ func _run() -> void:
 	check(main._flows.is_empty(), "back home from the jungle")
 	check(_audio().current_ambience() == "", "the jungle's sounds stop at home")
 
-	# The hilltop view behind the focus screen: the sun by day, the moon and
-	# stars by night, and it pans away as you slide to another screen.
+	# The hilltop view behind every screen: the sun by day, the moon and
+	# stars by night, and its layers pan as you slide to another screen.
 	var focus_pane: Node = main._panes[Vector2i.ZERO]
 	var backdrop: Control = main._backdrop
 	check(backdrop != null and backdrop.visible and backdrop.get_index() < main._world.get_index(), "the hilltop view sits behind the focus screen")
@@ -1213,28 +1255,34 @@ func _run() -> void:
 		await _wait(8)
 		check(backdrop._layers[4].position.x - near_spot.x > backdrop._layers[0].position.x - far_spot.x + 4.0, "sliding away, near layers move further than far ones")
 		await _wait(50)
-		check(not backdrop.visible, "and it's gone on the other screens")
+		check(backdrop.visible and backdrop.modulate.a > 0.99 and main._backdrop == backdrop, "and it stays, the same one, on the other screens")
+		var hilltop: Control = backdrop._layers[4]
+		check(hilltop.position.x + hilltop.size.x >= main.size.x and hilltop.position.x <= 0.0, "with no edge showing")
 		app.go("focus")
 		await _wait(50)
-		check(backdrop.visible and backdrop.modulate.a > 0.99, "back on the focus screen it's there again")
+		app.go("stats")
+		await _wait(50)
+		check(hilltop.position.y < 0.0 or hilltop.position.y + hilltop.size.y < main.size.y, "looking down lifts the layers")
+		check(backdrop._skirts[4].visible and hilltop.position.y + hilltop.size.y + backdrop._skirts[4].size.y >= main.size.y, "and ground fills in below them")
+		app.go("focus")
+		await _wait(50)
+		check(backdrop.visible and backdrop.modulate.a > 0.99, "back on the focus screen it's there")
 		app.set_setting("debug_hour", -1.0)
 		await _wait(5)
 
-	# Dark mode follows the time of day; the debug bar can pin it. The whole
-	# app fades into the new colours with nothing on screen moving or
-	# starting over.
+	# Dark mode follows the time of day (the debug bar's time slider moves
+	# it; there's no style or theme picker any more). The whole app fades
+	# into the new colours with nothing on screen moving or starting over.
 	var orb_before: Node = focus_pane._orb
 	var greeting_before: String = focus_pane._greeting.text
 	var orb_spot: Rect2 = orb_before.get_global_rect()
 	var greeting_end: Vector2 = focus_pane._greeting.get_global_rect().end
-	var dark_pill: Button = _find(focus_pane, func(n): return n is Button and n.accessibility_name == "Theme Dark")
-	check(dark_pill != null, "the debug bar has Theme Auto, Light and Dark")
-	if dark_pill:
-		await _tap_control(dark_pill, main)
-	else:
-		app.set_setting("debug_theme", "dark")
+	check(_find(focus_pane, func(n): return n is Button and (n.text in ["Classic", "Glass", "Pixel", "Storybook", "Auto", "Light", "Dark"])) == null,
+		"the debug bar has no style or theme pickers")
+	app.state.settings["debug_theme"] = "auto"
+	app.set_setting("debug_hour", 23.0)
 	await _wait(60)
-	check(_class("res://ui/ui.gd").dark, "Dark switches to dark mode")
+	check(_class("res://ui/ui.gd").dark, "late at night switches to dark mode")
 	check(focus_pane._orb == orb_before, "the orb carries on through the switch")
 	check(focus_pane._greeting.text == greeting_before and focus_pane._orb.get_global_rect().is_equal_approx(orb_spot)
 		and focus_pane._greeting.get_global_rect().end.is_equal_approx(greeting_end), "the greeting and layout stay put")
@@ -1686,6 +1734,8 @@ func _accounts(main: Node) -> void:
 	check(create != null and create.disabled, "Create waits for both")
 	check(have != null and have.is_visible_in_tree(), "I have an account shows when there's one")
 	check(screen.get_global_rect().has_point(main.size * 0.5) and screen.get_global_rect().size == main.size, "it covers the screen")
+	await _wait(40)
+	check(main._backdrop == null or main._backdrop.sunk > 0.99, "the hills sink low behind it, leaving mostly sky")
 	await _shot("create_account")
 	await _key(KEY_DOWN)
 	await _wait(40)
@@ -1720,6 +1770,10 @@ func _accounts(main: Node) -> void:
 		await _wait(60)
 	var new_slot: String = app.slot
 	check(new_slot != home_slot and not app.needs_account(), "Create makes a new account")
+	if main._backdrop:
+		check(main._backdrop.sunk > 0.0 and main._backdrop.sunk < 1.0, "and the hills rise into view (%.2f)" % main._backdrop.sunk)
+		await _wait(100)
+		check(main._backdrop.sunk < 0.01, "all the way")
 	check(app.state.profile["username"] == "Sam" and app.state.profile["institution"] == "University of York", "with that name and place")
 	check(main._at == Vector2i.ZERO and main._account == null, "and goes to the focus screen")
 	check(app.friends.is_empty(), "a new account has no friends")

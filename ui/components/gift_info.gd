@@ -7,19 +7,28 @@ extends PanelContainer
 ## glows, pulsing, with "Click to trade 10 in for a rare!" above it.
 ## On a computer it shows while the pointer's over the gift; on a phone the
 ## first tap shows it. Only one shows at a time. It never takes the pointer,
-## so the gift under it keeps its hover.
+## so the gift under it keeps its hover. It draws on its own layer over
+## everything else (popups, toasts, the minimap), and doesn't show until it
+## knows its size, so it's above the gift from its first frame.
 
 const WIDTH := 260.0
 ## The gap between the card and the gift.
 const GAP := 6.0
 const BAR_HEIGHT := 8
 
+## The layer over everything that the cards draw on.
+const LAYER := 100
+
 static var _shown: GiftInfo
+static var _overlay: CanvasLayer
 
 var tile: Control
 var gift_id := ""
 var _bar: _Bar
 var _going := false
+## Placed yet, and whether above the gift (or below, with no room above).
+var _placed := false
+var _above := true
 
 
 ## Shows the card for `id` over `tile`, replacing any other.
@@ -30,11 +39,20 @@ static func show_for(tile: Control, id: String) -> GiftInfo:
 		_shown.dismiss()
 	var info := GiftInfo.new(id)
 	info.tile = tile
-	var host: Node = Modal.layer if Modal.layer and is_instance_valid(Modal.layer) else tile.get_tree().root
-	host.add_child(info)
+	_overlay_for(tile).add_child(info)
 	_shown = info
 	info._appear()
 	return info
+
+
+## The layer the cards draw on, made the first time one shows.
+static func _overlay_for(tile: Control) -> CanvasLayer:
+	if not is_instance_valid(_overlay):
+		_overlay = CanvasLayer.new()
+		_overlay.name = "GiftInfoLayer"
+		_overlay.layer = LAYER
+		tile.get_tree().root.add_child(_overlay)
+	return _overlay
 
 
 ## The card showing over `tile`, if any.
@@ -60,8 +78,6 @@ func _init(id: String) -> void:
 	var rarity: String = g.get("rarity", "common")
 	var count := App.state.gift_count(id)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	top_level = true
-	z_index = 3
 	var sb := UI.with_shadow(UI.box(UI.SURFACE, Color.TRANSPARENT, 18))
 	sb.set_content_margin_all(14)
 	add_theme_stylebox_override("panel", sb)
@@ -114,14 +130,20 @@ static func _call_key() -> String:
 
 
 func _appear() -> void:
+	# Hidden till its text has wrapped to its width and it knows how tall it
+	# is: placed before then, it would sit too low and jump up.
 	modulate.a = 0.0
-	_place(true)
+	await get_tree().process_frame
+	if _going or not is_instance_valid(tile):
+		return
+	_place()
+	_placed = true
+	pivot_offset = Vector2(size.x * 0.5, size.y if _above else 0.0)
+	scale = Vector2.ONE * 0.96
 	var t := Motion.tween(self, "appear")
 	t.set_parallel(true)
 	t.tween_property(self, "modulate:a", 1.0, Motion.time(0.12))
-	var rest := position
-	position = rest + Vector2(0, 6)
-	t.tween_property(self, "position", rest, Motion.time(0.12))
+	t.tween_property(self, "scale", Vector2.ONE, Motion.time(0.12))
 
 
 ## Fades away and goes.
@@ -140,22 +162,23 @@ func _process(_dt: float) -> void:
 	if not is_instance_valid(tile) or not tile.is_visible_in_tree():
 		dismiss()
 		return
-	if not _going and modulate.a >= 1.0:
-		_place(false)
+	if _placed:
+		_place()
 
 
 ## Above the gift (below it if there's no room), centred on it and kept on
-## screen. Follows the gift if its list scrolls.
-func _place(_first: bool) -> void:
+## screen. It follows the gift if its list scrolls, and stays on the side it
+## picked first.
+func _place() -> void:
 	if not is_instance_valid(tile):
 		return
 	size = get_combined_minimum_size()
-	var view := get_viewport_rect().size
+	var view := get_viewport().get_visible_rect().size
 	var r := tile.get_global_rect()
 	var x := clampf(r.get_center().x - size.x * 0.5, 8.0, view.x - size.x - 8.0)
-	var y := r.position.y - size.y - GAP
-	if y < 8.0:
-		y = r.end.y + GAP
+	if not _placed:
+		_above = r.position.y - size.y - GAP >= 8.0
+	var y := r.position.y - size.y - GAP if _above else r.end.y + GAP
 	position = Vector2(x, y)
 
 

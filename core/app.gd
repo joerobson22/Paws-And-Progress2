@@ -474,8 +474,8 @@ func sky_look() -> Dictionary:
 	return DayCycle.at(DayCycle.solar_hour(day_hour(), sun.x, sun.y, cycle), cycle)
 
 
-## Whether the app is in its dark colours: after sunset till sunrise. The
-## debug bar can pin it to light or dark ("debug_theme").
+## Whether the app is in its dark colours: after sunset till sunrise. Tests
+## can pin it to light or dark ("debug_theme"; debug builds only).
 func wants_dark() -> bool:
 	match str(state.settings.get("debug_theme", "auto")) if OS.is_debug_build() else "auto":
 		"light":
@@ -483,15 +483,6 @@ func wants_dark() -> bool:
 		"dark":
 			return true
 	return night() >= 0.5
-
-
-## The UI style to draw in (one of UI.STYLES): picked on the debug bar while
-## the looks are tried out; always the app's own outside debug builds.
-func ui_style() -> String:
-	if not OS.is_debug_build():
-		return "classic"
-	var picked := str(state.settings.get("debug_style", "classic"))
-	return picked if picked in UI.STYLES else "classic"
 
 
 ## The walk's debug time buttons: the walk started `minutes` earlier.

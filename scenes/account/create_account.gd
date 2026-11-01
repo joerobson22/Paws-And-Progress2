@@ -17,10 +17,13 @@ var _have: Button
 var _col: VBoxContainer
 
 
-func _init(name_text: String = "", school_text: String = "") -> void:
+## `own_backdrop`: draw the app's background colour behind it; otherwise it
+## sits on the hilltop view the app keeps behind every screen.
+func _init(name_text: String = "", school_text: String = "", own_backdrop: bool = true) -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(UI.backdrop())
+	if own_backdrop:
+		add_child(UI.backdrop())
 
 	var centre := CenterContainer.new()
 	centre.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -61,6 +64,17 @@ func _init(name_text: String = "", school_text: String = "") -> void:
 	_have.add_theme_color_override("font_color", UI.ACCENT)
 	_have.add_theme_color_override("font_hover_color", UI.ACCENT)
 	_have.add_theme_font_size_override("font_size", 15)
+	if not own_backdrop:
+		# A soft pill behind it, as behind the focus screen's hint, so it
+		# reads over the hilltop view.
+		_have.custom_minimum_size.y = 38
+		for state in ["normal", "hover", "pressed", "hover_pressed"]:
+			var sb := (_have.get_theme_stylebox(state) as StyleBoxFlat).duplicate() as StyleBoxFlat
+			sb.bg_color = Color(UI.BG, 0.8)
+			sb.set_corner_radius_all(99)
+			sb.content_margin_left = 18
+			sb.content_margin_right = 18
+			_have.add_theme_stylebox_override(state, sb)
 	col.add_child(_have)
 
 	_name.text_changed.connect(func(_t): _refresh())

@@ -5,137 +5,54 @@ extends RefCounted
 ## change here shows up everywhere at once.
 
 # --- Colours -----------------------------------------------------------------
-# Palette tokens. They switch with the look (set_look): the style (a debug
-# choice, see STYLES) and light or dark. Screens read them at build time.
+# Palette tokens, in the storybook look: warm paper with soft watercolour
+# washes, cards with hand-cut uneven corners and a pencil rim, in Fraunces
+# and Quicksand. They switch between light and dark (set_dark) with the time
+# of day. Screens read them at build time.
 
-## The looks the debug bar can switch between. "classic" is the app's own.
-const STYLES := ["classic", "glass", "storybook", "pixel"]
+## Display and body fonts.
+const FONTS := ["Fraunces", "Quicksand"]
+## The pencil rim round surfaces, in pixels (its colour is EDGE).
+const EDGE_WIDTH := 2
 
-## Each style's colours, light and dark, and how its parts are drawn:
-## fonts (display, body), display_scale (display text a little smaller for
-## wide fonts), corner (radius multiplier; wobble for uneven storybook
-## corners), edge (outline width on surfaces, its colour is EDGE),
-## edge_buttons (outline every button too), hard_shadow (a solid offset
-## shadow instead of a soft one), crisp (no smoothing on box edges) and
-## backdrop (the picture behind every screen, drawn by ui/backdrop.gdshader).
-const LOOKS := {
-	"classic": {
-		"fonts": ["Fredoka", "Nunito"], "display_scale": 1.0,
-		"corner": 1.0, "wobble": false, "edge": 0, "edge_buttons": false,
-		"hard_shadow": false, "crisp": false, "backdrop": 0,
-		"light": {
-			"BG": "#f5f3ee", "SURFACE": "#ffffff", "SURFACE_SOFT": "#efece6",
-			"INK": "#1d2320", "INK_SOFT": "#68706b", "INK_FAINT": "#a3a9a5",
-			"LINE": "#e4e0d8", "ACCENT": "#2f6b4f", "ACCENT_SOFT": "#e2eee7",
-			"NEUTRAL": "#b8bcb8", "SHELF": "#ddd6c9",
-			"SCRIM": "#12171459", "SHADOW": "#1a211c17",
-			"EDGE": "#00000000", "ON_ACCENT": "#ffffff", "BG_TOP": "#f5f3ee", "BG_BOTTOM": "#f5f3ee",
-		},
-		"dark": {
-			"BG": "#121714", "SURFACE": "#1c2420", "SURFACE_SOFT": "#28322d",
-			"INK": "#edf2ee", "INK_SOFT": "#a7b2ab", "INK_FAINT": "#6d7a72",
-			"LINE": "#303b35", "ACCENT": "#5bb487", "ACCENT_SOFT": "#1f3a2d",
-			"NEUTRAL": "#5c6660", "SHELF": "#3a332b",
-			"SCRIM": "#00000099", "SHADOW": "#00000059",
-			"EDGE": "#00000000", "ON_ACCENT": "#ffffff", "BG_TOP": "#121714", "BG_BOTTOM": "#121714",
-		},
+const PALETTES := {
+	"light": {
+		"BG": "#f6efe2", "SURFACE": "#fffcf5", "SURFACE_SOFT": "#efe4cf",
+		"INK": "#3d2f24", "INK_SOFT": "#7a6553", "INK_FAINT": "#a8957f",
+		"LINE": "#6e543c33", "ACCENT": "#5f8f5a", "ACCENT_SOFT": "#dde9d2",
+		"NEUTRAL": "#c4b49c", "SHELF": "#e0cfae",
+		"SCRIM": "#3d2f2459", "SHADOW": "#6e543c26",
+		"EDGE": "#d6cdc1", "ON_ACCENT": "#fffaf0",
 	},
-	# Frosted glass: see-through white panels with a fine light rim over a
-	# soft sky-to-meadow gradient; Outfit and Figtree.
-	"glass": {
-		"fonts": ["Outfit", "Figtree"], "display_scale": 1.0,
-		"corner": 1.1, "wobble": false, "edge": 1, "edge_buttons": false,
-		"hard_shadow": false, "crisp": false, "backdrop": 1,
-		"light": {
-			"BG": "#d9eadf", "SURFACE": "#ffffff9e", "SURFACE_SOFT": "#ffffff73",
-			"INK": "#18302a", "INK_SOFT": "#4b6660", "INK_FAINT": "#8aa19b",
-			"LINE": "#18302a1f", "ACCENT": "#2f7a5a", "ACCENT_SOFT": "#cfe6da",
-			"NEUTRAL": "#a9bdb7", "SHELF": "#ffffff80",
-			"SCRIM": "#0f1d3333", "SHADOW": "#1e3c5024",
-			"EDGE": "#ffffffb3", "ON_ACCENT": "#ffffff", "BG_TOP": "#bfe0f2", "BG_BOTTOM": "#a9cdb3",
-		},
-		"dark": {
-			"BG": "#1c2f3a", "SURFACE": "#ffffff17", "SURFACE_SOFT": "#ffffff1f",
-			"INK": "#e8f2ef", "INK_SOFT": "#a7bdb7", "INK_FAINT": "#6f8580",
-			"LINE": "#ffffff1a", "ACCENT": "#6fd0a3", "ACCENT_SOFT": "#2a4a40",
-			"NEUTRAL": "#4f625d", "SHELF": "#ffffff1f",
-			"SCRIM": "#00000066", "SHADOW": "#00000059",
-			"EDGE": "#ffffff2e", "ON_ACCENT": "#08251a", "BG_TOP": "#0f1d33", "BG_BOTTOM": "#12261d",
-		},
-	},
-	# Storybook watercolour: warm paper with soft colour washes, cards with
-	# hand-cut uneven corners and a pencil rim; Fraunces and Quicksand.
-	"storybook": {
-		"fonts": ["Fraunces", "Quicksand"], "display_scale": 1.0,
-		"corner": 1.0, "wobble": true, "edge": 2, "edge_buttons": false,
-		"hard_shadow": false, "crisp": false, "backdrop": 2,
-		"light": {
-			"BG": "#f6efe2", "SURFACE": "#fffcf5", "SURFACE_SOFT": "#efe4cf",
-			"INK": "#3d2f24", "INK_SOFT": "#7a6553", "INK_FAINT": "#a8957f",
-			"LINE": "#6e543c33", "ACCENT": "#5f8f5a", "ACCENT_SOFT": "#dde9d2",
-			"NEUTRAL": "#c4b49c", "SHELF": "#e0cfae",
-			"SCRIM": "#3d2f2459", "SHADOW": "#6e543c26",
-			"EDGE": "#d6cdc1", "ON_ACCENT": "#fffaf0", "BG_TOP": "#f6efe2", "BG_BOTTOM": "#f6efe2",
-		},
-		"dark": {
-			"BG": "#1e2233", "SURFACE": "#2b3046", "SURFACE_SOFT": "#343a55",
-			"INK": "#efe6d6", "INK_SOFT": "#b9ad9a", "INK_FAINT": "#7d7566",
-			"LINE": "#dcc8aa26", "ACCENT": "#9cc792", "ACCENT_SOFT": "#34463a",
-			"NEUTRAL": "#5a5f78", "SHELF": "#3c4260",
-			"SCRIM": "#00000099", "SHADOW": "#00000059",
-			"EDGE": "#52515c", "ON_ACCENT": "#1e2233", "BG_TOP": "#1e2233", "BG_BOTTOM": "#1e2233",
-		},
-	},
-	# Pixel retro: square corners, chunky outlines and hard shadows on a
-	# faint grid, like a cosy handheld game; Silkscreen and DotGothic16 (the
-	# boards' Pixelify Sans drew 2 and 5 too like 8 and S for times).
-	"pixel": {
-		"fonts": ["Silkscreen", "DotGothic16"], "display_scale": 0.8,
-		"corner": 0.0, "wobble": false, "edge": 3, "edge_buttons": true,
-		"hard_shadow": true, "crisp": true, "backdrop": 3,
-		"light": {
-			"BG": "#e9e3c8", "SURFACE": "#fffbe8", "SURFACE_SOFT": "#f3e9c2",
-			"INK": "#2b2238", "INK_SOFT": "#6a5c72", "INK_FAINT": "#a497a6",
-			"LINE": "#2b223840", "ACCENT": "#3a9d4a", "ACCENT_SOFT": "#cfe8b8",
-			"NEUTRAL": "#b9ad8c", "SHELF": "#d5c99a",
-			"SCRIM": "#2b223866", "SHADOW": "#2b2238",
-			"EDGE": "#2b2238", "ON_ACCENT": "#fffbe8", "BG_TOP": "#e9e3c8", "BG_BOTTOM": "#e9e3c8",
-		},
-		"dark": {
-			"BG": "#1b1730", "SURFACE": "#2a2447", "SURFACE_SOFT": "#352d58",
-			"INK": "#f2ecd6", "INK_SOFT": "#b4a9cf", "INK_FAINT": "#756a96",
-			"LINE": "#4a4170", "ACCENT": "#5fd36e", "ACCENT_SOFT": "#2c4a37",
-			"NEUTRAL": "#4a4170", "SHELF": "#403766",
-			"SCRIM": "#0b091699", "SHADOW": "#0b0916",
-			"EDGE": "#0b0916", "ON_ACCENT": "#0b0916", "BG_TOP": "#1b1730", "BG_BOTTOM": "#1b1730",
-		},
+	"dark": {
+		"BG": "#1e2233", "SURFACE": "#2b3046", "SURFACE_SOFT": "#343a55",
+		"INK": "#efe6d6", "INK_SOFT": "#b9ad9a", "INK_FAINT": "#7d7566",
+		"LINE": "#dcc8aa26", "ACCENT": "#9cc792", "ACCENT_SOFT": "#34463a",
+		"NEUTRAL": "#5a5f78", "SHELF": "#3c4260",
+		"SCRIM": "#00000099", "SHADOW": "#00000059",
+		"EDGE": "#52515c", "ON_ACCENT": "#1e2233",
 	},
 }
 
 static var dark := false
-## The style in use, one of STYLES.
-static var style := "classic"
-static var BG := Color("#f5f3ee")
-static var SURFACE := Color("#ffffff")
-static var SURFACE_SOFT := Color("#efece6")
-static var INK := Color("#1d2320")
-static var INK_SOFT := Color("#68706b")
-static var INK_FAINT := Color("#a3a9a5")
-static var LINE := Color("#e4e0d8")
-static var ACCENT := Color("#2f6b4f")
-static var ACCENT_SOFT := Color("#e2eee7")
-static var NEUTRAL := Color("#b8bcb8")
+static var BG := Color("#f6efe2")
+static var SURFACE := Color("#fffcf5")
+static var SURFACE_SOFT := Color("#efe4cf")
+static var INK := Color("#3d2f24")
+static var INK_SOFT := Color("#7a6553")
+static var INK_FAINT := Color("#a8957f")
+static var LINE := Color("#6e543c33")
+static var ACCENT := Color("#5f8f5a")
+static var ACCENT_SOFT := Color("#dde9d2")
+static var NEUTRAL := Color("#c4b49c")
 ## The plank under the gift shelf.
-static var SHELF := Color("#ddd6c9")
-static var SCRIM := Color("#12171459")
-static var SHADOW := Color("#1a211c17")
-## The rim round surfaces in styles that draw one (see LOOKS).
-static var EDGE := Color(0, 0, 0, 0)
+static var SHELF := Color("#e0cfae")
+static var SCRIM := Color("#3d2f2459")
+static var SHADOW := Color("#6e543c26")
+## The pencil rim round surfaces.
+static var EDGE := Color("#d6cdc1")
 ## Text and icons on an ACCENT fill.
-static var ON_ACCENT := Color.WHITE
-## The backdrop's top and bottom colours, for styles with a gradient.
-static var BG_TOP := Color("#f5f3ee")
-static var BG_BOTTOM := Color("#f5f3ee")
+static var ON_ACCENT := Color("#fffaf0")
 
 # The same in both modes.
 const SUCCESS := Color("#3ba55c")
@@ -145,8 +62,6 @@ const ON_COLOUR := Color.WHITE
 ## Text over scenery.
 const ON_DARK := Color("#f4f7f5")
 const ON_DARK_SOFT := Color(0.957, 0.969, 0.961, 0.66)
-## See-through dark buttons and panels over scenery.
-const GLASS := Color(0.06, 0.1, 0.08, 0.38)
 ## The streak flame.
 const FLAME := Color("#e0702b")
 ## Behind the focus complete screen's scenery: a quarter-black sheet.
@@ -165,13 +80,11 @@ const ICON_TILE := 44
 static var _fonts: Dictionary = {}
 
 
-## Switches every palette token to `style_name`'s light or dark set, and the
-## way boxes and type are drawn with it. Screens built afterwards use the
-## new look; the shell rebuilds what's on screen.
-static func set_look(style_name: String, on: bool) -> void:
-	style = style_name if LOOKS.has(style_name) else "classic"
+## Switches every palette token to its light or dark colour. Screens built
+## afterwards use it; the shell rebuilds what's on screen.
+static func set_dark(on: bool) -> void:
 	dark = on
-	var p: Dictionary = LOOKS[style]["dark" if on else "light"]
+	var p: Dictionary = PALETTES["dark" if on else "light"]
 	BG = Color(p["BG"])
 	SURFACE = Color(p["SURFACE"])
 	SURFACE_SOFT = Color(p["SURFACE_SOFT"])
@@ -187,45 +100,20 @@ static func set_look(style_name: String, on: bool) -> void:
 	SHADOW = Color(p["SHADOW"])
 	EDGE = Color(p["EDGE"])
 	ON_ACCENT = Color(p["ON_ACCENT"])
-	BG_TOP = Color(p["BG_TOP"])
-	BG_BOTTOM = Color(p["BG_BOTTOM"])
-
-
-## Light or dark in the style already in use.
-static func set_dark(on: bool) -> void:
-	set_look(style, on)
-
-
-## A setting of the style in use (see LOOKS).
-static func look(key: String) -> Variant:
-	return LOOKS[style][key]
 
 
 # --- Type --------------------------------------------------------------------
 
-## The style's body or display font (Nunito and Fredoka in classic) at a
-## given weight, cached.
+## The body or display font (Quicksand or Fraunces) at a given weight, cached.
 static func font(display: bool = false, weight: int = 700) -> Font:
-	var family: String = look("fonts")[0 if display else 1]
+	var family: String = FONTS[0 if display else 1]
 	var key := "%s_%d" % [family, weight]
 	if not _fonts.has(key):
-		var file := "res://ui/fonts/%s.ttf" % family
-		# Silkscreen has no weights, only a separate bold.
-		if family == "Silkscreen" and weight >= 800:
-			file = "res://ui/fonts/Silkscreen-Bold.ttf"
 		var fv := FontVariation.new()
-		fv.base_font = load(file)
+		fv.base_font = load("res://ui/fonts/%s.ttf" % family)
 		fv.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): weight}
-		# DotGothic16 has one weight: bolder text is drawn thicker.
-		if family == "DotGothic16" and weight >= 700:
-			fv.variation_embolden = 0.5 if weight >= 800 else 0.3
 		_fonts[key] = fv
 	return _fonts[key]
-
-
-## A display text size in the style in use (some display fonts run wide).
-static func display_size(px: int) -> int:
-	return roundi(px * float(look("display_scale")))
 
 
 static func build_theme() -> Theme:
@@ -277,9 +165,8 @@ static func _theme_button(t: Theme, type: String, fill: Color, ink: Color) -> vo
 
 # --- Boxes -------------------------------------------------------------------
 
-## A box in the style in use: its corners (see corners()), and the style's
-## rim round plain surfaces (SURFACE, SURFACE_SOFT, BG) unless `border`
-## gives one.
+## A box: its hand-cut corners (see corners()), and the pencil rim round
+## plain surfaces (SURFACE, SURFACE_SOFT, BG) unless `border` gives one.
 static func box(fill: Color, border: Color = Color.TRANSPARENT, radius: int = RADIUS) -> StyleBoxFlat:
 	var b := StyleBoxFlat.new()
 	b.bg_color = fill
@@ -288,7 +175,6 @@ static func box(fill: Color, border: Color = Color.TRANSPARENT, radius: int = RA
 	b.content_margin_right = 20
 	b.content_margin_top = 12
 	b.content_margin_bottom = 12
-	b.anti_aliasing = not look("crisp")
 	if border.a > 0.0:
 		b.set_border_width_all(2)
 		b.border_color = border
@@ -299,7 +185,7 @@ static func box(fill: Color, border: Color = Color.TRANSPARENT, radius: int = RA
 	return b
 
 
-## A box with the style's corners but never its rim, for thin bars.
+## A box with the hand-cut corners but never the rim, for thin bars.
 static func bar_box(fill: Color, radius: int = 99) -> StyleBoxFlat:
 	var b := box(fill, Color.TRANSPARENT, radius)
 	b.set_border_width_all(0)
@@ -316,31 +202,24 @@ static func is_surface(fill: Color) -> bool:
 	return false
 
 
-## Gives `b` the style's rim, if it draws one.
+## Gives `b` the pencil rim.
 static func edge(b: StyleBoxFlat) -> StyleBoxFlat:
-	var w: int = look("edge")
-	if w > 0 and EDGE.a > 0.0:
-		b.set_border_width_all(w)
+	if EDGE.a > 0.0:
+		b.set_border_width_all(EDGE_WIDTH)
 		b.border_color = EDGE
 	return b
 
 
-## Rounds `b`'s corners by `radius` in the style in use: pills and circles
-## (99 or more) stay round unless the style is square, storybook cuts each
-## corner a little differently, pixel has none.
+## Rounds `b`'s corners by `radius`: pills and circles (99 or more) stay
+## round, and other boxes get each corner cut a little differently, by hand.
 static func corners(b: StyleBoxFlat, radius: int) -> StyleBoxFlat:
-	var k: float = look("corner")
-	if k <= 0.0:
-		b.set_corner_radius_all(0)
-	elif radius >= 99:
+	if radius >= 99 or radius < 8:
 		b.set_corner_radius_all(radius)
-	elif look("wobble") and radius >= 8:
+	else:
 		b.corner_radius_top_left = radius
 		b.corner_radius_top_right = roundi(radius * 1.35)
 		b.corner_radius_bottom_right = roundi(radius * 0.8)
 		b.corner_radius_bottom_left = roundi(radius * 1.2)
-	else:
-		b.set_corner_radius_all(roundi(radius * k))
 	return b
 
 
@@ -348,18 +227,11 @@ static func with_shadow(b: StyleBoxFlat, strength: float = 1.0) -> StyleBoxFlat:
 	return shadow(b, 14 * strength, Vector2(0, 4 * strength), strength)
 
 
-## A shadow under `b`: soft, `blur` wide and moved down by `offset`, or in
-## styles with hard shadows a solid one down and to the right.
+## A soft shadow under `b`, `blur` wide and moved down by `offset`.
 static func shadow(b: StyleBoxFlat, blur: float, offset: Vector2, strength: float = 1.0) -> StyleBoxFlat:
-	if look("hard_shadow"):
-		b.shadow_color = SHADOW
-		b.shadow_size = 1
-		var step := clampf(roundf(blur / 4.0), 3.0, 6.0)
-		b.shadow_offset = Vector2(step, step)
-	else:
-		b.shadow_color = Color(SHADOW, SHADOW.a * strength)
-		b.shadow_size = int(blur)
-		b.shadow_offset = offset
+	b.shadow_color = Color(SHADOW, SHADOW.a * strength)
+	b.shadow_size = int(blur)
+	b.shadow_offset = offset
 	return b
 
 
@@ -370,7 +242,7 @@ static func button_styles(fill: Color, radius: int, shadow: bool = false) -> Dic
 		var shade := fill
 		match state:
 			"hover":
-				shade = _shift(fill, 0.05)
+				shade = _shift(fill, 0.07)
 			"pressed", "hover_pressed":
 				shade = _shift(fill, 0.12)
 			"disabled":
@@ -384,9 +256,6 @@ static func button_styles(fill: Color, radius: int, shadow: bool = false) -> Dic
 			sb.expand_margin_top = 3
 			sb.expand_margin_bottom = 3
 		else:
-			if look("edge_buttons") and fill.a > 0.0:
-				sb.set_border_width_all(int(look("edge")))
-				sb.border_color = EDGE if state != "disabled" else Color(EDGE, EDGE.a * 0.45)
 			if shadow and state != "disabled":
 				with_shadow(sb, 0.8)
 		out[state] = sb
@@ -457,7 +326,7 @@ static func label(text: String, size: int = 17, colour: Color = INK, display: bo
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_override("font", font(display, weight))
-	l.add_theme_font_size_override("font_size", display_size(size) if display else size)
+	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", colour)
 	return l
 
@@ -728,8 +597,7 @@ static func panel(fill: Color, radius: int = 18, padding: int = 14) -> PanelCont
 	return p
 
 
-## The colour (and in some styles the picture) behind every screen, filling
-## its parent. dress_backdrop() repaints it after the look changes.
+## The watercolour paper behind a screen, filling its parent. dress_backdrop() repaints it after the look changes.
 static func backdrop() -> ColorRect:
 	var bg := ColorRect.new()
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -742,11 +610,6 @@ static func backdrop() -> ColorRect:
 
 
 static func dress_backdrop(bg: ColorRect) -> void:
-	bg.color = BG
-	var kind: int = look("backdrop")
-	if kind == 0:
-		bg.material = null
-		return
 	var m := bg.material as ShaderMaterial
 	if m == null:
 		m = ShaderMaterial.new()
@@ -754,39 +617,18 @@ static func dress_backdrop(bg: ColorRect) -> void:
 		bg.material = m
 	bg.color = Color.WHITE
 	m.set_shader_parameter("rect_size", bg.size)
-	m.set_shader_parameter("top", BG_TOP)
+	m.set_shader_parameter("top", BG)
 	m.set_shader_parameter("middle", BG)
-	m.set_shader_parameter("bottom", BG_BOTTOM)
-	var none := Color(0, 0, 0, 0)
-	var washes: Array = [none, none, none]
-	var spots: Array = [Vector3(0.3, 0.75, 0.45), Vector3(0.8, 0.85, 0.4), Vector3(0.5, 0.1, 0.3)]
-	var grain := 0.0
-	var grid := none
-	match kind:
-		1:
-			# Glass: light pooling low on the left, a green glow on the right.
-			if dark:
-				washes = [Color(0.94, 0.94, 0.86, 0.14), Color(0.24, 0.55, 0.43, 0.32), none]
-				spots = [Vector3(0.75, 0.18, 0.45), Vector3(0.25, 0.82, 0.55), spots[2]]
-			else:
-				washes = [Color(1, 1, 1, 0.4), Color(0.47, 0.78, 0.63, 0.35), none]
-		2:
-			# Storybook: watercolour washes of sky, sand and leaf on paper.
-			var k := 0.16 if dark else 0.22
-			washes = [Color(0.55, 0.71, 0.78, k), Color(0.78, 0.67, 0.47, k), Color(0.51, 0.67, 0.43, k)]
-			spots = [Vector3(0.15, 0.1, 0.5), Vector3(0.85, 0.32, 0.45), Vector3(0.6, 0.95, 0.55)]
-			grain = 0.05 if dark else 0.07
-		3:
-			# Pixel: a faint grid.
-			grid = Color(1, 1, 1, 0.035) if dark else Color(INK, 0.06)
-	m.set_shader_parameter("wash_a", washes[0])
-	m.set_shader_parameter("wash_b", washes[1])
-	m.set_shader_parameter("wash_c", washes[2])
-	m.set_shader_parameter("at_a", spots[0])
-	m.set_shader_parameter("at_b", spots[1])
-	m.set_shader_parameter("at_c", spots[2])
-	m.set_shader_parameter("grain", grain)
-	m.set_shader_parameter("grid", grid)
+	m.set_shader_parameter("bottom", BG)
+	# Watercolour washes of sky, sand and leaf on paper.
+	var k := 0.16 if dark else 0.22
+	m.set_shader_parameter("wash_a", Color(0.55, 0.71, 0.78, k))
+	m.set_shader_parameter("wash_b", Color(0.78, 0.67, 0.47, k))
+	m.set_shader_parameter("wash_c", Color(0.51, 0.67, 0.43, k))
+	m.set_shader_parameter("at_a", Vector3(0.15, 0.1, 0.5))
+	m.set_shader_parameter("at_b", Vector3(0.85, 0.32, 0.45))
+	m.set_shader_parameter("at_c", Vector3(0.6, 0.95, 0.55))
+	m.set_shader_parameter("grain", 0.05 if dark else 0.07)
 
 
 static func vbox(gap: int = 12) -> VBoxContainer:
@@ -960,12 +802,9 @@ static func level_badge(level: int, diameter: int = 40) -> PanelContainer:
 	var b := box(ACCENT, Color(1, 1, 1, 0.9), 999)
 	b.set_border_width_all(3)
 	b.set_content_margin_all(0)
-	if look("hard_shadow"):
-		shadow(b, 6, Vector2(0, 2))
-	else:
-		b.shadow_color = Color(0, 0, 0, 0.15)
-		b.shadow_size = 6
-		b.shadow_offset = Vector2(0, 2)
+	b.shadow_color = Color(0, 0, 0, 0.15)
+	b.shadow_size = 6
+	b.shadow_offset = Vector2(0, 2)
 	p.add_theme_stylebox_override("panel", b)
 	p.custom_minimum_size = Vector2(diameter, diameter)
 	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER

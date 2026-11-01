@@ -4,10 +4,9 @@ extends VBoxContainer
 ## screen, small, beside the home icon in the top left: a switch that
 ## unlocks every animal and place (and tops every gift up to 50), and one
 ## that gives the window a phone's shape and lays the app out as on a phone
-## (off: the window as it was). In the top right, sky_controls(): the UI
-## style being tried out, the app's colours (Auto follows the time of day,
-## or pin Light or Dark) and a time of day slider for the sky (Now follows
-## the clock).
+## (off: the window as it was). In the top right, sky_controls(): a time of
+## day slider for the sky, which turns the colours dark after sunset (Now
+## follows the clock).
 ## The walk also shows the buttons here that move it on.
 
 ## How far the walk's time buttons move it on, in minutes.
@@ -35,46 +34,13 @@ func _init() -> void:
 	add_child(grid)
 
 
-## The theme and time of day rows, for the focus screen's top right.
+## The time of day row, for the focus screen's top right.
 static func sky_controls() -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.scale = Vector2(SCALE, SCALE)
 	box.add_theme_constant_override("separation", 4)
-	box.add_child(_style_row())
-	box.add_child(_theme_row())
 	box.add_child(_time_row())
 	return box
-
-
-## The UI styles being tried out (UI.STYLES), the one in use filled in.
-static func _style_row() -> Control:
-	var row := UI.hbox(4)
-	row.add_child(_caption(Text.t("debug.style")))
-	var now := App.ui_style()
-	var names := {"classic": Text.t("debug.style_classic"), "glass": Text.t("debug.style_glass"),
-		"storybook": Text.t("debug.style_storybook"), "pixel": Text.t("debug.style_pixel")}
-	for kind in names:
-		var b := UI.pill_button(names[kind], kind == now, func():
-			App.set_setting("debug_style", kind), 24)
-		b.add_theme_font_size_override("font_size", 12)
-		b.accessibility_name = "%s %s" % [Text.t("debug.style"), names[kind]]
-		row.add_child(b)
-	return row
-
-
-## Auto | Light | Dark, the one in use filled in.
-static func _theme_row() -> Control:
-	var row := UI.hbox(4)
-	row.add_child(_caption(Text.t("debug.theme")))
-	var now := str(App.state.settings.get("debug_theme", "auto"))
-	var names := {"auto": Text.t("debug.theme_auto"), "light": Text.t("debug.theme_light"), "dark": Text.t("debug.theme_dark")}
-	for kind in names:
-		var b := UI.pill_button(names[kind], kind == now, func():
-			App.set_setting("debug_theme", kind), 24)
-		b.add_theme_font_size_override("font_size", 12)
-		b.accessibility_name = "%s %s" % [Text.t("debug.theme"), names[kind]]
-		row.add_child(b)
-	return row
 
 
 ## A slider through the day, and Now to follow the clock again.
@@ -139,7 +105,7 @@ func _switch(grid: GridContainer, title: String, tip: String, on: bool, setting:
 	grid.add_child(words)
 
 
-## Small see-through buttons that add 5, 10, 30 or 60 minutes to the walk.
+## Small paper buttons that add 5, 10, 30 or 60 minutes to the walk.
 static func time_buttons() -> HBoxContainer:
 	var row := UI.hbox(6)
 	row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -148,7 +114,7 @@ static func time_buttons() -> HBoxContainer:
 		b.text = Text.t("debug.add_minutes", {"minutes": minutes})
 		b.custom_minimum_size = Vector2(46, 32)
 		b.add_theme_font_size_override("font_size", 13)
-		UI.style_button(b, UI.GLASS, Color.WHITE, 999)
+		UI.style_button(b, UI.SURFACE, UI.INK, 999, true)
 		b.pressed.connect(App.debug_add_minutes.bind(minutes))
 		row.add_child(b)
 	return row
