@@ -149,6 +149,21 @@ func _on_hidden() -> void:
 		_orb.settle()
 
 
+## Where a closing flow shrinks to: the orb's middle and radius on screen,
+## or nothing before it's laid out.
+func orb_circle() -> Dictionary:
+	if not is_instance_valid(_orb) or _orb.size.x <= 0.0:
+		return {}
+	return {"centre": _orb.get_global_rect().get_center(), "radius": _orb.radius() * _orb.get_global_transform().get_scale().x}
+
+
+## A full-screen flow is closing into the orb: it shrinks back from filling
+## the screen as the flow's circle does.
+func orb_return(seconds: float) -> void:
+	if is_instance_valid(_orb):
+		_orb.shrink_from_full(seconds)
+
+
 func _on_tapped() -> void:
 	Audio.play("orb_tap", 1.0, -4.0, "bong")
 	_orb.fill_screen()

@@ -1,3 +1,4 @@
+class_name ChooseFocus
 extends Control
 ## Choose what to focus on, standing in the place you're about to walk.
 ## The buttons at the top pick where this pet walks (each pet remembers its
@@ -31,7 +32,9 @@ const PET_HEIGHT := 200.0
 const PLACE_BUTTON := 42
 const PLACE_GAP := 4
 const PLACE_PAD := 6
-## The scenery drifts by slowly behind the pets, in pixels a second.
+## The bin: how much it grows under the pointer, and how long that takes.
+const BIN_GROW := 1.05
+const BIN_GROW_TIME := 0.2
 
 static func sorts() -> Array:
 	return [
@@ -50,6 +53,14 @@ var _draft: PetData
 ## the animal until you type your own.
 var _name_is_default := true
 var _scenery: Scenery
+## Every place still showing, back to front: the last is the one picked,
+## fading in over the others, which go once it's fully in.
+var _stack: Array[Scenery] = []
+## The place buttons' highlight, in the grid's space; it slides from one
+## button to the next.
+var _marker := Rect2()
+var _marker_moving := false
+var _marker_target := Rect2()
 var _shade := _Shade.new()
 var _pick := Control.new()
 var _adopt_layer := Control.new()
@@ -70,11 +81,14 @@ var _pet_edit: LineEdit
 var _swatches: Array[Button] = []
 var _swatch_row: Control
 var _close: Button
+var _top: Control
 var _left: Button
 var _sort: Dropdown
 var _bottom: Control
 ## The paw at the top right; a tick while adopting.
 var _new: Button
+## True once a pet's been picked and the screen is fading out for the walk.
+var _leaving := false
 
 
 func _ready() -> void:
@@ -95,10 +109,12 @@ func _ready() -> void:
 	top.add_theme_constant_override("margin_top", 14 + int(insets["top"]))
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(top)
+	_top = top
 	var row := UI.hbox()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top.add_child(row)
-	_close = UI.round_button("close", Text.t("common.back"), _on_close, UI.SURFACE, UI.INK, 48)
+	# Just the ×, no button round it (see _style_top).
+	_close = UI.ghost_button("close", Text.t("common.back"), _on_close, UI.ON_DARK, 48, 26)
 	row.add_child(_close)
 	row.add_child(UI.spacer())
 	_new = UI.round_button("paw_add", Text.t("choose_focus.new_pet"), _on_new, UI.SURFACE, UI.INK, 48)
@@ -116,7 +132,7 @@ func _ready() -> void:
 	var buttons := UI.hbox()
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bottom.add_child(buttons)
-	_left = UI.round_button("bin", Text.t("choose_focus.rehome_pet"), _on_left, UI.DANGER, Color.WHITE, 56)
+	_left = _bin_button()
 	buttons.add_child(_left)
 	buttons.add_child(UI.spacer())
 	_sort = Dropdown.for_setting(sorts(), SORT_KEY, sorts()[0][0], true).on_scenery(56)
@@ -188,22 +204,52 @@ func _current_pet_id() -> String:
 	return p.id if p else ""
 
 
-## Puts the place's scenery behind everything, fading over the old one.
+## Puts the place's scenery behind everything, fading in over whatever is
+## showing now, from however far any earlier fade had got: picking places
+## quickly never makes one jump. Going back to the place still showing
+## underneath fades away what's over it instead.
 func _show_place(id: String) -> void:
 	var old := _scenery
+	if _stack.size() > 1 and str(_stack[0].biome.get("id", "")) == id:
+		_scenery = _stack[0]
+		for i in range(1, _stack.size()):
+			var going := _stack[i]
+			Motion.fade(going, 0.0, Motion.style.place_fade * going.modulate.a).tween_callback(going.queue_free)
+		_stack.resize(1)
+		Motion.to(_scenery, "front_tint:a", 1.0, Motion.style.place_fade)
+		_attach_front()
+		Audio.ambience(_scenery.ambience())
+		_layout()
+		return
 	_scenery = Scenery.new()
 	_scenery.biome = Content.biome(id)
 	_scenery.scroll = old.scroll if old else App.rng.randf_range(0.0, 50000.0)
 	_scenery.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_scenery)
-	move_child(_scenery, 1 if old else 0)
+	move_child(_scenery, old.get_index() + 1 if old else 0)
+	_stack.append(_scenery)
 	_attach_front()
 	if old:
-		_scenery.modulate.a = 0.0
-		Motion.fade(_scenery, 1.0, Motion.SLOW).tween_callback(old.queue_free)
-		Motion.to(old, "front_tint:a", 0.0, Motion.SLOW)
+		var coming := _scenery
+		coming.modulate.a = 0.0
+		Motion.fade(coming, 1.0, Motion.style.place_fade).tween_callback(_drop_below.bind(coming))
+		# The places underneath are still there, but not their growth in
+		# front of the pets.
+		for under in _stack:
+			if under != coming:
+				Motion.to(under, "front_tint:a", 0.0, Motion.style.place_fade)
 		Audio.ambience(_scenery.ambience())
 	_layout()
+
+
+## Once `top` has fully faded in, the places under it go.
+func _drop_below(top: Scenery) -> void:
+	var at := _stack.find(top)
+	if at <= 0:
+		return
+	for i in at:
+		_stack[i].queue_free()
+	_stack = _stack.slice(at)
 
 
 ## The place's front growth goes over the pets (a still scene, but you're
@@ -230,7 +276,7 @@ func _pick_place(id: String) -> void:
 	if p:
 		App.set_pet_place(p.id, id)
 	_show_place(id)
-	_refresh_places()
+	_refresh_places(true)
 
 
 func _place_buttons() -> Control:
@@ -243,6 +289,13 @@ func _place_buttons() -> Control:
 	_place_grid.add_theme_constant_override("h_separation", PLACE_GAP)
 	_place_grid.add_theme_constant_override("v_separation", PLACE_GAP)
 	panel.add_child(_place_grid)
+	# The highlight under the picked place, drawn under the buttons, as the
+	# app's map does; it stays with its button as the grid lays out again.
+	_marker = Rect2()
+	_place_grid.draw.connect(func():
+		if _marker.size != Vector2.ZERO:
+			_place_grid.draw_style_box(UI.box(UI.ACCENT_SOFT, Color.TRANSPARENT, 14), _marker))
+	_place_grid.sort_children.connect(func(): _move_marker.call_deferred(_marker_moving))
 	_places.clear()
 	for b in Content.biomes:
 		var id: String = b["id"]
@@ -278,23 +331,52 @@ func _fit_place_grid() -> void:
 	_place_grid.columns = maxi(1, ceili(count / float(maxi(rows, 1))))
 
 
-func _refresh_places() -> void:
+## Shows which place is picked: its icon goes green as the highlight slides
+## under it (with `slide`; else it's simply there).
+func _refresh_places(slide: bool = false) -> void:
 	var current := _place_id()
 	for id in _places:
 		var button: Button = _places[id]
 		var unlocked := App.is_unlocked("place", id)
 		var on: bool = id == current
-		var fill := UI.ACCENT_SOFT if on else Color.TRANSPARENT
 		var ink := UI.ACCENT if on else Color(UI.INK_SOFT, 1.0 if unlocked else 0.45)
 		button.get_node("Lock").visible = not unlocked
 		button.accessibility_name = _place_title(id) if unlocked else Text.t("choose_focus.place_locked_name", {"place": _place_title(id), "rule": Unlocks.describe(Content.unlock_rule("place", id))})
-		UI.style_button(button, fill, ink, 14)
+		UI.style_button(button, Color.TRANSPARENT, ink, 14)
 		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 			(button.get_theme_stylebox(state) as StyleBoxFlat).set_content_margin_all(0)
 		button.icon = Icons.place(Content.biome(id), 22)
 		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if _place_name:
 		_place_name.text = str(Content.biome(current).get("name", "")).to_upper()
+	_move_marker(slide)
+
+
+## Sends the highlight to the picked place's button, sliding there in the
+## time the places take to fade (or jumping, when `slide` is off).
+func _move_marker(slide: bool) -> void:
+	if not is_instance_valid(_place_grid) or not _places.has(_place_id()):
+		return
+	var target: Rect2 = (_places[_place_id()] as Control).get_rect()
+	if target.size == Vector2.ZERO:
+		return
+	if not slide or _marker.size == Vector2.ZERO or not is_inside_tree():
+		Motion.tween(_place_grid, "marker").kill()
+		_marker_moving = false
+		_set_marker(target)
+		return
+	if _marker_moving and _marker_target.is_equal_approx(target):
+		return
+	_marker_target = target
+	_marker_moving = true
+	var t := Motion.method(_place_grid, "marker", _set_marker, _marker, target, Motion.style.place_fade)
+	t.tween_callback(func(): _marker_moving = false)
+
+
+func _set_marker(r: Rect2) -> void:
+	_marker = r
+	if is_instance_valid(_place_grid):
+		_place_grid.queue_redraw()
 
 
 # --- Choosing ----------------------------------------------------------------
@@ -463,7 +545,7 @@ func _on_pet_changed(i: int) -> void:
 	var place := _place_id()
 	if place != str(_scenery.biome.get("id", "")):
 		_show_place(place)
-	_refresh_places()
+	_refresh_places(true)
 	_pet_line.text = p.name
 	_under.text = Text.t("choose_focus.pet_under", {
 		"kind": Content.animal(p.animal_id).get("name", ""),
@@ -481,10 +563,73 @@ func _start_walk(i: int) -> void:
 		Motion.shake(_project_pill, 6.0)
 		_open_projects()
 		return
+	_head_out(i, project)
+
+
+## Heading out: everything on the screen fades away but the pet you picked,
+## which walks over to where it stands on the walk. Then the walk takes
+## over in this same place, where your character walks in to join it (see
+## walk.gd), and the clock starts once you set off together.
+func _head_out(i: int, project: ProjectData) -> void:
+	if _leaving:
+		return
+	_leaving = true
 	var p := _pet_list[i]
-	var from := _pets.items[i].get_global_rect().get_center()
-	App.start_walk(project.id, p.id, -1, _place_id())
-	App.go("walk", {"from": from})
+	# Nothing more can be tapped.
+	var blocker := Control.new()
+	blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	blocker.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(blocker)
+	var fading: Array[CanvasItem] = [_top, _bottom, _shade, _words]
+	for n in ["Places", "Under"]:
+		var c := _pick.get_node_or_null(n) as CanvasItem
+		if c:
+			fading.append(c)
+	for c in fading:
+		Motion.fade(c, 0.0, Motion.style.leave_fade)
+	for j in _pets.items.size():
+		if j != i:
+			Motion.fade(_pets.items[j], 0.0, Motion.style.leave_fade)
+	# The pet steps out of the chooser (its shadow fades) and over to its
+	# place on the path, at the walk's size.
+	var stage := _pets.items[i]
+	var view: AnimalView = stage.get_meta("view")
+	var held := view.get_global_transform()
+	view.reparent(self, false)
+	view.global_position = held.origin
+	view.scale = held.get_scale()
+	move_child(view, _pick.get_index())
+	Motion.fade(stage, 0.0, Motion.style.leave_fade)
+	_scenery.front_gap = Vector2.ZERO
+	var spot := walk_spots(size, _scenery.path_y())
+	var to: Vector2 = spot["animal"]
+	var unit: float = spot["unit"]
+	var left := to.x < view.position.x - 1.0
+	view.walking = true
+	if left:
+		view.scale.x = -absf(view.scale.x)
+	var t := Motion.tween(view, "head_out")
+	t.set_parallel(true)
+	t.tween_property(view, "position", to, Motion.time(Motion.style.pet_to_path))
+	t.tween_property(view, "scale", Vector2(-unit if left else unit, unit), Motion.time(Motion.style.pet_to_path))
+	await t.finished
+	view.walking = false
+	if left:
+		# Facing the way the walk goes again.
+		var turn := Motion.tween(view, "turn")
+		turn.tween_property(view, "scale:x", unit, Motion.time(0.2))
+		await turn.finished
+	App.go("walk", {"intro": true, "instant": true, "project": project.id, "pet": p.id,
+		"place": _place_id(), "scroll": _scenery.scroll})
+
+
+## Where the walk puts you and your pet on a `view` sized screen whose path
+## is at `feet`: {walker, animal, unit}. Shared with walk.gd, so heading out
+## ends exactly where the walk begins.
+static func walk_spots(view: Vector2, feet: float) -> Dictionary:
+	var unit := minf(view.x, view.y) / 720.0
+	var x := view.x * (0.3 if view.x < view.y else 0.38)
+	return {"walker": Vector2(x, feet), "animal": Vector2(x + 170.0 * unit, feet + 4.0 * unit), "unit": unit}
 
 
 func _on_left() -> void:
@@ -883,20 +1028,51 @@ func _adopt() -> void:
 
 # --- Pieces ------------------------------------------------------------------
 
-## The × and the paw are round paper buttons; on the adopt form the paw
-## turns into a solid green tick.
+## The × is just a cross, with no button round it: white over the place,
+## ink over the adopt form's paper. The paw is a round paper button; on the
+## adopt form it turns into a solid green tick.
 func _style_top(on_form: bool) -> void:
-	UI.style_button(_close, UI.SURFACE, UI.INK, 999, true)
-	_close.icon = Icons.texture("close", 22, Color.WHITE, 3.0)
+	var ink := UI.INK if on_form else UI.ON_DARK
+	for state in ["icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_hover_pressed_color", "icon_focus_color"]:
+		_close.add_theme_color_override(state, ink)
 	if on_form:
 		UI.style_button(_new, UI.SUCCESS, Color.WHITE, 999, true)
 		_new.icon = Icons.texture("check", 22, Color.WHITE, 3.0)
 	else:
 		UI.style_button(_new, UI.SURFACE, UI.INK, 999, true)
 		_new.icon = Icons.texture("paw_add", 22, Color.WHITE, 2.4)
-	for b: Button in [_close, _new]:
-		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
-			(b.get_theme_stylebox(state) as StyleBoxFlat).set_content_margin_all(0)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		(_new.get_theme_stylebox(state) as StyleBoxFlat).set_content_margin_all(0)
+
+
+## The bin that rehomes a pet: a round paper button like the others, with a
+## red bin and a red rim to say it's for something you can't undo. It eases a
+## little bigger under the pointer (no shade, so nothing jumps).
+func _bin_button() -> Button:
+	var b := UI.round_button("bin", Text.t("choose_focus.rehome_pet"), _on_left, UI.SURFACE, UI.DANGER, 56, true)
+	var styles := UI.button_styles(UI.SURFACE, 999, true)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		# Hovering keeps the resting look; only a press shades it.
+		var sb: StyleBoxFlat = (styles["pressed" if state in ["pressed", "hover_pressed"] else ("disabled" if state == "disabled" else "normal")] as StyleBoxFlat).duplicate()
+		if state == "focus":
+			sb = styles["focus"]
+		else:
+			sb.set_border_width_all(3)
+			sb.border_color = Color(UI.DANGER, sb.bg_color.a / maxf(UI.SURFACE.a, 0.01))
+		sb.set_content_margin_all(0)
+		b.add_theme_stylebox_override(state, sb)
+	b.set_meta("no_grow", true)
+	b.resized.connect(func(): b.pivot_offset = b.size * 0.5)
+	var grow := func(to: float):
+		if to > 1.0 and (b.disabled or App.touch_screen()):
+			return
+		b.pivot_offset = b.size * 0.5
+		var t := Motion.tween(b, "bin_grow")
+		t.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		t.tween_property(b, "scale", Vector2.ONE * to, Motion.time(BIN_GROW_TIME))
+	b.mouse_entered.connect(grow.bind(BIN_GROW))
+	b.mouse_exited.connect(grow.bind(1.0))
+	return b
 
 
 ## Light text with a soft shadow, centred, so it reads over any scenery.

@@ -126,7 +126,7 @@ func _init(id: String) -> void:
 
 ## "Tap" on a phone, "Click" with a mouse.
 static func _call_key() -> String:
-	return "gift.tap_to_trade" if OS.has_feature("mobile") else "gift.click_to_trade"
+	return "gift.tap_to_trade" if App.touch_screen() else "gift.click_to_trade"
 
 
 func _appear() -> void:

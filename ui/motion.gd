@@ -1,11 +1,18 @@
 class_name Motion
 extends RefCounted
 ## Every animation in the app goes through here, so everything moves the same
-## way: a tween that eases in and out. Change the curve or the timings here
-## and the whole app follows.
+## way: a tween that eases in and out. Its curve, overall speed and the
+## timings of the bigger moments are in ui/motion.tres, to change in the
+## Godot editor (see MotionStyle); change them there and the whole app follows.
 
-const TRANS := Tween.TRANS_SINE
-const EASE := Tween.EASE_IN_OUT
+## How the app moves (ui/motion.tres).
+static var style: MotionStyle = _load_style()
+
+
+static func _load_style() -> MotionStyle:
+	const PATH := "res://ui/motion.tres"
+	var s := load(PATH) as MotionStyle if ResourceLoader.exists(PATH) else null
+	return s if s else MotionStyle.new()
 
 ## Durations in seconds.
 const FAST := 0.18
@@ -30,7 +37,7 @@ static func reduced() -> bool:
 static func time(seconds: float) -> float:
 	if still:
 		return 0.0
-	return seconds * (0.5 if reduced() else 1.0)
+	return seconds * (0.5 if reduced() else 1.0) / maxf(style.speed, 0.05)
 
 
 ## A tween bound to `node` with the app's curve. Starting another with the
@@ -43,7 +50,7 @@ static func tween(node: Node, key: String = "") -> Tween:
 			var old = node.get_meta(meta)
 			if old is Tween and old.is_valid():
 				old.kill()
-	var t := node.create_tween().set_trans(TRANS).set_ease(EASE)
+	var t := node.create_tween().set_trans(style.transition).set_ease(style.easing)
 	if meta != "":
 		node.set_meta(meta, t)
 	return t

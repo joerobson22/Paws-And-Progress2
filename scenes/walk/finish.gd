@@ -15,8 +15,11 @@ extends Control
 
 var params := {}
 
-## How much the scenery (and you) dim around the animal.
-const DIM := 0.25
+## How much the scenery dims, the glow's size and the pet's turn are in
+## ui/motion.tres (MotionStyle), to change in the Godot editor.
+## The home button's size.
+const HOME_SIZE := 56
+
 ## Throws slower than this (pixels a second) just put the gift back.
 const THROW_SPEED := 450.0
 ## An upward flick this fast (screen heights a second) throws about two
@@ -106,7 +109,7 @@ func _ready() -> void:
 		_animal.scale = Vector2(_unit, _unit)
 		_scenery.add_child(_animal)
 		_stand_actors()
-		_glow.radius = 70.0 * _unit
+		_glow.radius = Motion.style.glow_radius * _unit
 		_place_glow()
 
 	_catcher.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -133,46 +136,26 @@ func go_back() -> void:
 
 func _build_words(session: FocusSession, roll: Dictionary) -> void:
 	var insets := UI.safe_insets(self)
+	var wide := UI.is_wide(self)
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 24 + int(insets["left"]))
 	margin.add_theme_constant_override("margin_right", 24 + int(insets["right"]))
-	margin.add_theme_constant_override("margin_top", 46 + int(insets["top"]))
-	margin.add_theme_constant_override("margin_bottom", 24 + int(insets["bottom"]))
+	# Phones keep the top right corner for the home button.
+	margin.add_theme_constant_override("margin_top", (46 if wide else 78) + int(insets["top"]))
+	margin.add_theme_constant_override("margin_bottom", 22 + int(insets["bottom"]))
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ui.add_child(margin)
 	var col := UI.vbox(4)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(col)
 
+	# Along the top: what you did, then your level filling up.
 	var seconds := session.focus_seconds if session else 0
 	var title := _word(UI.label(Text.t("finish.title"), 40, UI.ON_DARK, true, 600))
 	col.add_child(title)
 	var time := _word(UI.label(SessionClock.format(seconds), 24, UI.ON_DARK_SOFT, true, 500))
 	col.add_child(time)
-	col.add_child(UI.spacer(true))
-
-	var found := UI.vbox(2)
-	found.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var colour := Content.rarity_colour(roll.get("rarity", "common"))
-	if roll.is_empty():
-		found.add_child(_word(UI.label(Text.t("finish.no_gift"), 24, UI.ON_DARK, true, 600)))
-		var why := Text.t("finish.too_short") if seconds < 60 else \
-			Text.t("finish.no_gift_why", {"minutes": floori(Content.drop_table.get("min_seconds", 600) / 60.0)})
-		found.add_child(_word(UI.para(why, 15, UI.ON_DARK_SOFT)))
-	else:
-		var g := Content.gift(_gift_id)
-		var finder := Content.pet_called(_pet, true)
-		found.add_child(_word(UI.label(Text.t("finish.found", {"pet": finder, "a_rarity": UI.a(Content.rarity_name(roll["rarity"]).to_lower())}), 16, colour.lightened(0.4), false, 800)))
-		found.add_child(_word(UI.label(g.get("name", "?"), 30, UI.ON_DARK, true, 600)))
-		var desc := _word(UI.para(g.get("description", ""), 15, UI.ON_DARK_SOFT))
-		desc.custom_minimum_size.x = minf(420.0, size.x - 48.0)
-		desc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		found.add_child(desc)
-	col.add_child(found)
-	_words = [title, time, found]
-	for w in _words:
-		w.modulate.a = 0.0
 
 	# Your level, then the XP this walk earned.
 	var earned := Levels.walk_xp(seconds, str(roll.get("rarity", "")), Content.levels) if seconds >= 60 else 0
@@ -184,22 +167,61 @@ func _build_words(session: FocusSession, roll: Dictionary) -> void:
 	_bar.custom_minimum_size.x = minf(380.0, size.x - 140.0)
 	level_row.add_child(_bar)
 	level_row.modulate.a = 0.0
-	col.add_child(UI.spacer())
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 10
+	col.add_child(gap)
 	col.add_child(level_row)
 	_xp_label = _word(UI.label(Text.t("finish.xp", {"xp": earned}), 18, UI.ON_DARK, true, 600))
 	_xp_label.modulate.a = 0.0
 	col.add_child(_xp_label)
 	_bar.shown_changed.connect(func(xp: int): _xp_label.text = Text.t("finish.xp", {"xp": maxi(0, _xp_to - xp)}))
 	_bar.levelled_up.connect(_on_level_up)
+	# The middle is left clear for your pet and its gift.
+	col.add_child(UI.spacer(true))
 
-	var bottom := UI.hbox()
-	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bottom.add_child(UI.spacer())
-	_home = UI.round_button("home", Text.t("common.home"), go_back, Color.WHITE, UI.ACCENT.darkened(0.2), 64)
+	# Along the very bottom: what your pet found.
+	var found := UI.vbox(2)
+	found.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var colour := Content.rarity_colour(roll.get("rarity", "common"))
+	# Kept clear of the home button in the bottom right (computers).
+	var room := minf(420.0, size.x - 48.0 - float(insets["left"] + insets["right"]) - (2.0 * (HOME_SIZE + 16.0) if wide else 0.0))
+	if roll.is_empty():
+		found.add_child(_word(UI.label(Text.t("finish.no_gift"), 24, UI.ON_DARK, true, 600)))
+		var why := Text.t("finish.too_short") if seconds < 60 else \
+			Text.t("finish.no_gift_why", {"minutes": floori(Content.drop_table.get("min_seconds", 600) / 60.0)})
+		var why_label := _word(UI.para(why, 15, UI.ON_DARK_SOFT))
+		why_label.custom_minimum_size.x = room
+		why_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		found.add_child(why_label)
+	else:
+		var g := Content.gift(_gift_id)
+		var finder := Content.pet_called(_pet, true)
+		found.add_child(_word(UI.label(Text.t("finish.found", {"pet": finder, "a_rarity": UI.a(Content.rarity_name(roll["rarity"]).to_lower())}), 16, colour.lightened(0.4), false, 800)))
+		found.add_child(_word(UI.label(g.get("name", "?"), 30, UI.ON_DARK, true, 600)))
+		var desc := _word(UI.para(g.get("description", ""), 15, UI.ON_DARK_SOFT))
+		desc.custom_minimum_size.x = room
+		desc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		found.add_child(desc)
+	col.add_child(found)
+	_words = [title, time, found]
+	for w in _words:
+		w.modulate.a = 0.0
+
+	# The way home: a paper button like the walk's, in the bottom right on
+	# computers and the top right on phones (where the gift's words take the
+	# whole width of the bottom).
+	_home = UI.round_button("home", Text.t("common.home"), go_back, UI.SURFACE, UI.INK, HOME_SIZE, true)
 	_home.modulate.a = 0.0
 	_home.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bottom.add_child(_home)
-	col.add_child(bottom)
+	_ui.add_child(_home)
+	var place_home := func():
+		var ins := UI.safe_insets(self)
+		if UI.is_wide(self):
+			_home.position = size - Vector2(HOME_SIZE + 22.0 + ins["right"], HOME_SIZE + 22.0 + ins["bottom"])
+		else:
+			_home.position = Vector2(size.x - HOME_SIZE - 14.0 - ins["right"], 14.0 + ins["top"])
+	resized.connect(place_home)
+	place_home.call()
 
 
 ## Centred light text with a soft shadow.
@@ -215,11 +237,14 @@ func _word(l: Label) -> Label:
 # --- The sequence ------------------------------------------------------------
 
 func _play() -> void:
+	# Your pet turns round to show you what it's found.
+	if _animal and _gift_id != "":
+		_turn_to_walker()
 	# The scenery dims and the camera moves in on the animal.
 	var zoom := _zoom_target()
 	var t := Motion.tween(self, "zoom")
 	t.set_parallel(true)
-	t.tween_property(self, "_dim", DIM, Motion.time(0.6))
+	t.tween_property(self, "_dim", Motion.style.dim, Motion.time(0.6))
 	t.tween_property(_stage, "scale", Vector2.ONE * zoom["scale"], Motion.time(1.0))
 	t.tween_property(_stage, "position", zoom["position"], Motion.time(1.0))
 	t.tween_property(_glow, "strength", 1.0 if _gift_id != "" else 0.0, Motion.time(1.0))
@@ -269,6 +294,19 @@ func _on_level_up(level: int) -> void:
 
 static func _reward_name(r: Dictionary) -> String:
 	return str(Content.biome(r["id"]).get("name", "") if r["type"] == "place" else Content.animal(r["id"]).get("name", ""))
+
+
+## Turns the animal round (a quick squash through side-on) to face you, if
+## it isn't already.
+func _turn_to_walker() -> void:
+	var facing := -1.0 if _walker.position.x < _animal.position.x else 1.0
+	if signf(_animal.scale.x) == facing:
+		return
+	var s := absf(_animal.scale.y)
+	var t := Motion.tween(_animal, "turn")
+	t.tween_method(func(v: float):
+		_animal.scale.x = v * s
+		_place_glow(), _animal.scale.x / s, facing, Motion.time(Motion.style.turn))
 
 
 func _place_glow() -> void:
@@ -513,7 +551,8 @@ func _fetch(spot: Vector2, z: float) -> void:
 	_animal.running = false
 	_animal.walking = false
 	_animal.submerged = 0.0
-	_animal.scale = Vector2(_rest_scale, _rest_scale)
+	_animal.scale = Vector2(_rest_scale * signf(_animal.scale.x), _rest_scale)
+	_turn_to_walker()
 	_place_glow()
 	Motion.to(_glow, "strength", 1.0)
 	_state = "ready"

@@ -23,7 +23,7 @@ These are optional. Without them the app uses the one-colour icon.
 | File | Shows |
 | --- | --- |
 | `achievements/<achievement id>.svg` | An hours or gifts achievement's medal, instead of its icon. It's faded until earned. Ids are in `data/achievements.json` (hours) and `all_gifts`. |
-| `art/places/<place id>.png` (in `art/`) | A place's button picture, white on transparent. See `art/README.md`. |
+| `art/places/<place id>.png` (in `art/`) | A place's button picture, white on transparent. See `assets/README.md`. |
 
 ## The icons
 

@@ -148,6 +148,22 @@ func fill_screen() -> void:
 	Motion.method(self, "grow", _set_grow, _grow, _grow + (far / 0.8 + 2.0) / r, Motion.SLOW)
 
 
+## The other way: starts out covering the whole screen and shrinks back to
+## its resting size in `seconds`, as a full-screen flow closes into it.
+func shrink_from_full(seconds: float = Motion.SLOW) -> void:
+	var r := maxf(radius() * get_global_transform().get_scale().x, 1.0)
+	var far := 0.0
+	var centre := get_global_rect().get_center()
+	var view := get_viewport_rect().size
+	for corner in [Vector2.ZERO, Vector2(view.x, 0), view, Vector2(0, view.y)]:
+		far = maxf(far, centre.distance_to(corner))
+	_filling = true
+	_pressing = false
+	_set_grow(1.0 + (far / 0.8 + 2.0) / r)
+	var t := Motion.method(self, "grow", _set_grow, _grow, 1.0, seconds)
+	t.tween_callback(func(): _filling = false)
+
+
 ## Back to its resting size at once (it's off screen).
 func settle() -> void:
 	_filling = false

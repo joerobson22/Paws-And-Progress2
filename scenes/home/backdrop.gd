@@ -30,16 +30,17 @@ extends Control
 var pan := Vector2.ZERO
 ## True while a full-screen flow hides it, so it needn't draw.
 var covered := false
-## How far the layers have sunk below their places, 0 to 1: the create
-## account screen shows mostly sky, and creating an account raises them into
-## view. Near layers sink further than far ones.
-var sunk := 0.0
+## How far the view looks down at the ground, 0 to 1: the create account
+## screen looks down at the hilltop under your feet, and creating an account
+## tilts the view up to the forest and the sky. Near layers move further than
+## far ones, and the sky and the sun or moon least of all.
+var look_down := 0.0
 ## For tests and the debug bar: 0 day to 1 night. Below 0 works it out.
 var night_override := -1.0
 
-## How far a layer sinks when `sunk` is 1, in screen heights, on top of its
-## parallax.
-const SINK_BASE := 0.3
+## How far a layer rises when `look_down` is 1, in screen heights, on top
+## of its parallax.
+const LOOK_BASE := 0.3
 
 var _layers: Array[BackdropLayer] = []
 var _colours: Array[Color] = []
@@ -106,16 +107,18 @@ func _layout() -> void:
 	if view.x <= 0.0 or view.y <= 0.0:
 		return
 	var look := App.sky_look()
-	_cover($DaySky, view, Vector2.ZERO)
-	_cover($NightSky, view, Vector2.ZERO)
-	_place_light($Sun, float(look["sun"]), view)
-	_place_light($Moon, float(look["moon"]), view)
+	# Looking down lifts everything up the screen, the sky least.
+	var sky_lift := Vector2(0, -look_down * view.y * LOOK_BASE)
+	_cover($DaySky, view, sky_lift)
+	_cover($NightSky, view, sky_lift)
+	_place_light($Sun, float(look["sun"]), view, sky_lift)
+	_place_light($Moon, float(look["moon"]), view, sky_lift)
 	var travel := _travel()
 	for i in _layers.size():
 		var l := _layers[i]
 		var sway := sin(_age * 0.12 + l.get_index() * 1.7) * l.drift
-		var sink := sunk * view.y * (SINK_BASE + l.parallax)
-		_cover(l, view, pan * l.parallax * travel + Vector2(sway, sink))
+		var lift := look_down * view.y * (LOOK_BASE + l.parallax * 2.0)
+		_cover(l, view, pan * l.parallax * travel + Vector2(sway, -lift))
 		# Ground in the layer's colour below its bottom edge, down to the
 		# screen's, for when looking down lifts it.
 		var gap := view.y - (l.position.y + l.size.y)
@@ -148,7 +151,7 @@ func _cover(n: TextureRect, view: Vector2, offset: Vector2) -> void:
 
 ## The sun or moon `along` its arc (0 rising on the left, 1 setting on the
 ## right; below 0 it's down and hidden).
-func _place_light(n: TextureRect, along: float, view: Vector2) -> void:
+func _place_light(n: TextureRect, along: float, view: Vector2, offset: Vector2 = Vector2.ZERO) -> void:
 	n.visible = along >= 0.0
 	if not n.visible:
 		return
@@ -156,4 +159,4 @@ func _place_light(n: TextureRect, along: float, view: Vector2) -> void:
 	n.size = Vector2(side, side)
 	var x := lerpf(0.08, 0.92, along) * view.x
 	var y := view.y * horizon - sin(along * PI) * view.y * climb
-	n.position = Vector2(x, y) - n.size * 0.5 + pan * 0.05
+	n.position = Vector2(x, y) - n.size * 0.5 + pan * 0.05 + offset

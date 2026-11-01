@@ -7,22 +7,45 @@ extends Control
 ## Time on screen always comes from the session's timestamps (SessionClock),
 ## never from counting frames, so it stays right after the app is
 ## backgrounded, the laptop sleeps, or the app is killed and reopened.
-## params: {"from": where the opening circle grew from}
+## Heading out from the choose focus screen (params "intro"), the walk
+## opens in the same place with your pet already standing on the path: you
+## walk in from the left to join it, the lead appears with what you're
+## working on, and a second later you set off together. Only then does the
+## clock start: the time fades in, the encouragement types itself out word
+## by word, and the buttons fade in. The encouragement changes every ten
+## minutes of focus.
+## params: {"from": where the opening circle grew from} for a walk already
+## going, or {"intro": true, "project", "pet", "place", "scroll"} to set off.
 
 var params := {}
 
 ## Ground pixels per second at walk speed 1.0 (at 720px tall).
 const BASE_SPEED := 70.0
+## The timings of setting off (walking in, the lead, the pause, typing out
+## the encouragement and how often it changes) are in ui/motion.tres
+## (MotionStyle), to change in the Godot editor.
 
 var _scenery: Scenery
 var _actors := Node2D.new()
 var _walker: CharacterView
 var _animal: AnimalView
-var _bush: _Bush
+## The bush your pet dives into (art/walk/bush.tscn, which you can change).
+const BUSH := "res://art/walk/bush.tscn"
+var _bush: Node2D
 var _project: ProjectData
 var _pet: PetData
 var _hud: Control
 var _timer: Label
+var _title: Label
+var _quote: Label
+## Which encouragement shows (see _quote_key()).
+var _quote_key := 0
+## The buttons, which fade in once you set off.
+var _buttons: Array[Control] = []
+## True until you've walked in and set off (see _intro()).
+var _arriving := false
+var _walking_in := false
+var _blocker: Control
 var _pause: Button
 var _sound: Button
 var _gift: GiftButton
@@ -39,8 +62,13 @@ var _result := {}
 
 func _ready() -> void:
 	var clock := App.state.active
-	_project = App.state.project(clock.project_id) if clock else null
-	_pet = App.state.pet(clock.pet_id) if clock else null
+	_arriving = bool(params.get("intro", false))
+	if _arriving:
+		_project = App.state.project(str(params.get("project", "")))
+		_pet = App.state.pet(str(params.get("pet", "")))
+	else:
+		_project = App.state.project(clock.project_id) if clock else null
+		_pet = App.state.pet(clock.pet_id) if clock else null
 	if _project == null or _pet == null:
 		# The project was deleted mid-walk, or there's no walk: nothing to show.
 		App.cancel_walk()
@@ -48,10 +76,10 @@ func _ready() -> void:
 		return
 
 	_scenery = Scenery.new()
-	_scenery.biome = Content.biome(clock.biome_id)
+	_scenery.biome = Content.biome(str(params.get("place", "")) if _arriving else clock.biome_id)
 	_scenery.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	# Start somewhere different each walk.
-	_scenery.scroll = App.rng.randf_range(0.0, 100000.0)
+	# Start somewhere different each walk (or just where you were standing).
+	_scenery.scroll = float(params.get("scroll", App.rng.randf_range(0.0, 100000.0)))
 	add_child(_scenery)
 
 	add_child(_actors)
@@ -65,13 +93,82 @@ func _ready() -> void:
 	# The jungle's leaves and vines pass in front of you both.
 	_scenery.front_into(self)
 
-	_build_hud(clock)
+	_build_hud()
 	DisplayServer.screen_set_keep_on(App.state.settings.get("keep_screen_on", true))
 	resized.connect(_layout)
 	_layout()
 	_update_ambience()
+	if _arriving:
+		_intro()
+		return
 	_apply_paused(clock.is_paused())
 	_gift.set_seconds(clock.elapsed(App.now()))
+	_show_quote(false)
+
+
+## Setting off: you walk in from the left to your pet, the lead appears with
+## the project's name, and a second later you set off together and the
+## clock starts.
+func _intro() -> void:
+	_pace = 0.0
+	_lead_alpha = 0.0
+	_animal.walking = false
+	for c: CanvasItem in [_timer, _title, _quote]:
+		c.modulate.a = 0.0
+	for b in _buttons:
+		b.modulate.a = 0.0
+	# Nothing can be tapped until you set off.
+	_blocker = Control.new()
+	_blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_blocker)
+	_walking_in = true
+	_walker.walking = true
+	# From just off the left edge to your place by your pet, worked out each
+	# frame so a resize mid-way still ends in the right spot.
+	var step := func(p: float):
+		var home: Vector2 = ChooseFocus.walk_spots(size, _scenery.path_y())["walker"]
+		_walker.position.x = lerpf(-90.0 * _unit(), home.x, p)
+	step.call(0.0)
+	var t := Motion.tween(_walker, "walk_in")
+	t.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	t.tween_method(step, 0.0, 1.0, Motion.time(Motion.style.walk_in))
+	await t.finished
+	_walking_in = false
+	_walker.walking = false
+	Motion.method(self, "lead", func(v: float): _lead_alpha = v, 0.0, 1.0, Motion.style.lead_in)
+	_drop_in(_title)
+	await get_tree().create_timer(Motion.time(Motion.style.set_off_wait)).timeout
+	if not is_inside_tree():
+		return
+	_set_off()
+
+
+## You and your pet set off together: the clock starts, the scenery gets up
+## to speed, the time drops in, then the encouragement types itself out,
+## while the buttons fade in where they are.
+func _set_off() -> void:
+	App.start_walk(_project.id, _pet.id, -1, str(_scenery.biome.get("id", "")))
+	_arriving = false
+	_walker.walking = true
+	_animal.walking = true
+	_apply_paused(false)
+	_last_second = -1
+	_gift.set_seconds(0)
+	Motion.method(self, "pace", func(v: float): _pace = v, 0.0, 1.0, Motion.style.speed_up)
+	_timer.modulate.a = 0.0
+	var t := _drop_in(_timer)
+	if is_instance_valid(_blocker):
+		_blocker.queue_free()
+	for b in _buttons:
+		Motion.fade(b, 1.0, Motion.SLOW)
+	await t.finished
+	_show_quote(true)
+
+
+## Fades `c` in as it drops gently into place.
+func _drop_in(c: Control) -> Tween:
+	return Motion.enter(c, 0.0, -Motion.style.drop, Motion.SLOW)
 
 
 func _exit_tree() -> void:
@@ -88,7 +185,7 @@ func _notification(what: int) -> void:
 			RenderingServer.render_loop_enabled = true
 
 
-func _build_hud(clock: SessionClock) -> void:
+func _build_hud() -> void:
 	var insets := UI.safe_insets(self)
 	var wide := UI.is_wide(self)
 	_hud = MarginContainer.new()
@@ -107,14 +204,14 @@ func _build_hud(clock: SessionClock) -> void:
 	# Kept this tall when it shrinks past a day, so nothing under it moves.
 	_timer.custom_minimum_size.y = _timer.get_combined_minimum_size().y
 	col.add_child(_timer)
-	var title := _shadowed(UI.label(_project.name, 22, UI.ON_DARK, true, 500))
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	col.add_child(title)
-	var quote := _shadowed(UI.label(Content.quote(clock.start_unix), 15, UI.ON_DARK_SOFT, false, 700))
-	quote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	quote.custom_minimum_size.x = minf(440.0, size.x - 60.0)
-	quote.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	col.add_child(quote)
+	_title = _shadowed(UI.label(_project.name, 22, UI.ON_DARK, true, 500))
+	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	col.add_child(_title)
+	_quote = _shadowed(UI.label("", 15, UI.ON_DARK_SOFT, false, 700))
+	_quote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_quote.custom_minimum_size.x = minf(440.0, size.x - 60.0)
+	_quote.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(_quote)
 	col.add_child(UI.spacer(true))
 
 	var bottom := UI.hbox()
@@ -127,6 +224,7 @@ func _build_hud(clock: SessionClock) -> void:
 	# a row of their own just above them on phones.
 	if OS.is_debug_build():
 		var steps := DebugBar.time_buttons()
+		_buttons.append(steps)
 		if wide:
 			bottom.add_child(steps)
 			bottom.add_child(UI.spacer())
@@ -149,11 +247,13 @@ func _build_hud(clock: SessionClock) -> void:
 	var row := UI.hbox()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top.add_child(row)
-	row.add_child(_weather_picker())
+	var weather := _weather_picker()
+	row.add_child(weather)
 	row.add_child(UI.spacer())
 	_sound = UI.round_button("sound", Text.t("walk.sound"), _toggle_sound, UI.SURFACE, UI.INK, 40, true)
 	row.add_child(_sound)
 	_show_sound()
+	_buttons.append_array([_pause, _gift, weather, _sound])
 
 
 ## The weather to walk in: the real weather (when you've let the app look
@@ -214,14 +314,14 @@ func _unit() -> float:
 func _layout() -> void:
 	if _scenery == null:
 		return
-	var s := _unit()
-	var feet := _scenery.path_y()
-	var x := size.x * (0.3 if size.x < size.y else 0.38)
+	var spots := ChooseFocus.walk_spots(size, _scenery.path_y())
+	var s: float = spots["unit"]
 	_walker.scale = Vector2(s, s)
-	_walker.position = Vector2(x, feet)
+	# (While walking in, only the height follows a resize.)
+	_walker.position = Vector2(_walker.position.x if _walking_in else spots["walker"].x, spots["walker"].y)
 	if not _finishing:
 		_animal.scale = Vector2(s, s)
-		_animal.position = Vector2(x + 170.0 * s, feet + 4.0 * s)
+		_animal.position = spots["animal"]
 
 
 func _process(delta: float) -> void:
@@ -243,6 +343,8 @@ func _process(delta: float) -> void:
 			var wide := UI.is_wide(self)
 			_timer.add_theme_font_size_override("font_size", (84 if wide else 64) if elapsed < 86400 else (68 if wide else 48))
 			_gift.set_seconds(elapsed)
+			if _quote_key_now() != _quote_key and not _quote.text.is_empty():
+				_show_quote(true)
 
 	_ambience_check -= delta
 	if _ambience_check <= 0.0:
@@ -254,6 +356,40 @@ func _process(delta: float) -> void:
 		var minimised := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED
 		if RenderingServer.render_loop_enabled == minimised:
 			RenderingServer.render_loop_enabled = not minimised
+
+
+## Which encouragement to show: a new one every Motion.style.quote_every minutes of
+## focus, starting from one picked by when the walk began.
+func _quote_key_now() -> int:
+	var clock := App.state.active
+	if clock == null:
+		return _quote_key
+	return clock.start_unix + clock.elapsed(App.now()) / (Motion.style.quote_every * 60)
+
+
+## Shows the encouragement for now: typed out letter by letter (pausing a
+## moment between words), after the old one fades, with `typed`; else just
+## there.
+func _show_quote(typed: bool) -> void:
+	_quote_key = _quote_key_now()
+	var text := Content.quote(_quote_key)
+	if not typed or Motion.reduced():
+		Motion.tween(_quote, "type").kill()
+		_quote.text = text
+		_quote.visible_characters = -1
+		_quote.modulate.a = 1.0
+		return
+	var t := Motion.tween(_quote, "type")
+	if _quote.modulate.a > 0.0 and _quote.visible_characters != 0 and _quote.text != "":
+		t.tween_property(_quote, "modulate:a", 0.0, Motion.time(Motion.NORMAL))
+	t.tween_callback(func():
+		_quote.text = text
+		_quote.visible_characters = 0
+		_quote.modulate.a = 1.0)
+	for i in text.length():
+		t.tween_interval(Motion.time(Motion.style.type_letter + (Motion.style.type_space if text[i] == " " else 0.0)))
+		t.tween_callback(func(): _quote.visible_characters = i + 1)
+	t.tween_callback(func(): _quote.visible_characters = -1)
 
 
 func _draw_lead() -> void:
@@ -345,7 +481,7 @@ func _dive(gift_id: String) -> void:
 	var seconds := float(dive.get("seconds", 0.9))
 	var feet := _scenery.path_y()
 
-	_bush = _Bush.new()
+	_bush = (load(BUSH) as PackedScene).instantiate()
 	_bush.scale = Vector2(s, s)
 	_bush.position = Vector2(size.x + 160.0 * s, feet + 6.0 * s)
 	_actors.add_child(_bush)
@@ -423,17 +559,3 @@ func _go_finish() -> void:
 		"walker": _walker.position, "animal": _animal.position, "unit": _unit(),
 	}
 	App.go("finish", params_out)
-
-
-## A round leafy bush, drawn in front of the pet as it dives in. The origin
-## is where it meets the ground.
-class _Bush extends Node2D:
-	func _draw() -> void:
-		var greens := [Color("#4e7a46"), Color("#5f8f52"), Color("#6fa45e")]
-		var blobs := [[-58, -28, 34], [58, -26, 32], [-30, -58, 40], [26, -60, 42], [0, -32, 46], [-6, -86, 34], [44, -44, 30], [-48, -50, 30]]
-		for i in blobs.size():
-			var b: Array = blobs[i]
-			draw_circle(Vector2(b[0], b[1]), b[2], greens[i % greens.size()], true, -1.0, true)
-		for i in 9:
-			var a := -PI + PI * i / 8.0
-			draw_circle(Vector2(cos(a) * 46.0, -50.0 + sin(a) * 40.0), 4.0, Color("#86b874"), true, -1.0, true)

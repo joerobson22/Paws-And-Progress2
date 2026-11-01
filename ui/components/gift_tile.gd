@@ -109,7 +109,7 @@ func _interactive() -> bool:
 
 func _on_tapped() -> void:
 	if trades:
-		if OS.has_feature("mobile") and GiftInfo.showing(self) == null:
+		if App.touch_screen() and GiftInfo.showing(self) == null:
 			GiftInfo.show_for(self, gift_id)
 			set_process(true)
 			return
@@ -127,9 +127,11 @@ func _trade() -> void:
 		Audio.play("trade_not_yet", 0.7, -8.0, "pop")
 		return
 	GiftInfo.hide_any()
+	# A gift you've had before (even if you've none left) isn't new.
+	var seen := App.state.inventory.keys()
 	var new_id := App.trade_in(gift_id)
 	if new_id != "":
-		GiftDetails.open(new_id, true)
+		GiftDetails.open(new_id, true, true, not seen.has(new_id))
 
 
 ## Only tiles that do something take the pointer; the rest let it through
@@ -144,7 +146,7 @@ func _hover(on: bool) -> void:
 	if not _interactive():
 		return
 	set_process(true)
-	if trades and not OS.has_feature("mobile"):
+	if trades and not App.touch_screen():
 		if on:
 			GiftInfo.show_for(self, gift_id)
 		elif GiftInfo.showing(self):
@@ -158,7 +160,7 @@ func _target() -> float:
 	if not _interactive():
 		return 1.0
 	var grown := GiftInfo.showing(self) != null if trades else _hovered
-	if trades and not OS.has_feature("mobile"):
+	if trades and not App.touch_screen():
 		grown = grown or _hovered
 	return HoverGrow.GROW if grown else 1.0
 
