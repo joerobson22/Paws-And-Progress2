@@ -17,7 +17,7 @@
 		"reset": "Your save was from an older version, so this is a fresh start. The old one is kept beside it as save.old."
 	},
 	"greetings": {
-		"_doc": "The line above the focus orb on the home screen. One is picked each time you come home: half the time a greeting for the time of day (morning 5am to noon, afternoon to 5pm, evening to 10pm, then night), otherwise a line from 'anytime'. '{name}' becomes the player's name; lines with it are skipped until they've set one. 'fallback' shows if a list is ever empty.",
+		"_doc": "The line above the focus orb on the home screen. One is picked each time you come home: half the time a greeting for the time of day (morning 5am to noon, afternoon to 5pm, evening to 10pm, then night), otherwise a line from 'anytime'. On a holiday, it's always a line from that holiday's list in 'holidays' (add or change them freely). '{name}' becomes the player's name; lines with it are skipped until they've set one. 'fallback' shows if a list is ever empty.",
 		"morning": [
 			"Good morning, {name}",
 			"Morning, {name}. Fresh start.",
@@ -100,6 +100,44 @@
 			"Clear the noise. Find the path.",
 			"Your companion believes in you."
 		],
+		"holidays": {
+			"halloween": [
+				"Happy Halloween, {name}",
+				"Happy Halloween!",
+				"Spooky focus, anyone?",
+				"The pumpkins are watching. Better get to work.",
+				"Not even the skeletons skip focus time.",
+				"Trick or treat? Treat yourself to an hour of focus."
+			],
+			"christmas": [
+				"Merry Christmas, {name}",
+				"Merry Christmas!",
+				"Snow's settling. Stay cosy and focused.",
+				"A little focus, then back to the mince pies.",
+				"Season's greetings from the hilltop.",
+				"Even the reindeer put in the hours."
+			],
+			"new_year": [
+				"Happy New Year, {name}!",
+				"Happy New Year!",
+				"A brand new year. Start it well.",
+				"Fireworks first. Resolutions after."
+			],
+			"easter": [
+				"Happy Easter, {name}",
+				"Happy Easter!",
+				"Eggs hidden everywhere. Focus first, hunt later.",
+				"Hop to it.",
+				"A sweet day for a little focus."
+			],
+			"birthday": [
+				"Happy birthday, {name}!",
+				"Happy birthday!",
+				"It's your day. Do something you're proud of.",
+				"Another year older, another step up the hill.",
+				"Party hat on. Let's go."
+			]
+		},
 		"fallback": "Ready when you are"
 	},
 	"quotes": [

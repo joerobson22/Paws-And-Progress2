@@ -1434,6 +1434,10 @@ func _holidays(main: Node) -> void:
 			await _wait(30)
 			check(app.claim_holiday_gift() == "", "only once a year")
 		check((main._decor_layer.get_child_count() > 0) == (look.menu_scene != null), "%s's decorations hang over the screens" % id)
+		var greeting: String = main._panes[Vector2i.ZERO]._greeting.text
+		var lines: Array = _class("res://core/text.gd").list("greetings.holidays." + id).map(
+			func(l): return _class("res://core/text.gd").fill(str(l), {"name": str(app.state.profile.get("username", ""))}))
+		check(greeting in lines, "the home screen greets you for %s: %s" % [id, greeting])
 		await _shot("holiday_%s_home" % id)
 		match id:
 			"halloween":

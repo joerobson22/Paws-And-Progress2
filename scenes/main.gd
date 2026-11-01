@@ -346,6 +346,9 @@ func _dress_screens() -> void:
 	if id == _decor_for:
 		return
 	_decor_for = id
+	var focus: Node = _panes.get(Vector2i.ZERO)
+	if focus and focus.has_method("holiday_changed"):
+		focus.holiday_changed()
 	for c in _decor_layer.get_children():
 		c.queue_free()
 	var look := Holidays.look(id)

@@ -112,3 +112,20 @@ func test_finding_every_gift_leaves_out_holidays() -> void:
 	var p := Unlocks.progress({"all_tables": true}, {"found": {"dog_a": true}}, gifts)
 	check(p["done"], "the dog gift is all it takes")
 	eq(p["goal"], 1)
+
+
+## On a holiday the home screen greets you with that holiday's lines.
+func test_holiday_greetings() -> void:
+	var rng := RandomNumberGenerator.new()
+	for h in _list:
+		var lines := Text.list("greetings.holidays." + h["id"])
+		check(not lines.is_empty(), "%s has greetings" % h["id"])
+		var named: Array = lines.map(func(l): return Text.fill(str(l), {"name": "Sam"}))
+		for i in 20:
+			rng.seed = i
+			var line := Content.greeting(12, "Sam", rng, h["id"])
+			check(line in named, "%s: %s" % [h["id"], line])
+			rng.seed = i
+			check(not Content.greeting(12, "", rng, h["id"]).contains("{name}"), "no name, no {name}")
+	rng.seed = 1
+	check(Content.greeting(12, "Sam", rng, "") != "", "ordinary days still greet")
