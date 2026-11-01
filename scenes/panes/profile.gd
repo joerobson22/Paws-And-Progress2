@@ -103,6 +103,7 @@ func _total_focus() -> Control:
 	var row := ProfileCard.field(Text.t("profile.total_focus"), _total_text())
 	var value: Label = row.get_child(0).get_child(1)
 	row.mouse_filter = Control.MOUSE_FILTER_STOP
+	row.set_meta("no_grow", true)
 	row.accessibility_name = Text.t("profile.total_focus_tap", {"time": value.text})
 	Press.attach(row).tapped.connect(func():
 		_long_total = not _long_total
@@ -368,8 +369,11 @@ func _reward_row(r: Dictionary, before: int, after: int, at: float) -> Control:
 	track.custom_minimum_size.x = TRACK_WIDTH
 	# How full the line is above this row's dot (coming from the row before)
 	# and below it (going on to the next).
-	track.above = 1.0 if before == level else clampf((at - before) / float(level - before) * 2.0 - 1.0, 0.0, 1.0)
-	track.below = 1.0 if after == level else clampf((at - level) / float(after - level) * 2.0, 0.0, 1.0)
+	# Rewards at the same level share a stretch of line, filled once that
+	# level is reached.
+	var same := 1.0 if open else 0.0
+	track.above = same if before == level else clampf((at - before) / float(level - before) * 2.0 - 1.0, 0.0, 1.0)
+	track.below = same if after == level else clampf((at - level) / float(after - level) * 2.0, 0.0, 1.0)
 	track.reached = open
 	row.add_child(track)
 	return row

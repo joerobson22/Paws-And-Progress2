@@ -92,9 +92,7 @@ func test_art_paths_are_well_formed() -> void:
 		if ResourceLoader.exists(dir + "animal.tscn"):
 			check(a["parts"].size() <= 3, "%s: the shader maps three colours" % a["id"])
 	for b in load_json("res://data/biomes.json")["biomes"]:
-		for layer in b["layers"]:
-			if layer.has("art"):
-				check(ResourceLoader.exists(layer["art"]), "%s art %s" % [b["id"], layer["art"]])
+		check(not b.has("layers"), "%s: its layers live in its scene, not biomes.json" % b["id"])
 	check(ResourceLoader.exists("res://art/animal_colours.gdshader"))
 	check(load("res://art/templates/animal/animal.tscn") is PackedScene, "the animal template loads")
 	check(load("res://art/templates/scenery/tile.tscn") is PackedScene, "the scenery template loads")
@@ -119,3 +117,62 @@ func test_cosmetic_art_folders_match_items() -> void:
 				if file.get_extension() in ["png", "svg", "webp"]:
 					var stem := file.get_basename().trim_suffix("_behind").trim_suffix("_sad")
 					check(stems.has(stem), "%s%s/%s isn't a limb" % [root, folder, file])
+
+
+## Every place's look is a scene you edit in Godot: one per place, named
+## after it, each with layers and ground to walk on.
+func test_every_place_has_a_scenery_scene() -> void:
+	var ids := {}
+	for b in load_json("res://data/biomes.json")["biomes"]:
+		ids[b["id"]] = true
+		var path := "res://art/scenery/%s/place.tscn" % b["id"]
+		check(ResourceLoader.exists(path), "%s has %s" % [b["id"], path])
+		if not ResourceLoader.exists(path):
+			continue
+		var place = (load(path) as PackedScene).instantiate()
+		check(place is PlaceScenery, "%s's scene is a PlaceScenery" % b["id"])
+		var layers: Array = place.layers()
+		check(layers.size() >= 2, "%s has layers" % b["id"])
+		check(layers.any(func(l): return l["kind"] == "ground"), "%s has ground to walk on" % b["id"])
+		for layer in layers:
+			check(SceneryLayer.KINDS.split(",").has(layer["kind"]), "%s: %s is a kind the walk draws" % [b["id"], layer["kind"]])
+			if layer.has("art"):
+				check(ResourceLoader.exists(layer["art"]), "%s art %s" % [b["id"], layer["art"]])
+		place.free()
+	for folder in DirAccess.get_directories_at("res://art/scenery/"):
+		check(ids.has(folder), "art/scenery/%s isn't a place's id" % folder)
+
+
+## A place's scene gives the walk the same layers it was made from.
+func test_place_scene_layers_round_trip() -> void:
+	var l := SceneryLayer.new()
+	l.kind = "pines"
+	l.parallax = 0.3
+	l.y = 0.64
+	l.height = 0.28
+	l.colour = Color("#456f50")
+	l.pattern = 13
+	l.spacing = 52
+	l.snow = true
+	var d := l.to_layer()
+	eq(d, {"kind": "pines", "parallax": 0.3, "y": 0.64, "height": 0.28, "colour": "#456f50", "seed": 13, "spacing": 52, "snow": true})
+	check(l.art_tile() == null, "no sprites inside: drawn as its kind")
+	var sprite := Sprite2D.new()
+	l.add_child(sprite)
+	var tile = l.art_tile()
+	check(tile != null and tile["node"].get_child_count() == 1 and tile["width"] == l.tile_width, "sprites inside repeat as its art")
+	tile["node"].free()
+	l.free()
+
+
+## The sound list and the motion settings open in the editor and load.
+func test_editable_resources_load() -> void:
+	var lib := load("res://assets/sounds/sounds.tres") as SoundLibrary
+	check(lib != null and lib.sounds.size() > 20, "the sound list loads")
+	var seen := {}
+	for s in lib.sounds:
+		check(not seen.has(s.id), "%s is listed once" % s.id)
+		seen[s.id] = true
+	check(lib.find("dog_bark") != null and lib.find("dog_bark").stream != null, "listed sounds keep their recordings")
+	check(load("res://ui/motion.tres") is MotionStyle, "the motion settings load")
+	check(load("res://art/walk/bush.tscn") is PackedScene, "the bush loads")

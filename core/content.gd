@@ -44,6 +44,7 @@ func _init() -> void:
 	drop_table = _load("res://data/drop_table.json")
 	var b := _load("res://data/biomes.json")
 	biomes = b.get("biomes", [])
+	_read_place_scenes()
 	day_cycle = b.get("day_cycle", {})
 	weathers = b.get("weathers", {})
 	var keys: Array = day_cycle.get("keys", [])
@@ -149,6 +150,26 @@ func next_rarity(rarity_id: String) -> String:
 
 func gift_rarity(id: String) -> String:
 	return str(gift(id).get("rarity", ""))
+
+
+## Each place's look comes from its scene, art/scenery/<id>/place.tscn
+## (made and changed in the Godot editor: see PlaceScenery), as its layers.
+const PLACE_SCENE := "res://art/scenery/%s/place.tscn"
+
+
+func _read_place_scenes() -> void:
+	for b in biomes:
+		var path := PLACE_SCENE % str(b["id"])
+		if not ResourceLoader.exists(path):
+			push_warning("Content: no scenery scene for %s (%s)" % [b["id"], path])
+			b["layers"] = b.get("layers", [])
+			continue
+		var place := (load(path) as PackedScene).instantiate() as PlaceScenery
+		if place == null:
+			push_warning("Content: %s isn't a place's scenery" % path)
+			continue
+		b["layers"] = place.layers()
+		place.free()
 
 
 func biome(id: String) -> Dictionary:

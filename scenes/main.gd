@@ -72,13 +72,17 @@ const BACKDROP := "res://art/home/backdrop.tscn"
 const SKY_EVERY := 20.0
 ## The window settings last put in place, so only a change to them moves it.
 var _window_applied := ""
-## How long the hills take to rise into view after creating an account.
+## How long the view takes to tilt up from the ground after creating an account.
 const ACCOUNT_RISE := 1.6
 ## True while the create account screen is up (App.needs_account()).
 var _locked := false
 ## Holds the create account screen, over flows and under popups.
 var _account_layer := Control.new()
 var _account: CreateAccount
+## Whether the debug phone view was last laid out, and the phone's outline
+## (rounded corners, the camera's island and the home bar) drawn over it.
+var _phone_view := false
+var _phone_frame := PhoneFrame.new()
 
 var _press := false
 var _press_pos := Vector2.ZERO
@@ -155,6 +159,9 @@ func _ready() -> void:
 	_account_layer.z_index = 2
 	_modal_layer.z_index = 2
 	Modal.layer = _modal_layer
+	_phone_frame.visible = _phone_view
+	_phone_frame.z_index = 4
+	add_child(_phone_frame)
 
 	App.navigate.connect(_open)
 	get_viewport().size_changed.connect(_fit_design_size)
@@ -184,9 +191,23 @@ func _ready() -> void:
 func _fit_design_size() -> void:
 	var window := get_window()
 	var side: float
-	if App.debug_phone_view():
-		side = float(Display.PHONE.x)
-	elif OS.has_feature("mobile"):
+	var phone_view := App.debug_phone_view()
+	if phone_view != _phone_view:
+		_phone_view = phone_view
+		_phone_frame.visible = phone_view
+		# Every screen is built again at the phone's size once it's in place.
+		_relayout_all.call_deferred()
+	if phone_view:
+		# Exactly a phone's screen, whatever shape the window ends up: the
+		# picture keeps the phone's shape, with black either side if the
+		# window couldn't be made that narrow.
+		window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+		_set_narrow(false)
+		if window.content_scale_size != Display.PHONE:
+			window.content_scale_size = Display.PHONE
+		return
+	window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	if OS.has_feature("mobile"):
 		var points := Vector2(DisplayServer.window_get_size()) / Display.screen_scale()
 		side = clampf(minf(points.x, points.y), PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
 	else:
@@ -197,11 +218,22 @@ func _fit_design_size() -> void:
 			side = clampf(window_size.x * Display.PHONE.y / window_size.y, PHONE_MIN_SHORT_SIDE, DESIGN_SHORT_SIDE)
 		else:
 			side = maxf(short / maxf(short / DESKTOP_SHORT_SIDE, MIN_DESKTOP_SCALE), PHONE_MIN_SHORT_SIDE)
-	_set_narrow(not OS.has_feature("mobile") and not App.debug_phone_view() \
+	_set_narrow(not OS.has_feature("mobile") \
 		and DisplayServer.window_get_size().x < DisplayServer.window_get_size().y * NARROW_WINDOW)
 	var target := Vector2i(roundi(side), roundi(side))
 	if window.content_scale_size != target:
 		window.content_scale_size = target
+
+
+## After the debug phone view comes or goes: waits for the new size to
+## settle, then lays the shell out and has every screen build itself again.
+func _relayout_all() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if _minimap:
+		_minimap.hover_grow = not App.phone_layout()
+	_layout()
+	App.state_changed.emit()
 
 
 ## Switches to or from the phone layout as the window narrows or widens.
@@ -306,6 +338,7 @@ func _switch_palette(dark: bool) -> void:
 	theme = UI.build_theme()
 	UI.dress_backdrop(_bg)
 	_minimap.queue_redraw()
+	_phone_frame.queue_redraw()
 	for dir in _arrows:
 		_arrows[dir].refresh()
 	if _account:
@@ -393,14 +426,14 @@ func _show_home(on: bool, instant: bool) -> void:
 			item.modulate.a = 1.0 if on else 0.0
 		else:
 			Motion.fade(item, 1.0 if on else 0.0, Motion.NORMAL)
-	# The create account screen shows mostly sky; the hills rise into view
-	# once it's done.
+	# The create account screen looks down at the hilltop under your feet;
+	# once it's done the view tilts up to the forest and the sky.
 	if is_instance_valid(_backdrop):
-		var sunk := 0.0 if on else 1.0
+		var down := 0.0 if on else 1.0
 		if instant:
-			_backdrop.sunk = sunk
+			_backdrop.look_down = down
 		else:
-			Motion.to(_backdrop, "sunk", sunk, ACCOUNT_RISE if on else Motion.SLOW)
+			Motion.to(_backdrop, "look_down", down, ACCOUNT_RISE if on else Motion.SLOW)
 
 
 func _show_account(instant: bool, typed: Array = ["", ""]) -> void:
@@ -506,8 +539,18 @@ func _close_flows() -> void:
 	_panes[_at].visible = true
 	_panes[_at].show_pane()
 	_hide_others()
-	top.origin = size * 0.5
-	top.close()
+	# The flow shrinks back into the focus orb, which shrinks from filling
+	# the screen back to its place in the middle, as it grew when you tapped
+	# it.
+	var focus: Node = _panes[Vector2i.ZERO]
+	var orb: Dictionary = focus.orb_circle() if focus.has_method("orb_circle") else {}
+	if orb.is_empty():
+		top.origin = size * 0.5
+		top.close()
+	else:
+		top.origin = orb["centre"]
+		top.close(Motion.SLOW, orb["radius"] * 0.85)
+		focus.orb_return(Motion.SLOW)
 	Motion.fade(_minimap, 1.0)
 
 

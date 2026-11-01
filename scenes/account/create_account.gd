@@ -39,7 +39,8 @@ func _init(name_text: String = "", school_text: String = "", own_backdrop: bool 
 	var title := UI.label(Text.t("create.title"), 34, UI.INK, true, 600)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(title)
-	var note := UI.para(Text.t("create.note"), 15)
+	# Ink, not the soft grey: it sits over the ground, not a card.
+	var note := UI.para(Text.t("create.note"), 15, UI.INK)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(note)
@@ -86,7 +87,7 @@ func _init(name_text: String = "", school_text: String = "", own_backdrop: bool 
 
 func _ready() -> void:
 	refresh_accounts()
-	if not OS.has_feature("mobile"):
+	if not App.touch_screen():
 		_name.grab_focus.call_deferred()
 
 

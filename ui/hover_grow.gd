@@ -25,8 +25,12 @@ static func attach(control: Control) -> void:
 	_wire.call_deferred(control)
 
 
-static func _wire(control: Control) -> void:
-	if not is_instance_valid(control) or control.has_meta("no_grow") or is_pill(control):
+static func _wire(target) -> void:
+	# (Gone already, if it was built and thrown away in the same frame.)
+	if not is_instance_valid(target):
+		return
+	var control := target as Control
+	if control.has_meta("no_grow") or is_pill(control):
 		return
 	control.resized.connect(func(): control.pivot_offset = control.size * 0.5)
 	control.pivot_offset = control.size * 0.5
@@ -52,6 +56,10 @@ static func _to(control: Control, s: float) -> void:
 	if not is_instance_valid(control) or not control.is_inside_tree():
 		return
 	if s > 1.0 and control is BaseButton and (control as BaseButton).disabled:
+		return
+	# A finger doesn't hover: nothing grows in the debug phone view.
+	var app := control.get_tree().root.get_node_or_null("App")
+	if s > 1.0 and app and app.state and app.touch_screen():
 		return
 	control.pivot_offset = control.size * 0.5
 	if s > 1.0:

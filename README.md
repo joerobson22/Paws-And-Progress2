@@ -58,18 +58,25 @@ smaller than 800 × 560 points, so layouts never squash.
   above the orb (it grows under the pointer), and the sun/moon switch for dark
   mode. Tap the orb and the choose focus screen grows out of it, set in the
   place you'll walk (holding still, with the place's growth in front of your
-  pets): pick the place from the row at the top (in the order they unlock),
-  with the project and the pet's name under it. Swipe through your pets (each
-  one's kind and time focused is under it), tap one to start a walk, or
-  complete or delete one with the buttons at the bottom. The × in the top left
-  goes back. The + in the top right adopts a new one (what it's for, the pet's
+  pets): pick the place from the row at the top (in the order they unlock;
+  a highlight slides to the one you pick as the places fade into each
+  other), with the project and the pet's name under it. Swipe through your
+  pets (each one's kind and time focused is under it) and tap one to set
+  off: the screen fades away but your pet, which walks over to the path;
+  you walk in from the left to join it, the lead appears with the project's
+  name, and a second later you set off together and the clock starts. The
+  red-rimmed bin at the bottom rehomes a pet. The × in the top left goes
+  back, and the screen shrinks back into the orb. The + in the top right adopts a new one (what it's for, the pet's
   name, its animal and three colours; a locked animal hides the colours):
   while you fill that in the bottom buttons go, the × cancels and the + turns
   into a tick that adopts it. Debug builds (running from the editor) also show
   two small switches beside the home icon in the top left: one unlocks every
-  animal and place, the other turns the window into a phone's shape and lays
-  the app out as on a phone (tap-to-open map, no edge arrows); turning it off
-  puts the window back as it was.
+  animal and place, the other shows the app exactly as on a phone (an
+  iPhone's 390 × 844 screen with its rounded corners, camera island and
+  home bar, kept clear of as on the phone; everything is built again at
+  that size, with no hovering). The window narrows to fit where it can,
+  with black either side where it can't; turning it off puts the window
+  back as it was.
 - **Gifts** (left): three rings under "Collection stats" for how your
   collection's coming along: gifts discovered (green), pets' gift tables
   completed (blue) and cosmetics unlocked from gifts (purple). Under them,
@@ -115,11 +122,14 @@ On a walk, the button in the corner is a pie chart of the gift your pet will
 bring back. For the first ten minutes a dark green slice sweeps round; then it
 dings and fills with bright green from the middle, and from there blue, purple
 and gold slices show the chance of a rare, epic or legendary gift, growing as
-you go (rarities below a guaranteed one drop out). The sound button in the top
+you go (rarities below a guaranteed one drop out). The time and the
+project's name sit at the top, and under them a line of encouragement types
+itself out word by word, changing every ten minutes. The sound button in the top
 right mutes everything. Debug builds add a weather picker in the top left and
 buttons that add 5, 10, 30 or 60 minutes. When you finish, your pet dives into
-a bush and comes back with the gift, the camera zooms in, and the XP you
-earned pours into your level bar.
+a bush and comes back with the gift, turns round to show you, the camera
+zooms in, and the XP you earned pours into your level bar at the top. What
+it found is along the very bottom.
 
 **Levels.** Every minute focused is 1 XP, plus a bonus for the walk's gift.
 Levelling up unlocks new animals and places (lakeside, forest, jungle, tundra,
@@ -334,24 +344,31 @@ gets a list. The unit tests check that every key the code uses is in the file.
 - **Grades:** `data/grades.json`.
 - **Achievements:** `data/achievements.json` (hour goals; the gift sets come
   from the animals and gifts).
-- **Place:** add a stack of layers to `data/biomes.json`, with an icon and an
-  `unlock` rule. A white `art/places/<id>.png` replaces the drawn icon.
+- **Place:** add it to `data/biomes.json` (name, icon, `unlock` rule,
+  ambience) and give it a scenery scene, `art/scenery/<id>/place.tscn`,
+  made and changed in the Godot editor. A white `art/places/<id>.png`
+  replaces the drawn icon.
 - **XP and level thresholds:** `data/levels.json`.
 
 ## Art and sound status
 
-Art is placeholder, drawn in code, until you drop your own into `art/`; see
-[art/README.md](art/README.md) for how to add animals (a rig of separate
-limbs, painted red, green and blue and recoloured by a shader), gift images
-scenery tiles you arrange in the Godot editor, and the character with its cosmetics. Anything without art keeps
-its placeholder:
+[assets/README.md](assets/README.md) is the guide to changing every
+picture, place, sound and animation in the Godot editor: each place's
+scenery is a scene you open and edit (drawn live in the editor), every
+sound's recording, loudness and pitch are in one list
+(`assets/sounds/sounds.tres`), and the app's timings and curves in
+`ui/motion.tres`. Animals and the character are rigs of separate limbs,
+painted red, green and blue and recoloured by a shader. Anything without
+art keeps its placeholder:
 
 - Animals: `ui/components/animal_view.gd` draws each animal from its
   recolourable parts. A rig at `animal.sprite_dir`
   (e.g. `res://art/animals/dog1/animal.tscn`) replaces the drawing.
 - Character: `ui/components/character_view.gd`, one look per cosmetic `style`; a rig in `art/character/` with per-item pieces in `art/cosmetics/<id>/` replaces it.
 - Gifts: `ui/components/gift_art.gd` (every screen showing a gift uses it).
-- Scenery: `scenes/walk/scenery.gd` draws each place's layers in chunks,
+- Scenery: each place's layers are in `art/scenery/<id>/place.tscn`;
+  `scenes/walk/scenery_painter.gd` draws a layer's kind (in the editor
+  too) and `scenes/walk/scenery.gd` scrolls them in chunks, with
   the sun and moon, the growth in front of the walker, and the weather
   (clouds, rain, lightning, snow, blizzards, the tundra's wind, stars,
   fireflies). The light tints each layer through its node, so the clock

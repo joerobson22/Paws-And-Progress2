@@ -225,27 +225,29 @@ func _run() -> void:
 		check(grid_tall <= 46.0, "the debug switches are small, level with the home icon (%.0f)" % grid_tall)
 		switches[1].button_pressed = true
 		await _wait(30)
-		check(root.content_scale_size == Vector2i(390, 390) and app.phone_layout() and not map.hover_grow,
-			"the phone size switch lays the app out at a phone's width")
+		check(root.content_scale_size == Vector2i(390, 844) and root.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_KEEP \
+			and app.phone_layout() and not map.hover_grow,
+			"the phone size switch lays the app out on a phone's screen")
+		check(main.size.is_equal_approx(Vector2(390, 844)), "exactly a phone's size, whatever the window (%s)" % main.size)
+		check(main._phone_frame.visible, "with a phone's outline over it")
 		check(arrows.values().all(func(a): return not a.visible), "with no edge arrows")
 		var map_box: Rect2 = map.get_global_rect()
-		check(absf(map_box.get_center().x - main.size.x * 0.5) < 1.0 and is_equal_approx(map_box.end.y, main.size.y - main.MAP_INSET),
+		check(absf(map_box.get_center().x - main.size.x * 0.5) < 1.0 and is_equal_approx(map_box.end.y, main.size.y - main.MAP_INSET - main._phone_frame.INSETS["bottom"]),
 			"and the map in the middle at the bottom (%s)" % map_box)
 		await _drag(map_box.get_center(), map_box.get_center(), 1)
 		await _wait(30)
-		check(map.open and absf(map.get_global_rect().get_center().x - main.size.x * 0.5) < 1.0 and is_equal_approx(map.get_global_rect().end.y, main.size.y - main.MAP_INSET),
+		check(map.open and absf(map.get_global_rect().get_center().x - main.size.x * 0.5) < 1.0 and is_equal_approx(map.get_global_rect().end.y, main.size.y - main.MAP_INSET - main._phone_frame.INSETS["bottom"]),
 			"growing up from there")
 		await _shot("debug_phone_map")
 		await _key(KEY_ESCAPE)
 		await _wait(30)
-		if _class("res://core/display.gd").managed():
-			check(absf(main.size.x - 390.0) < 1.0 and main.size.y > 780.0, "in a phone-shaped window (%s)" % main.size)
 		await _shot("debug_phone")
 		# The pane rebuilt at the new size, so find its switch again.
 		debug = _find(main._panes[Vector2i.ZERO], func(n): return _is(n, "debug_bar.gd"))
 		_all(debug, func(n): return _is(n, "switch.gd"))[1].button_pressed = false
 		await _wait(30)
-		check(not app.phone_layout() and map.hover_grow and root.content_scale_size != Vector2i(390, 390), "and back to the computer layout")
+		check(not app.phone_layout() and map.hover_grow and root.content_scale_aspect == Window.CONTENT_SCALE_ASPECT_EXPAND \
+			and not main._phone_frame.visible, "and back to the computer layout")
 		check(map.get_global_rect().position.x == main.MAP_INSET, "with the map back in the corner")
 		check(showing.call().size() == 4, "with its arrows")
 
@@ -362,7 +364,19 @@ func _run() -> void:
 	await _wait(25)
 	check(app.state.gift_count("dog_common") == 2 and app.state.gift_count("dog_rare") == rares + 1, "clicking trades it in")
 	check(modal_class.is_open(), "and shows what it brought")
+	var is_new_tag := func(n): return n is Label and n.text == "NEW"
+	check(_find(modal_class.top(), is_new_tag) == null, "not NEW: you've had one before")
 	await _shot("trade_result")
+	_close_modal()
+	await _wait(10)
+	# A gift you'd never had is NEW, right beside its name.
+	_class("res://ui/components/gift_details.gd").open("dog_rare", true, true, true)
+	await _wait(25)
+	var new_label: Label = _find(modal_class.top(), is_new_tag)
+	var heading: Label = _find(modal_class.top(), func(n): return n is Label and n.text == _content().gift("dog_rare")["name"])
+	check(new_label != null and heading != null and heading.get_parent() == new_label.get_parent().get_parent() \
+		and new_label.get_global_rect().position.x - heading.get_global_rect().end.x < 20.0, "a first-ever gift says NEW right after its name")
+	await _shot("trade_result_new")
 	_close_modal()
 	await _wait(10)
 	# Two left isn't enough: a click wiggles and trades nothing.
@@ -894,6 +908,21 @@ func _run() -> void:
 	await _wait(50)
 	check(chooser._scenery.biome["id"] == "beach", "and the first is still at the beach")
 	await _shot("choose_beach")
+	# Picking places quickly: each fades in from wherever the last had got
+	# to, and the highlight slides along in the same time.
+	check(chooser._marker.is_equal_approx(chooser._places["beach"].get_rect()), "the highlight is under the beach")
+	chooser._pick_place("lake")
+	await _wait(12)
+	var part: float = chooser._scenery.modulate.a
+	check(part > 0.03 and part < 0.97 and chooser._stack.size() == 2, "the lake is part way in, over the beach (%.2f)" % part)
+	check(chooser._marker_moving and not chooser._marker.is_equal_approx(chooser._places["lake"].get_rect()), "the highlight is sliding to it")
+	await _shot("choose_place_sliding")
+	chooser._pick_place("beach")
+	await _wait(2)
+	check(chooser._scenery.biome["id"] == "beach" and chooser._stack.size() == 1 and chooser._stack[0].modulate.a > 0.99,
+		"going straight back fades the lake away from where it had got to, over the beach")
+	await _wait(50)
+	check(chooser._marker.is_equal_approx(chooser._places["beach"].get_rect()) and not chooser._marker_moving, "and the highlight slides back")
 	# In the jungle the growth stands in front of the pets, under the words,
 	# and the scene holds still while you choose.
 	app.state.settings["debug_unlock_all"] = true
@@ -1053,6 +1082,46 @@ func _run() -> void:
 	await _wait(20)
 	check(leaving.is_rehomed() and not chooser._pet_list.has(leaving) and app.state.pet(leaving.id) != null, "rehoming hides the pet but keeps its record")
 
+	# Tapping a pet sets off: everything but the pet fades and it walks to
+	# the path; the walk opens in the same place, you walk in to join it,
+	# the lead and the project's name appear, and only a second later do you
+	# set off and the clock start. Then the time drops in and the
+	# encouragement types itself out.
+	var setting_off: PetData = chooser._current_pet()
+	app.state.settings["last_project"] = app.state.projects[1].id
+	chooser._start_walk(chooser._pets.index)
+	await _wait(25)
+	check(chooser._top.modulate.a < 0.5 and chooser._bottom.modulate.a < 0.5, "the screen's buttons fade away")
+	await _shot("set_off_pet_to_path")
+	await _wait(60)
+	var arriving: Node = main._flows.back().get_child(0)
+	check(arriving.get("_arriving") == true and app.state.active == null, "the walk opens with you walking in, before the clock starts")
+	check(arriving._animal.animal_id == setting_off.animal_id and arriving._scenery.biome["id"] == app.pet_place(setting_off), "with that pet, in its place")
+	await _wait(30)
+	await _shot("set_off_walking_in")
+	check(arriving._walker.position.x < arriving._animal.position.x - 100.0, "you walk in from the left")
+	for i in 40:
+		if arriving._lead_alpha > 0.9 or app.state.active != null:
+			break
+		await _wait(6)
+	await _wait(12)
+	check(arriving._lead_alpha > 0.5 and arriving._title.modulate.a > 0.3 and app.state.active == null and arriving._timer.modulate.a < 0.05, "the lead and the project's name, but no time yet")
+	await _shot("set_off_lead")
+	await _wait(80)
+	check(app.state.active != null and app.state.active.pet_id == setting_off.id, "then you set off and the clock starts")
+	await _wait(40)
+	await _shot("set_off_typing")
+	check(arriving._quote.visible_characters >= 0, "the encouragement types itself out")
+	await _wait(330)
+	check(arriving._quote.visible_characters == -1 and arriving._quote.text != "", "all of it")
+	check(arriving._pause.modulate.a > 0.95 and arriving._sound.modulate.a > 0.95, "and the buttons are in")
+	await _shot("set_off_walking")
+	var first_quote: String = arriving._quote.text
+	app.state.active.start_unix -= 11 * 60
+	await _wait(150)
+	check(arriving._quote.text != first_quote, "ten minutes on, a new line of encouragement")
+	app.cancel_walk()
+
 	app.start_walk(app.state.projects[1].id, app.state.pets[1].id)
 	app.go("walk", {"from": main.size * 0.5})
 	await _wait(60)
@@ -1179,8 +1248,12 @@ func _run() -> void:
 	check(finish._state == "ready", "and the pet brings that one back too")
 
 	app.go("home")
-	await _wait(60)
+	await _wait(18)
+	await _shot("finish_closing_into_orb")
+	check(main._panes[Vector2i.ZERO]._orb._grow > 1.05, "the orb shrinks back from filling the screen as the flow closes into it")
+	await _wait(42)
 	check(main._flows.is_empty() and main._at == Vector2i.ZERO, "home closes the flow")
+	check(absf(main._panes[Vector2i.ZERO]._orb._grow - 1.0) < 0.01, "and the orb is back to its size")
 
 	# Closing the app mid-walk ends the walk: the next launch logs it up to
 	# when the app was last open, with no gift, and shows focus ended.
@@ -1735,7 +1808,7 @@ func _accounts(main: Node) -> void:
 	check(have != null and have.is_visible_in_tree(), "I have an account shows when there's one")
 	check(screen.get_global_rect().has_point(main.size * 0.5) and screen.get_global_rect().size == main.size, "it covers the screen")
 	await _wait(40)
-	check(main._backdrop == null or main._backdrop.sunk > 0.99, "the hills sink low behind it, leaving mostly sky")
+	check(main._backdrop == null or main._backdrop.look_down > 0.99, "the view looks down at the ground behind it")
 	await _shot("create_account")
 	await _key(KEY_DOWN)
 	await _wait(40)
@@ -1771,9 +1844,9 @@ func _accounts(main: Node) -> void:
 	var new_slot: String = app.slot
 	check(new_slot != home_slot and not app.needs_account(), "Create makes a new account")
 	if main._backdrop:
-		check(main._backdrop.sunk > 0.0 and main._backdrop.sunk < 1.0, "and the hills rise into view (%.2f)" % main._backdrop.sunk)
+		check(main._backdrop.look_down > 0.0 and main._backdrop.look_down < 1.0, "and the view tilts up to the sky (%.2f)" % main._backdrop.look_down)
 		await _wait(100)
-		check(main._backdrop.sunk < 0.01, "all the way")
+		check(main._backdrop.look_down < 0.01, "all the way")
 	check(app.state.profile["username"] == "Sam" and app.state.profile["institution"] == "University of York", "with that name and place")
 	check(main._at == Vector2i.ZERO and main._account == null, "and goes to the focus screen")
 	check(app.friends.is_empty(), "a new account has no friends")

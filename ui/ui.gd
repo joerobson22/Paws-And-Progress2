@@ -298,6 +298,10 @@ static func is_wide(c: Control) -> bool:
 static func safe_insets(c: Control) -> Dictionary:
 	if not c.is_inside_tree():
 		return insets_for(Rect2(), Rect2(), 0.0, false)
+	# The debug phone view keeps clear of its pretend camera and home bar.
+	var app := c.get_tree().root.get_node_or_null("App")
+	if app and app.state and app.debug_phone_view():
+		return PhoneFrame.INSETS.duplicate()
 	return insets_for(
 		Rect2(Vector2(DisplayServer.window_get_position()), Vector2(DisplayServer.window_get_size())),
 		Rect2(DisplayServer.get_display_safe_area()),

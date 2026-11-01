@@ -438,6 +438,12 @@ func debug_phone_view() -> bool:
 	return OS.is_debug_build() and bool(state.settings.get("debug_phone_view", false))
 
 
+## True on phones and tablets, and in the debug phone view: a finger, not a
+## mouse, so nothing reacts to hovering and "tap" is said rather than "click".
+func touch_screen() -> bool:
+	return OS.has_feature("mobile") or debug_phone_view()
+
+
 ## Set by main.gd while a computer's window is tall and narrow, like a phone.
 var narrow_window := false
 
