@@ -100,15 +100,18 @@ func _ready() -> void:
 	_update_ambience()
 	if _arriving:
 		_intro()
+		# Built out of sight while your pet steps over to the path (see
+		# App.prepare()): you walk in once it's on show.
+		if not bool(params.get("prepared", false)):
+			begin()
 		return
 	_apply_paused(clock.is_paused())
 	_gift.set_seconds(clock.elapsed(App.now()))
 	_show_quote(false)
 
 
-## Setting off: you walk in from the left to your pet, the lead appears with
-## the project's name, and a second later you set off together and the
-## clock starts.
+## Ready to set off: your pet on the path, you just off the left edge, and
+## nothing on show yet but the scene.
 func _intro() -> void:
 	_pace = 0.0
 	_lead_alpha = 0.0
@@ -122,6 +125,15 @@ func _intro() -> void:
 	_blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_blocker)
+	_walker.position.x = -90.0 * _unit()
+
+
+## Setting off: you walk in from the left to your pet, the lead appears with
+## the project's name, and a second later you set off together and the
+## clock starts. (Main calls this when a walk built out of sight comes on.)
+func begin() -> void:
+	if not _arriving or _walking_in or not is_instance_valid(_blocker):
+		return
 	_walking_in = true
 	_walker.walking = true
 	# From just off the left edge to your place by your pet, worked out each
@@ -380,23 +392,13 @@ func _quote_key_now() -> int:
 func _show_quote(typed: bool) -> void:
 	_quote_key = _quote_key_now()
 	var text := Content.quote(_quote_key)
-	if not typed or Motion.reduced():
-		Motion.tween(_quote, "type").kill()
-		_quote.text = text
-		_quote.visible_characters = -1
-		_quote.modulate.a = 1.0
+	if typed:
+		Motion.type_out(_quote, text)
 		return
-	var t := Motion.tween(_quote, "type")
-	if _quote.modulate.a > 0.0 and _quote.visible_characters != 0 and _quote.text != "":
-		t.tween_property(_quote, "modulate:a", 0.0, Motion.time(Motion.NORMAL))
-	t.tween_callback(func():
-		_quote.text = text
-		_quote.visible_characters = 0
-		_quote.modulate.a = 1.0)
-	for i in text.length():
-		t.tween_interval(Motion.time(Motion.style.type_letter + (Motion.style.type_space if text[i] == " " else 0.0)))
-		t.tween_callback(func(): _quote.visible_characters = i + 1)
-	t.tween_callback(func(): _quote.visible_characters = -1)
+	Motion.tween(_quote, "type").kill()
+	_quote.text = text
+	_quote.visible_characters = -1
+	_quote.modulate.a = 1.0
 
 
 func _draw_lead() -> void:
@@ -530,7 +532,7 @@ func _dive(gift_id: String) -> void:
 	t.parallel().tween_method(_hop.bind(inside, out, maxi(hops, 1), height * 0.6, -1.0), 0.0, 1.0, Motion.time(maxf(0.8, seconds * 0.8)))
 	await t.finished
 	_animal.walking = false
-	_animal.scale.x = absf(_animal.scale.x)
+	# It stays facing you, back the way it came, into the end screen.
 	Motion.pop(_animal, 0.12)
 	Audio.play("gift_found", 1.0, -6.0, "chime")
 	await get_tree().create_timer(Motion.time(0.7)).timeout
@@ -564,5 +566,6 @@ func _go_finish() -> void:
 	params_out["scene"] = {
 		"biome": _scenery.biome.get("id", "lake"), "scroll": _scenery.scroll, "clock": _scenery.clock,
 		"walker": _walker.position, "animal": _animal.position, "unit": _unit(),
+		"facing": signf(_animal.scale.x),
 	}
 	App.go("finish", params_out)

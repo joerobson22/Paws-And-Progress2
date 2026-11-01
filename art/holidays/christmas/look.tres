@@ -14,3 +14,4 @@ lit_trees = 0.2
 light_colours = PackedColorArray(0.91, 0.282, 0.235, 1, 0.949, 0.773, 0.239, 1, 0.31, 0.69, 0.427, 1, 0.29, 0.561, 0.851, 1)
 home_scene = ExtResource("2")
 menu_scene = ExtResource("3")
+orb_colours = PackedColorArray(0.784, 0.122, 0.169, 1, 0.114, 0.541, 0.29, 1, 0.965, 0.957, 0.933, 1, 0.886, 0.227, 0.247, 1, 0.078, 0.416, 0.22, 1, 1, 1, 1, 1)

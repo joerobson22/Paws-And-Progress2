@@ -40,6 +40,17 @@ extends Resource
 ## How often the encouragement changes, in minutes of focus.
 @export_range(1, 120, 1, "suffix:min") var quote_every := 10
 
+@export_group("Arriving home after making an account")
+## The view tilting up from the hilltop to the sky.
+@export_range(0.0, 5.0, 0.05, "suffix:s") var account_rise := 1.6
+## Then the focus orb growing from nothing (the greeting then drops in and
+## types itself out like a walk's encouragement)...
+@export_range(0.0, 3.0, 0.05, "suffix:s") var orb_grow := 0.6
+## ...and "Tap to focus" rising this far as it fades in...
+@export_range(0.0, 60.0, 1.0, "suffix:px") var hint_rise := 14.0
+## ...before the map, the arrows and the home icon fade in.
+@export_range(0.0, 3.0, 0.05, "suffix:s") var home_ui_fade := 0.6
+
 @export_group("Focus complete")
 ## How far the gift's glow reaches (on a screen 720 tall).
 @export_range(0.0, 200.0, 1.0, "suffix:px") var glow_radius := 44.0

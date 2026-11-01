@@ -10,9 +10,6 @@ extends Resource
 ## One colour per recolourable part of the animal, in the order the animal lists its parts.
 @export var colours: Array[Color] = []
 @export var adopted_unix: int = 0
-## Where it walks, picked on the choose focus screen; "" until one is
-## picked (then it starts in the animal's home, see App.pet_place).
-@export var place: String = ""
 ## When it last finished a walk; 0 if it never has.
 @export var last_walked_unix: int = 0
 ## place id -> seconds it has walked there.
@@ -36,7 +33,6 @@ func to_dict() -> Dictionary:
 		"animal_id": animal_id,
 		"colours": cols,
 		"adopted_unix": adopted_unix,
-		"place": place,
 		"last_walked_unix": last_walked_unix,
 		"rehomed_unix": rehomed_unix,
 		"places": places,
@@ -51,7 +47,6 @@ static func from_dict(d: Dictionary) -> PetData:
 	for c in d.get("colours", []):
 		p.colours.append(Color.from_string(str(c), Color.WHITE))
 	p.adopted_unix = int(d.get("adopted_unix", 0))
-	p.place = str(d.get("place", ""))
 	p.last_walked_unix = int(d.get("last_walked_unix", 0))
 	p.rehomed_unix = int(d.get("rehomed_unix", 0))
 	var got = d.get("places", {})

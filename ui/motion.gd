@@ -126,6 +126,37 @@ static func wiggle(control: Control) -> Tween:
 	return t
 
 
+## Types `text` into `label` letter by letter, pausing a moment between
+## words (Motion.style.type_letter and type_space), after any words already
+## there fade. Less motion: it's just there. Returns the tween (null when
+## it isn't typed). With `appear` false the label's fade is left to the
+## caller (it's fading in some other way).
+static func type_out(label: Label, text: String, appear: bool = true) -> Tween:
+	if reduced() or still:
+		tween(label, "type").kill()
+		label.text = text
+		label.visible_characters = -1
+		if appear:
+			label.modulate.a = 1.0
+		return null
+	# Laid out as the whole text from the start, so centred words don't
+	# shuffle along as each letter arrives.
+	label.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
+	var t := tween(label, "type")
+	if appear and label.modulate.a > 0.0 and label.visible_characters != 0 and label.text != "":
+		t.tween_property(label, "modulate:a", 0.0, time(NORMAL))
+	t.tween_callback(func():
+		label.text = text
+		label.visible_characters = 0
+		if appear:
+			label.modulate.a = 1.0)
+	for i in text.length():
+		t.tween_interval(time(style.type_letter + (style.type_space if text[i] == " " else 0.0)))
+		t.tween_callback(func(): label.visible_characters = i + 1)
+	t.tween_callback(func(): label.visible_characters = -1)
+	return t
+
+
 ## Repeats a gentle up-and-down drift until the node leaves the tree.
 static func float_loop(item: CanvasItem, height: float = 6.0, seconds: float = 1.6) -> Tween:
 	var rest: Vector2 = item.get("position")

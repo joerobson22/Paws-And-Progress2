@@ -13,3 +13,4 @@ ground_props = Array[Texture2D]([ExtResource("2"), ExtResource("3"), ExtResource
 prop_spacing = 170.0
 prop_height = 28.0
 home_scene = ExtResource("6")
+orb_colours = PackedColorArray(0.965, 0.702, 0.788, 1, 0.804, 0.706, 0.949, 1, 0.678, 0.902, 0.8, 1, 0.969, 0.894, 0.616, 1, 0.694, 0.839, 0.957, 1)

@@ -89,6 +89,8 @@ var _bottom: Control
 var _new: Button
 ## True once a pet's been picked and the screen is fading out for the walk.
 var _leaving := false
+## The place picked (see _place_id()).
+var _place := ""
 
 
 func _ready() -> void:
@@ -170,14 +172,13 @@ func _on_new() -> void:
 
 # --- The place ---------------------------------------------------------------
 
-## Where the pet in the middle walks (the last place picked when there are
-## no pets), or lakeside if that's locked.
+## The place picked: it opens on where you last focused (App.focus_place),
+## and only changes when you pick one, or adopt a pet (to its home).
+## Swiping between pets leaves it where it is.
 func _place_id() -> String:
-	var id := str(App.state.settings.get("walk_biome", "lake"))
-	var p := _current_pet()
-	if p:
-		id = App.pet_place(p)
-	return id if App.is_unlocked("place", id) and Content.biome(id).get("id", "") == id else "lake"
+	if _place == "":
+		_place = App.focus_place()
+	return _place if App.can_walk_in(_place) else "lake"
 
 
 ## A place's name.
@@ -271,10 +272,7 @@ func _pick_place(id: String) -> void:
 		return
 	if id == _place_id():
 		return
-	App.set_setting("walk_biome", id)
-	var p := _current_pet()
-	if p:
-		App.set_pet_place(p.id, id)
+	_place = id
 	_show_place(id)
 	_refresh_places(true)
 
@@ -541,11 +539,6 @@ func _on_pet_changed(i: int) -> void:
 		(_pets.items[j].get_meta("view") as AnimalView).walking = j == i
 	var p := _pet_list[i]
 	App.state.settings["last_pet"] = p.id
-	# Each pet walks in its own place.
-	var place := _place_id()
-	if place != str(_scenery.biome.get("id", "")):
-		_show_place(place)
-	_refresh_places(true)
 	_pet_line.text = p.name
 	_under.text = Text.t("choose_focus.pet_under", {
 		"kind": Content.animal(p.animal_id).get("name", ""),
@@ -575,6 +568,11 @@ func _head_out(i: int, project: ProjectData) -> void:
 		return
 	_leaving = true
 	var p := _pet_list[i]
+	# The walk is built underneath while the pet steps over, so it's fully
+	# drawn when it takes over.
+	var walk := {"intro": true, "instant": true, "project": project.id, "pet": p.id,
+		"place": _place_id(), "scroll": _scenery.scroll, "prepared": true}
+	App.prepare("walk", walk)
 	# Nothing more can be tapped.
 	var blocker := Control.new()
 	blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -619,8 +617,7 @@ func _head_out(i: int, project: ProjectData) -> void:
 		var turn := Motion.tween(view, "turn")
 		turn.tween_property(view, "scale:x", unit, Motion.time(0.2))
 		await turn.finished
-	App.go("walk", {"intro": true, "instant": true, "project": project.id, "pet": p.id,
-		"place": _place_id(), "scroll": _scenery.scroll})
+	App.go("walk", walk)
 
 
 ## Where the walk puts you and your pet on a `view` sized screen whose path
@@ -1022,7 +1019,11 @@ func _adopt() -> void:
 	_draft.name = pet_name
 	App.add_pet(_draft)
 	Audio.play(str(Content.animal(_draft.animal_id).get("sound", "")), 1.0, -6.0)
-	Toast.show_text(Text.t("choose_focus.say_hello", {"pet": pet_name}), "paw")
+	# A new pet is met in its home (if you can walk there yet).
+	var home := str(Content.animal(_draft.animal_id).get("home", ""))
+	if App.can_walk_in(home) and home != _place_id():
+		_place = home
+		_show_place(home)
 	_show_mode(false, _draft.id)
 
 

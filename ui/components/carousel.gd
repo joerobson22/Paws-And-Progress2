@@ -20,6 +20,13 @@ var side_alpha := 0.32
 var reach := 2.4
 var index := 0
 var items: Array[Control] = []
+## Held on the item in the middle: it can't be scrolled, dragged or tapped
+## (e.g. the hat carousel on your birthday, when the party hat stays on).
+var locked := false:
+	set(v):
+		locked = v
+		mouse_filter = Control.MOUSE_FILTER_IGNORE if v else Control.MOUSE_FILTER_STOP
+		focus_mode = Control.FOCUS_NONE if v else Control.FOCUS_ALL
 
 var _pos := 0.0  # where the middle is, in items (animates between whole numbers)
 var _pressing := false
@@ -53,7 +60,7 @@ func set_items(list: Array[Control], start: int = 0) -> void:
 
 
 func go_to(i: int, animate: bool = true) -> void:
-	if items.is_empty():
+	if items.is_empty() or (locked and i != index):
 		return
 	i = clampi(i, 0, items.size() - 1)
 	var moved := i != index

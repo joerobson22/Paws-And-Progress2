@@ -54,6 +54,17 @@ func test_birthday() -> void:
 	eq(Holidays.on(_at(2028, 2, 29), _list, "2004-02-29"), "birthday")
 
 
+
+func test_birthday_beats_every_holiday() -> void:
+	eq(Holidays.on(_at(2026, 12, 25), _list, "2001-12-25"), "birthday", "your birthday beats Christmas")
+	eq(Holidays.on(_at(2027, 1, 1, 0, 2), _list, "2001-01-01"), "birthday", "and New Year")
+	eq(Holidays.on(_at(2026, 4, 5), _list, "2001-04-05"), "birthday", "and Easter")
+	# ...but Christmas is still on, for its present and its pet.
+	eq(Holidays.all_on(_at(2026, 12, 25), _list, "2001-12-25"), ["birthday", "christmas"] as Array[String])
+	eq(Holidays.all_on(_at(2026, 12, 25), _list, ""), ["christmas"] as Array[String])
+	eq(Holidays.all_on(_at(2026, 6, 1), _list, ""), [] as Array[String])
+
+
 ## A span can run over New Year, in either direction.
 func test_spans_over_new_year() -> void:
 	var list := [{"id": "winter", "from": "12-30", "to": "01-02"}]

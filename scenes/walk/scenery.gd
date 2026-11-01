@@ -141,6 +141,10 @@ func _ready() -> void:
 	Outdoors.changed.connect(_update_light)
 	_update_light()
 	_update_shade()
+	# Drawn from its very first frame, not one later: a place that pops in
+	# blank (only the sky) for a frame reads as a flash.
+	if size.x > 0.0:
+		_place_chunks()
 
 
 func _notification(what: int) -> void:

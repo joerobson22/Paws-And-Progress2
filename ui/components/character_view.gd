@@ -53,6 +53,13 @@ var part := "":
 		_dress()
 ## Reaching forward for the lead on a walk; arms down for portraits.
 var holding_lead := true
+## Wears a holiday's hat (the party hat on your birthday) over the look's
+## own: always for you (no look of its own), and for a look of yours being
+## changed (the customise preview).
+var holiday_hat := false:
+	set(v):
+		holiday_hat = v
+		_dress()
 ## Hand position in local space, so the walk screen can draw the lead.
 var hand := Vector2(22, -78)
 ## 0 normally, up to 1 when they're dejected: shoulders down, head hung,
@@ -273,7 +280,7 @@ func _item(slot: String) -> Dictionary:
 	var cosmetics: Dictionary = _look().get("cosmetics", {})
 	var id := str(cosmetics.get(slot, ""))
 	# Your own hat on a holiday that picks it (the party hat on your birthday).
-	if slot == "hat" and look.is_empty() and App.holiday_hat() != "":
+	if slot == "hat" and (look.is_empty() or holiday_hat) and App.holiday_hat() != "":
 		id = App.holiday_hat()
 	var item := Content.cosmetic(id) if id != "" else {}
 	return item if not item.is_empty() else Content.default_cosmetic(slot)

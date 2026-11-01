@@ -40,6 +40,9 @@ extends Resource
 ## Pictures that replace layers of the hilltop view, by layer name (dead
 ## forests for Halloween).
 @export var backdrop_swaps: Dictionary = {}
+## The focus orb's colours: its blobs drift through these in turn instead
+## of its usual greens and blues (none keeps those).
+@export var orb_colours := PackedColorArray()
 
 @export_group("You")
 ## A hat you wear all day whatever you've picked (a gift id); "" for none.

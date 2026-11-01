@@ -263,7 +263,9 @@ descriptions and rarities are in `data/gifts.json`.
   go).
 
 The create account screen looks down at the hilltop; making an account
-tilts the view up to the forest and sky.
+tilts the view up to the forest and sky. Then the focus orb grows in, the
+greeting types itself out, "Tap to focus" rises in, and last the map and
+arrows fade in (timings under "Arriving home" in `ui/motion.tres`).
 
 ---
 
@@ -287,7 +289,8 @@ it and change it in the Inspector:
 | **Home Scene** | Decorations on the home view. Open it: a group named after each layer (`Hilltop`, `ForestNear`...) holds sprites laid out on that layer's picture (1600 × 1000), so they move with it. Drag the pumpkins or eggs about, or add your own. |
 | **Menu Scene** | Decorations hung over the screens (under popups and walks): the Christmas lights and the birthday bunting along the top. |
 | **Backdrop Swaps** | Pictures that replace home view layers while it's on, by layer name (Halloween's dead forests in `art/holidays/halloween/home/`). |
-| **Hat** | A hat you wear all day whatever you picked (a gift id: `party_hat` on your birthday). |
+| **Orb Colours** | The focus orb's colours while it's on: its circles drift through these in turn (a rainbow on your birthday, reds and oranges at Halloween). Empty keeps its usual greens and blues. |
+| **Hat** | A hat you wear all day whatever you picked (a gift id: `party_hat` on your birthday). The hats in the customise popup are held on it. |
 
 The lights and bunting are **Festoon** nodes: set **Kind** (lights or
 bunting), **Swag Width**, **Spacing**, **Bulb** (a bulb's size, or a
@@ -311,8 +314,9 @@ presents are in `data/gifts.json` (tables `skeleton_dog`, `reindeer`,
 `01-01 00:05`). Easter moves each year, so it's days either side of Easter
 Sunday (`[-2, 1]` is Good Friday to Easter Monday). Your birthday comes
 from the date of birth you give when you create your account. If two land
-on the same day, the first in the file wins (your birthday beats
-Halloween).
+on the same day, the first in the file is how the app looks (your
+birthday is first, so it beats every holiday), but each one still gives
+its present and counts towards its pet.
 
 ---
 
@@ -374,6 +378,10 @@ Inspector:
 | | **Drop** | How far the project's name and the time drop as they fade in. |
 | | **Type Letter**, **Type Space** | How fast the encouragement types itself out, and the pause between words. |
 | | **Quote Every** | How often the encouragement changes, in minutes of focus. |
+| Arriving home | **Account Rise** | The view tilting up from the hilltop after making an account. |
+| | **Orb Grow** | Then the focus orb growing in from nothing. |
+| | **Hint Rise** | How far "Tap to focus" rises as it fades in. |
+| | **Home Ui Fade** | Last, the map, the arrows and the home icon fading in. |
 | Focus complete | **Glow Radius** | How far the gift's glow reaches. |
 | | **Dim** | How much the scenery darkens round your pet. |
 | | **Turn** | Your pet turning round to show you the gift. |
