@@ -151,7 +151,15 @@ func _achievements() -> Control:
 # --- Settings ----------------------------------------------------------------
 
 func open_settings() -> void:
-	var m := Modal.open(480)
+	_fill_settings(Modal.open(480))
+
+
+## The settings in `m`, built again in the new colours when colour vision
+## changes.
+func _fill_settings(m: Modal) -> void:
+	for part in [m.header, m.body]:
+		for child in part.get_children():
+			child.queue_free()
 	# The title stays put while the settings scroll.
 	m.header.add_child(m.heading_row(Text.t("settings.title")))
 	var s := UI.vbox(10)
@@ -161,22 +169,27 @@ func open_settings() -> void:
 	s.add_child(UI.divider())
 	s.add_child(_toggle(Text.t("settings.ambience"), Text.t("settings.ambience_note"), "ambience"))
 	s.add_child(UI.divider())
-	s.add_child(_toggle(Text.t("settings.reduce_motion"), Text.t("settings.reduce_motion_note"), "reduce_motion"))
-	s.add_child(UI.divider())
 	s.add_child(_toggle(Text.t("settings.keep_screen_on"), Text.t("settings.keep_screen_on_note"), "keep_screen_on"))
 	s.add_child(UI.divider())
 	s.add_child(_location_toggle())
 	for row in Display.settings_rows(get_window()):
 		s.add_child(UI.divider())
 		s.add_child(row)
-	# Last, in red. The account stays on this device to log back into.
 	s.add_child(UI.divider())
-	var out := UI.button(Text.t("accounts.log_out"), func():
-		Modal.close_all()
-		App.log_out(), "danger")
-	out.accessibility_name = Text.t("accounts.log_out")
-	s.add_child(out)
-	var about := UI.para(Text.t("settings.about", {"version": ProjectSettings.get_setting("application/config/version", "")}), 13, UI.INK_FAINT)
+	s.add_child(UI.caption(Text.t("settings.accessibility")))
+	s.add_child(_vision_row(m))
+	s.add_child(UI.divider())
+	s.add_child(_toggle(Text.t("settings.reduce_motion"), Text.t("settings.reduce_motion_note"), "reduce_motion"))
+	s.add_child(UI.divider())
+	var links := HFlowContainer.new()
+	links.alignment = FlowContainer.ALIGNMENT_CENTER
+	links.add_theme_constant_override("h_separation", 14)
+	links.add_child(UI.text_link(Text.t("legal.privacy"), Legal.open.bind(Legal.PRIVACY), 14))
+	links.add_child(UI.text_link(Text.t("legal.terms"), Legal.open.bind(Legal.TERMS), 14))
+	links.add_child(UI.text_link(Text.t("legal.licences"), Legal.open_licences, 14))
+	s.add_child(links)
+	var about := UI.para(Text.t("settings.about", {"app": ProjectSettings.get_setting("application/config/name", ""),
+		"version": ProjectSettings.get_setting("application/config/version", "")}), 13, UI.INK_SOFT)
 	about.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	s.add_child(about)
 	# Clear of the scrollbar, so the switches never touch it.
@@ -186,10 +199,11 @@ func open_settings() -> void:
 	UI.clear_of_bar(m.scroller(), room)
 
 
-## Whose account this is: their face, name and where they study. Log out
-## is at the bottom.
+## Whose account this is: their face, name and where they study, with Data
+## (what's kept about you) and Log out on the right. The account stays on
+## this device to log back into.
 func _account_row() -> Control:
-	var row := UI.hbox(14)
+	var row := UI.hbox(12)
 	var face := UI.character_portrait({}, Vector2(44, 44), true)
 	face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(face)
@@ -202,6 +216,44 @@ func _account_row() -> Control:
 	if school != "":
 		text.add_child(UI.trimmed(school, 13, UI.INK_SOFT, false, 600))
 	row.add_child(text)
+	var data := _small_button(Text.t("settings.data"), Legal.open_data, "quiet")
+	data.accessibility_name = Text.t("settings.data_name")
+	row.add_child(data)
+	row.add_child(_small_button(Text.t("accounts.log_out"), func():
+		Modal.close_all()
+		App.log_out(), "danger"))
+	return row
+
+
+func _small_button(text: String, on_press: Callable, kind: String) -> Button:
+	var b := UI.button(text, on_press, kind)
+	b.custom_minimum_size.y = 38
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	b.add_theme_font_size_override("font_size", 14)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+		var sb := (b.get_theme_stylebox(state) as StyleBoxFlat).duplicate() as StyleBoxFlat
+		sb.content_margin_left = 14
+		sb.content_margin_right = 14
+		b.add_theme_stylebox_override(state, sb)
+	return b
+
+
+## Colour vision (UI.VISIONS): the app recolours as soon as one's picked.
+func _vision_row(m: Modal) -> Control:
+	var row := UI.hbox(16)
+	var text := UI.vbox(2)
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.add_child(UI.label(Text.t("settings.vision"), 16, UI.INK, false, 800))
+	text.add_child(UI.para(Text.t("settings.vision_note"), 13))
+	row.add_child(text)
+	var options := UI.VISIONS.map(func(id): return [id, Text.t("settings.visions." + id)])
+	var pick := Dropdown.new(options, str(App.state.settings.get("vision", "off")), false, "", false)
+	pick.accessibility_name = Text.t("settings.vision")
+	pick.chosen.connect(func(id: String, _reversed: bool):
+		if id != UI.vision:
+			App.set_setting("vision", id)
+			_fill_settings(m))
+	row.add_child(pick)
 	return row
 
 

@@ -174,7 +174,7 @@ func has_accounts() -> bool:
 ## The create account screen's Create: fills in this slot if it has no name
 ## yet (a first launch keeps anything done so far), or else makes a new,
 ## empty slot with your settings from this one and moves into it.
-func create_account(username: String, institution: String) -> void:
+func create_account(username: String, institution: String, dob: String = "") -> void:
 	var index := SaveSlots.read_index()
 	if str(state.profile.get("username", "")).strip_edges() != "":
 		var id := SaveSlots.new_id(now(), rng, index["slots"])
@@ -188,6 +188,9 @@ func create_account(username: String, institution: String) -> void:
 		(index["slots"] as Array).append(slot)
 	state.profile["username"] = username.strip_edges()
 	state.profile["institution"] = institution.strip_edges()
+	state.profile["dob"] = dob
+	# When the privacy policy and terms were agreed to.
+	state.profile["agreed_unix"] = now()
 	_set_signed_out(false, index)
 	_changed()
 
@@ -198,6 +201,16 @@ func log_out() -> void:
 	save()
 	_set_signed_out(true, SaveSlots.read_index())
 	state_changed.emit()
+
+
+## Settings, Data, Delete: this account and everything in it goes for good,
+## and the create account screen comes up.
+func delete_account() -> void:
+	log_out()
+	delete_slot(slot)
+	# Where you are isn't kept for the next account either.
+	state.settings.erase("location_cache")
+	state.settings.erase("weather_cache")
 
 
 ## "I have an account": carries on in slot `id`, as it was left.
@@ -223,7 +236,7 @@ func delete_slot(id: String) -> void:
 		if not signed_out:
 			return
 		var rest: Array = (index["slots"] as Array).filter(func(x): return x != id)
-		var blank := SaveSlots.FIRST if not rest.has(SaveSlots.FIRST) else SaveSlots.new_id(now(), rng, index["slots"])
+		var blank := SaveSlots.FIRST if id != SaveSlots.FIRST and not rest.has(SaveSlots.FIRST) else SaveSlots.new_id(now(), rng, index["slots"])
 		# Out of the slot first, so it can go; the blank one joins the list
 		# when it's given a name.
 		index["current"] = blank

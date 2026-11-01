@@ -57,10 +57,11 @@ static func from_dict(d: Dictionary) -> GameState:
 	var cosmetics: Dictionary = GameState.default_profile()["cosmetics"]
 	cosmetics.merge(state.profile.get("cosmetics", {}), true)
 	state.profile["cosmetics"] = cosmetics
-	for k in ["created_unix", "skin_tone", "hair_tone", "walks_since_epic", "walks"]:
+	for k in ["created_unix", "skin_tone", "hair_tone", "walks_since_epic", "walks", "agreed_unix"]:
 		state.profile[k] = int(state.profile[k])
 	state.profile["username"] = str(state.profile["username"])
 	state.profile["institution"] = str(state.profile["institution"])
+	state.profile["dob"] = str(state.profile["dob"])
 	state.profile["shelf"] = state.shelf()
 	# Older saves marked a half-made account; the create account screen does that now.
 	state.profile.erase("setup_pending")

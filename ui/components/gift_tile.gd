@@ -77,7 +77,8 @@ func _init(id: String, count: int = -1, glowing: bool = false, side: float = 78.
 		return
 	# The count sits over the picture's corner. A PanelContainer stretches its
 	# children, so the tag lives in its own holder.
-	var colour := Content.rarity_colour(g.get("rarity", "common"))
+	# The darker text shade, so the white count reads on it.
+	var colour := Content.rarity_text_colour(g.get("rarity", "common"))
 	var corner := Control.new()
 	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(corner)

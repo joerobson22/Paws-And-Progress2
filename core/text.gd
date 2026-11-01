@@ -25,12 +25,12 @@ static func t(key: String, values: Dictionary = {}) -> String:
 
 
 ## The singular or plural line at `key` for `n` (also filled in as {n}).
-static func count(key: String, n: int) -> String:
+static func count(key: String, n: int, values: Dictionary = {}) -> String:
 	var found = lookup(key)
 	if not found is Dictionary:
-		return t(key, {"n": n})
+		return t(key, values.merged({"n": n}))
 	var line = found.get("one" if n == 1 else "other", found.get("other", key))
-	return fill(str(line), {"n": n})
+	return fill(str(line), values.merged({"n": n}))
 
 
 ## The list at `key` (month names, greetings), or [] if there isn't one.

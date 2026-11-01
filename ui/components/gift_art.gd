@@ -38,6 +38,7 @@ func _init(id: String = "", glow_amount: float = 0.0) -> void:
 	gift_id = id
 	glow = glow_amount
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	accessibility_name = str(Content.gift(id).get("name", "")) if id != "" else ""
 
 
 func colour() -> Color:

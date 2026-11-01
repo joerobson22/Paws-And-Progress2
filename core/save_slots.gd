@@ -63,7 +63,7 @@ static func remove(index: Dictionary, id: String, index_path: String = INDEX_PAT
 		return false
 	(index["slots"] as Array).erase(id)
 	var path := file(id, index_path)
-	for p in [path, path + ".bak", path + ".tmp"]:
+	for p in [path, path + ".bak", path + ".tmp", path + ".old", path + ".bak.old"]:
 		if FileAccess.file_exists(p):
 			DirAccess.remove_absolute(p)
 	return true

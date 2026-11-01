@@ -289,6 +289,8 @@ func _select(start: int, animate: bool = true) -> void:
 		now_index = int(Stats.day_date(today)["month"]) - 1 if period == "year" else today - start
 	_chart.split = split
 	_chart.set_bars(buckets, _labels(buckets.size()), now_index, animate)
+	# The chart's words for a screen reader; the chips under it say who.
+	_chart.accessibility_name = Text.t("alt.chart", {"period": _chart_title.text, "time": _chart_total.text})
 
 	for child in _legend.get_children():
 		child.queue_free()

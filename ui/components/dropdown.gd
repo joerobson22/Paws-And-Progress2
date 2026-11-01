@@ -120,6 +120,8 @@ func _open() -> void:
 	_menu.add_child(card)
 	var list := UI.vbox(2)
 	card.add_child(list)
+	# Opened from the keyboard, the keyboard moves into the menu.
+	var keys := has_focus(true)
 	for o in _options:
 		var on: bool = o[0] == current
 		var b := UI.button(o[1], Callable(), "quiet" if on else "ghost")
@@ -144,6 +146,8 @@ func _open() -> void:
 				arrow.pivot_offset = arrow.size * 0.5)
 		b.pressed.connect(_choose.bind(o[0], arrow))
 		list.add_child(b)
+		if on and keys:
+			b.grab_focus.call_deferred()
 	card.size = card.get_combined_minimum_size()
 	var at := get_global_rect()
 	# Under the pill, or above it when asked or there's no room underneath.
@@ -191,9 +195,19 @@ func _apply() -> void:
 	chosen.emit(current, reversed)
 
 
+## Esc closes the menu (not the popup it's in) and goes back to the pill.
+func _unhandled_input(e: InputEvent) -> void:
+	if is_instance_valid(_menu) and e.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_close()
+
+
 func _close() -> void:
 	if is_instance_valid(_menu):
 		var m := _menu
+		var keys := m.get_viewport().gui_get_focus_owner()
+		if keys and m.is_ancestor_of(keys):
+			grab_focus(not keys.has_focus(true))
 		_menu = null
 		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		UI.ignore_mouse(m)
