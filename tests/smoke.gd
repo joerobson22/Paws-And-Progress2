@@ -1981,8 +1981,9 @@ func _shelf_editor(editor: Node) -> void:
 	await _tap_menu(sort, "A–Z")
 	await _wait(6)
 	check(sort._flipping and is_instance_valid(sort._menu) and not app.state.settings.get("gift_sort_reversed"), "the arrow flips before anything changes")
-	await _shot("gift_sort_flip")
+	# Tapped mid-flip, before the (slow) screenshot lets the flip finish.
 	await _tap_menu(sort, "Rarity")
+	await _shot("gift_sort_flip")
 	# Animations run on real time, which a slow display stretches out.
 	for i in 60:
 		if not sort._flipping and not is_instance_valid(sort._menu):
