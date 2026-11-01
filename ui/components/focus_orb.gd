@@ -17,7 +17,7 @@ const HOVER_TIME := 0.35
 ## How much darker it gets under the pointer.
 const HOVER_SHADE := 0.14
 ## How much more solid the blobs are drawn than their listed opacity, so the
-## orb reads clearly on the paper behind it.
+## orb reads clearly over the view.
 const DEPTH := 1.5
 ## In the light colours: how much more saturated and how much darker.
 const LIGHT_SATURATE := 1.9
@@ -87,7 +87,7 @@ func _draw() -> void:
 		var p: Vector2 = c + Vector2(cos(angle), sin(angle)) * base * b[3] * breathe
 		var colour := Color.from_string(b[0], Color.WHITE).lerp(Color.from_string(BLUES[k], Color.WHITE), tint)
 		if not UI.dark:
-			# Richer on light paper, so it doesn't wash out at midday.
+			# Richer by day, so it doesn't wash out against a bright sky.
 			colour = Color.from_hsv(colour.h, minf(1.0, colour.s * LIGHT_SATURATE), colour.v * (1.0 - LIGHT_DEPTH))
 		colour = colour.darkened(HOVER_SHADE * _shade)
 		draw_circle(p, base * b[2] * breathe * wobble, Color(colour, minf(1.0, b[1] * DEPTH)), true, -1.0, true)

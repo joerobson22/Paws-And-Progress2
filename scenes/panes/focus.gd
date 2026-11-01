@@ -1,8 +1,6 @@
 extends Pane
-## The middle of the app: a greeting, and under it the focus orb on a
-## see-through paper panel (so it stands out from the view even on a bright
-## midday),
-## with "Tap to focus" under it. Tap the orb (a soft bong) and it swells to
+## The middle of the app: a greeting, and under it the focus orb with
+## "Tap to focus" under it. Tap the orb (a soft bong) and it swells to
 ## fill the screen as the choose focus screen grows out of it. A home icon
 ## in the top left marks it, as each screen's icon does. Behind it all is
 ## the hilltop view (HomeBackdrop, drawn by the app shell). Debug builds
@@ -13,16 +11,10 @@ const GREETING_BOX := 160.0
 const GREETING_SIZE := 24
 ## The gap between the greeting's last line and the orb.
 const GREETING_GAP := 48.0
-## How opaque the paper behind the orb is, and its margin round the orb
-## and hint.
-const BACKING_ALPHA := 0.6
-const BACKING_PAD := 18.0
 
 var _orb: FocusOrb
 var _greeting: Label
 var _hint: Label
-## The see-through paper behind the orb and the hint.
-var _backing: Panel
 var _home: Control
 var _debug: DebugBar
 var _sky_debug: Control
@@ -34,11 +26,6 @@ var _line_walks := -1
 
 func build() -> void:
 	_pick_line()
-	_backing = Panel.new()
-	var paper := UI.box(Color(UI.SURFACE, BACKING_ALPHA), Color.TRANSPARENT, 40)
-	_backing.add_theme_stylebox_override("panel", paper)
-	_backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_backing)
 	_greeting = UI.label(_line, GREETING_SIZE, UI.INK, true, 600)
 	_greeting.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_greeting.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
@@ -89,9 +76,7 @@ func _place() -> void:
 	_orb.size = Vector2(d, d)
 	_orb.position = (size - _orb.size) * 0.5 + Vector2(0, size.y * 0.02)
 	_hint.size = Vector2(d, _hint.get_combined_minimum_size().y)
-	_hint.position = Vector2(_orb.position.x, _orb.position.y + d + 14)
-	_backing.position = _orb.position - Vector2(BACKING_PAD, BACKING_PAD)
-	_backing.size = Vector2(d + BACKING_PAD * 2.0, _hint.position.y + _hint.size.y + BACKING_PAD - _backing.position.y)
+	_hint.position = Vector2(_orb.position.x, _orb.position.y + d + 20)
 	# The home icon sits where the other screens' title icons do.
 	var insets := UI.safe_insets(self)
 	_home.size = _home.custom_minimum_size
