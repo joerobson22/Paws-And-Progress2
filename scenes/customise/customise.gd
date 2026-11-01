@@ -128,6 +128,8 @@ static func _section_height(section: Dictionary) -> float:
 	var h := 0.0
 	for part in section["rows"]:
 		h += (SWATCH + 30.0) if str(part) in ["skin_tone", "hair_tone"] else (OPTION.y + 52.0)
+		if str(part) == "hat" and App.holiday_hat() != "":
+			h += 20.0
 	return h + 14.0 * maxf(0.0, section["rows"].size() - 1)
 
 
@@ -191,6 +193,12 @@ static func _slot_row(slot: String, draft: Dictionary, view: CharacterView) -> C
 		draft["cosmetics"][slot] = options[i]["id"]
 		called.text = str(options[i].get("name", ""))
 		view.refresh())
+	# A holiday hat (your party hat on your birthday) is worn whatever's
+	# picked here; the pick still saves for tomorrow.
+	if slot == "hat" and App.holiday_hat() != "":
+		var note := UI.label(Text.t("holiday.hat_locked", {"hat": str(Content.cosmetic(App.holiday_hat()).get("name", "")).to_lower()}), 13, UI.INK_SOFT, false, 700)
+		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(note)
 	return v
 
 

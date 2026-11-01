@@ -26,6 +26,8 @@ var skin_tones: Array[Color] = []
 var hair_tones: Array[Color] = []
 ## The customise popup's tabs: [{id, name, rows: [slot or "skin_tone"/"hair_tone"]}].
 var cosmetic_sections: Array = []
+## Days the app dresses up (data/holidays.json; see Holidays).
+var holidays: Array = []
 
 var _animals_by_id: Dictionary = {}
 var _gifts_by_id: Dictionary = {}
@@ -56,6 +58,7 @@ func _init() -> void:
 	cosmetic_slots = c.get("slots", [])
 	cosmetic_items = c.get("items", [])
 	cosmetic_sections = c.get("sections", [])
+	holidays = _load("res://data/holidays.json").get("holidays", [])
 	for hex in c.get("skin_tones", []):
 		skin_tones.append(Color.from_string(hex, Color.WHITE))
 	for hex in c.get("hair_tones", []):
@@ -170,6 +173,14 @@ func _read_place_scenes() -> void:
 			continue
 		b["layers"] = place.layers()
 		place.free()
+
+
+## A holiday by id (data/holidays.json), or {} for none.
+func holiday(id: String) -> Dictionary:
+	for h in holidays:
+		if h["id"] == id:
+			return h
+	return {}
 
 
 func biome(id: String) -> Dictionary:

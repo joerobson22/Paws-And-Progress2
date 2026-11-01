@@ -11,6 +11,10 @@ extends Control
 ## down. A full-screen flow (choosing a focus, a walk) covers it, so it stops
 ## drawing until that closes. A wash of the app's background colour mutes it
 ## so the screen reads on top.
+## A holiday dresses it up (its HolidayLook): pictures swapped for others
+## (dead forests at Halloween), snow on everything, decorations laid on its
+## layers (its home_scene: pumpkins, eggs, lights in the trees), snow
+## falling or fireworks in the sky.
 
 ## How bright the layers are at night (each layer can set its own).
 @export_range(0.0, 1.0) var night_brightness := 0.45
@@ -48,6 +52,16 @@ var _wash: ColorRect
 ## Under each layer, ground in its colour, for when panning lifts it.
 var _skirts: Array[ColorRect] = []
 var _age := 0.0
+## Each layer's own picture, for when a holiday's swap ends.
+var _pictures: Array[Texture2D] = []
+## The holiday dressed for ("" for none), and what it added: the
+## decorations on each layer (by layer), the fireworks and the snow.
+var _dressed := ""
+var _decor := {}
+var _fireworks: Fireworks
+var _snowfall: Snowfall
+var _snow: ShaderMaterial
+const SNOW_SHADER := "res://art/holidays/snow_cap.gdshader"
 
 
 func _ready() -> void:
@@ -57,6 +71,9 @@ func _ready() -> void:
 		if c is BackdropLayer:
 			_layers.append(c)
 			_colours.append(c.modulate)
+			_pictures.append(c.texture)
+			# Coloured through self_modulate, so things laid on it keep theirs.
+			c.modulate = Color.WHITE
 			var skirt := ColorRect.new()
 			skirt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			c.add_child(skirt)
@@ -66,6 +83,14 @@ func _ready() -> void:
 		n.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		n.stretch_mode = TextureRect.STRETCH_SCALE
 		n.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_fireworks = Fireworks.new()
+	_fireworks.visible = false
+	add_child(_fireworks)
+	move_child(_fireworks, $Layers.get_index())
+	_snowfall = Snowfall.new()
+	_snowfall.visible = false
+	_snowfall.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_snowfall)
 	_wash = ColorRect.new()
 	_wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_wash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -93,13 +118,56 @@ func refresh() -> void:
 		return
 	var night := night_override if night_override >= 0.0 else App.night()
 	$NightSky.modulate.a = night
+	_dress(App.holiday())
 	for i in _layers.size():
 		var dim := _layers[i].night_brightness if _layers[i].night_brightness >= 0.0 else night_brightness
 		var b := lerpf(1.0, dim, night)
 		var c := _colours[i]
-		_layers[i].modulate = Color(c.r * b, c.g * b, c.b * b, c.a)
+		_layers[i].self_modulate = Color(c.r * b, c.g * b, c.b * b, c.a)
+		_skirts[i].color = _layers[i].self_modulate
+		if _decor.has(_layers[i]):
+			(_decor[_layers[i]] as Node2D).modulate = Color(b, b, b).lerp(Color.WHITE, 0.35)
+	if _snow:
+		_snow.set_shader_parameter("light", lerpf(1.0, 0.55, night))
 	_wash.color = Color(UI.BG, wash)
 	_layout()
+
+
+## Dresses the view for holiday `id` ("" for none), if it isn't already.
+func _dress(id: String) -> void:
+	if id == _dressed:
+		return
+	_dressed = id
+	var look := Holidays.look(id)
+	for holder in _decor.values():
+		(holder as Node).queue_free()
+	_decor.clear()
+	_snow = null
+	if look and look.snow and ResourceLoader.exists(SNOW_SHADER):
+		_snow = ShaderMaterial.new()
+		_snow.shader = load(SNOW_SHADER)
+	for i in _layers.size():
+		var l := _layers[i]
+		var swap = look.backdrop_swaps.get(str(l.name)) if look else null
+		l.texture = swap if swap is Texture2D else _pictures[i]
+		l.material = _snow
+		_skirts[i].material = _snow
+	_fireworks.visible = look != null and look.fireworks
+	if look and not look.firework_colours.is_empty():
+		_fireworks.colours = look.firework_colours
+	_snowfall.visible = look != null and look.snow
+	if look == null or look.home_scene == null:
+		return
+	# The scene's groups go onto the layers they're named after.
+	var scene := look.home_scene.instantiate()
+	for group in scene.get_children():
+		var l := $Layers.get_node_or_null(NodePath(group.name)) as BackdropLayer
+		if l == null:
+			continue
+		group.owner = null
+		group.reparent(l, false)
+		_decor[l] = group
+	scene.free()
 
 
 func _layout() -> void:
@@ -113,12 +181,18 @@ func _layout() -> void:
 	_cover($NightSky, view, sky_lift)
 	_place_light($Sun, float(look["sun"]), view, sky_lift)
 	_place_light($Moon, float(look["moon"]), view, sky_lift)
+	if _fireworks.visible:
+		_fireworks.position = sky_lift
+		_fireworks.size = Vector2(view.x, view.y * horizon)
 	var travel := _travel()
 	for i in _layers.size():
 		var l := _layers[i]
 		var sway := sin(_age * 0.12 + l.get_index() * 1.7) * l.drift
 		var lift := look_down * view.y * (LOOK_BASE + l.parallax * 2.0)
 		_cover(l, view, pan * l.parallax * travel + Vector2(sway, -lift))
+		# Decorations are laid out in the picture's own pixels.
+		if _decor.has(l) and l.texture:
+			(_decor[l] as Node2D).scale = l.size / l.texture.get_size()
 		# Ground in the layer's colour below its bottom edge, down to the
 		# screen's, for when looking down lifts it.
 		var gap := view.y - (l.position.y + l.size.y)

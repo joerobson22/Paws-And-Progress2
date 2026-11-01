@@ -8,7 +8,7 @@ func test_the_cast() -> void:
 		check(ids.has(id), "%s is in the core cast" % id)
 	for id in ["elephant", "lion", "gorilla", "hyrax", "lizard", "spider", "snake", "eagle", "parakeet", "fox", "leopard", "tiger", "monkey", "giraffe", "red_panda", "rhino", "frog"]:
 		check(ids.has(id), "%s is unlockable" % id)
-	eq(ids.size(), 29)
+	eq(ids.size(), 33)
 	for a in animals:
 		eq(a["parts"].size(), a["default_colours"].size(), "%s colours per part" % a["id"])
 

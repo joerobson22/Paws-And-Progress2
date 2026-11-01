@@ -368,6 +368,7 @@
 	},
 	"unlock": {
 		"start": "Yours from the start",
+		"holiday": "Focus for {minutes} minutes {when}",
 		"level": "Reach level {level}",
 		"hours": "Focus for {hours} hours",
 		"hours_in": "Focus for {hours} hours {where}",
@@ -532,7 +533,20 @@
 		"add_minutes": "+{minutes}",
 		"time": "Time",
 		"time_now": "Now",
-		"time_note": "Try the sky at another time of day (debug builds only)"
+		"time_note": "Try the sky at another time of day (debug builds only)",
+		"holiday": "Theme",
+		"holiday_note": "Try out a holiday's look (debug builds only)",
+		"holiday_real": "Today's date",
+		"holiday_none": "No holiday"
+	},
+	"holiday": {
+		"present": {
+			"halloween": "Happy Halloween! Here's a present.",
+			"christmas": "Merry Christmas! Here's a present.",
+			"easter": "Happy Easter! Here's a present.",
+			"birthday": "Happy birthday! Here's a present."
+		},
+		"hat_locked": "Your {hat} stays on all day"
 	},
 	"create": {
 		"title": "Create account",

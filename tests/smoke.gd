@@ -7,9 +7,11 @@ extends SceneTree
 ##   godot --headless --path . -s tests/smoke.gd
 ## Optional: --shots=<dir> saves a screenshot per step (needs a display);
 ## --quick skips drawing every place and weather, for a fast look at the UI.
+## --holidays only tries each holiday's look (and takes its pictures).
 
 var _shots_dir := ""
 var _quick := false
+var _holidays_only := false
 var _failed := false
 
 
@@ -19,6 +21,8 @@ func _initialize() -> void:
 			_shots_dir = arg.trim_prefix("--shots=")
 		elif arg == "--quick":
 			_quick = true
+		elif arg == "--holidays":
+			_holidays_only = true
 	change_scene_to_file("res://scenes/main.tscn")
 	_run.call_deferred()
 
@@ -55,10 +59,17 @@ func _run() -> void:
 	# The colours follow the time of day; light, so the run looks the same
 	# whenever it runs. Dark mode is tried further down.
 	app.set_setting("debug_theme", "light")
+	# An ordinary day, whatever today's date (holidays are tried at the end).
+	app.set_setting("debug_holiday", "none")
 
 	# Long enough for the first frames to settle on a slow machine (CI), so
 	# the map is laid out before the pointer moves over it.
 	await _wait(70)
+	if _holidays_only:
+		await _holidays(main)
+		print("SMOKE OK" if not _failed else "SMOKE FAILED")
+		quit(1 if _failed else 0)
+		return
 	await _shot("focus")
 
 	# The map sits in the bottom left corner. With a mouse it grows up and to
@@ -1319,7 +1330,7 @@ func _run() -> void:
 		app.set_setting("debug_hour", 23.0)
 		await _wait(5)
 		check(backdrop.get_node("Moon").visible and not backdrop.get_node("Sun").visible and backdrop.get_node("NightSky").modulate.a > 0.99, "at night: the moon and stars")
-		var dimmed: Color = backdrop._layers[4].modulate
+		var dimmed: Color = backdrop._layers[4].self_modulate
 		check(dimmed.v < backdrop._colours[4].v * 0.6, "and the layers dim")
 		await _shot("backdrop_night_light_theme")
 		var near_spot: Vector2 = backdrop._layers[4].position
@@ -1390,12 +1401,103 @@ func _run() -> void:
 		var title: Control = _find(pane, func(n): return n is TextureRect and n.get_parent() is CenterContainer and n.get_parent().get_parent() is HBoxContainer)
 		check(pane.name == "Focus" or title != null, "%s has its map icon by its title" % pane.name)
 		check(_find(pane, func(n): return n is PanelContainer and n.get_parent() is HBoxContainer and n.get_child_count() == 1 and n.get_child(0) is TextureRect and n.size.x == 44.0) == null, "%s's icon has no tile behind it" % pane.name)
+	await _holidays(main)
 	if _failed:
 		quit(1)
 		return
 	print("SMOKE OK")
 	quit(0)
 
+
+## Each holiday's look, tried from the debug bar: its present the first time
+## (once a year), its decorations over the screens and on the hilltop, and a
+## walk in it.
+func _holidays(main: Node) -> void:
+	var app := _app()
+	var backdrop: Control = main._backdrop
+	app.state.profile["dob"] = "2001-06-14"
+	app.state.profile.erase("holiday_gifts")
+	app.set_setting("debug_hour", 12.0)
+	for id in ["halloween", "christmas", "new_year", "easter", "birthday"]:
+		var had: int = app.state.gift_count(str(_content().holiday(id).get("gift", "")))
+		app.set_setting("debug_holiday", id)
+		await _wait(30)
+		check(app.holiday() == id, "previewing %s" % id)
+		check(backdrop._dressed == id, "the hilltop dresses for %s" % id)
+		var h: Dictionary = _content().holiday(id)
+		var look = app.holiday_look()
+		if h.has("gift"):
+			check(app.state.gift_count(h["gift"]) == had + 1, "%s brings its present" % id)
+			check(_class("res://ui/modal.gd").is_open(), "and shows it")
+			await _shot("holiday_%s_present" % id)
+			_close_modal()
+			await _wait(30)
+			check(app.claim_holiday_gift() == "", "only once a year")
+		check((main._decor_layer.get_child_count() > 0) == (look.menu_scene != null), "%s's decorations hang over the screens" % id)
+		await _shot("holiday_%s_home" % id)
+		match id:
+			"halloween":
+				check(is_equal_approx(app.day_hour(), 0.0) and app.night() > 0.99, "it's always midnight on Halloween")
+				check(backdrop._layers[3].texture != backdrop._pictures[3], "the forest's trees are dead")
+			"christmas":
+				check(_class("res://ui/ui.gd").dark == false and root.get_node("Outdoors").weather() == "snowy", "it always snows at Christmas")
+				check(backdrop._snowfall.visible and backdrop._layers[0].material != null, "snow on the hilltop view")
+			"new_year":
+				check(backdrop._fireworks.visible, "fireworks behind the hilltop")
+			"birthday":
+				var me: Node = _class("res://ui/components/character_view.gd").new()
+				check(me._item("hat").get("id", "") == "party_hat", "your party hat stays on on your birthday")
+				me.free()
+		app.go("profile")
+		await _wait(50)
+		await _shot("holiday_%s_profile" % id)
+		app.go("focus")
+		await _wait(50)
+		app.start_walk(app.state.projects[0].id, app.state.pets[0].id, -1, "forest" if id != "easter" else "blossom")
+		app.go("walk", {"from": main.size * 0.5})
+		await _wait(90)
+		var walk: Node = main._flows.back().get_child(0)
+		walk._scenery.clock = -1.0
+		if id == "christmas":
+			check(walk._scenery.weather_kind() == "snowy" and walk._scenery._pile.visible, "snow piles up on a Christmas walk")
+			app.debug_add_minutes(30)
+			await _wait(10)
+		await _shot("holiday_%s_walk" % id)
+		app.cancel_walk()
+		app.go("home")
+		await _wait(60)
+	# The holiday pets, and the presents worn.
+	var cast := ColorRect.new()
+	cast.color = Color("#f4ecdf")
+	cast.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	main.add_child(cast)
+	var at := 90.0
+	for id in ["skeleton_dog", "reindeer", "easter_egg", "birthday_cake"]:
+		var pet: Node2D = _class("res://ui/components/animal_view.gd").new()
+		pet.animal_id = id
+		pet.walking = true
+		pet.position = Vector2(at, main.size.y * 0.4)
+		cast.add_child(pet)
+		at += main.size.x / 4.6
+	at = 70.0
+	for outfit in [{"hat": "pumpkin_head"}, {"top": "tree_costume"}, {"hat": "bunny_ears"}, {"hat": "party_hat"}, {"hat": "reindeer_legendary", "top": "reindeer_epic"}]:
+		var look: Dictionary = app.state.profile.duplicate(true)
+		look["cosmetics"].merge(outfit, true)
+		var me: Node2D = _class("res://ui/components/character_view.gd").new()
+		me.look = look
+		me.holding_lead = false
+		me.position = Vector2(at, main.size.y * 0.9)
+		cast.add_child(me)
+		at += main.size.x / 5.4
+	await _wait(10)
+	await _shot("holiday_cast")
+	cast.queue_free()
+	# Your birthday's pet: locked until you've focused half an hour on it.
+	check(not app.unlock_progress("animal", "birthday_cake")["done"], "the birthday cake is locked to start with")
+	app.set_setting("debug_holiday", "none")
+	app.set_setting("debug_hour", -1.0)
+	await _wait(30)
+	check(backdrop._dressed == "" and main._decor_layer.get_child_count() == 0, "an ordinary day again")
 
 ## Drop-in art: an animal rig of separate limbs that the shader paints with the
 ## animal's colours, gift images, and scenery tiles, each beside its placeholder.

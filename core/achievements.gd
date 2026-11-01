@@ -24,7 +24,7 @@ static func list(data: Dictionary, tables: Array, gifts: Array) -> Array:
 		if count == 0:
 			continue
 		out.append({"id": "table_%s" % t["id"], "name": Text.fill(str(each.get("name", Text.t("achievements.table_name"))), {"table": t["name"]}),
-			"kind": "table", "goal": count, "icon": "", "table": t["id"], "animal": str(t.get("animal", "")),
+			"kind": "table", "goal": count, "icon": str(t.get("icon", "")), "table": t["id"], "animal": str(t.get("animal", "")),
 			"description": Text.t("achievements.table_description", {"count": count, "table": str(t["name"]).to_lower()})})
 	return out
 

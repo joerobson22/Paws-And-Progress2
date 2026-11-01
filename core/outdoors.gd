@@ -108,9 +108,13 @@ func set_choice(kind: String) -> void:
 	changed.emit()
 
 
-## The weather kind the places show (see Weather.KINDS): the one you picked,
-## else the latest real weather, else "sunny".
+## The weather kind the places show (see Weather.KINDS): a holiday's (it
+## always snows at Christmas), else the one you picked, else the latest real
+## weather, else "sunny".
 func weather() -> String:
+	var look := App.holiday_look()
+	if look and look.weather in Weather.KINDS:
+		return look.weather
 	if choice() != "":
 		return choice()
 	var w := _cached("weather_cache")

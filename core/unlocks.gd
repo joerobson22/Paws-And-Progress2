@@ -9,13 +9,16 @@ extends RefCounted
 ##   {"hours": 20}                    focus for 20 hours in all
 ##   {"hours": 10, "place": "jungle"} focus for 10 hours in the Jungle
 ##   {"table": "cat"}                 find every gift in the cat table
-##   {"all_tables": true}             find every gift there is
+##   {"all_tables": true}             find every gift there is (bar the holidays')
+##   {"holiday": "easter", "minutes": 30}  focus for 30 minutes over one Easter
 ## `facts` is what's been done so far: {level, total_seconds,
-## place_seconds: {place id: seconds}, found: {gift id: true}}.
+## place_seconds: {place id: seconds}, found: {gift id: true},
+## holiday_seconds: {holiday id: the most focused over one year's run of it}}.
 
 
-## How far along a rule is: {kind ("start", "level", "hours", "table" or
-## "all_tables"), have, goal, done}. Hours count in seconds.
+## How far along a rule is: {kind ("start", "level", "hours", "table",
+## "all_tables" or "holiday"), have, goal, done}. Hours and minutes count in
+## seconds.
 static func progress(rule: Dictionary, facts: Dictionary, gifts: Array) -> Dictionary:
 	var kind := kind_of(rule)
 	var have := 0
@@ -30,9 +33,16 @@ static func progress(rule: Dictionary, facts: Dictionary, gifts: Array) -> Dicti
 				have = int(facts.get("place_seconds", {}).get(str(rule["place"]), 0))
 			else:
 				have = int(facts.get("total_seconds", 0))
+		"holiday":
+			goal = int(rule.get("minutes", 30)) * 60
+			have = int(facts.get("holiday_seconds", {}).get(str(rule["holiday"]), 0))
 		"table", "all_tables":
 			var found: Dictionary = facts.get("found", {})
 			for g in gifts:
+				# Holiday gifts only come once a year, so finding every gift
+				# leaves them out.
+				if kind == "all_tables" and Content.table(g["table"]).has("holiday"):
+					continue
 				if kind == "all_tables" or g["table"] == str(rule["table"]):
 					goal += 1
 					if found.has(g["id"]):
@@ -42,6 +52,8 @@ static func progress(rule: Dictionary, facts: Dictionary, gifts: Array) -> Dicti
 
 
 static func kind_of(rule: Dictionary) -> String:
+	if rule.has("holiday"):
+		return "holiday"
 	if rule.has("level"):
 		return "level"
 	if rule.has("hours"):
@@ -67,6 +79,8 @@ static func describe(rule: Dictionary) -> String:
 			return Text.t("unlock.table", {"table": str(Content.table(str(rule["table"])).get("name", rule["table"])).to_lower()})
 		"all_tables":
 			return Text.t("unlock.all_tables")
+		"holiday":
+			return Text.t("unlock.holiday", {"minutes": int(rule.get("minutes", 30)), "when": Content.holiday(str(rule["holiday"])).get("when", "")})
 	return Text.t("unlock.start")
 
 
@@ -78,6 +92,8 @@ static func describe_progress(p: Dictionary) -> String:
 		"hours":
 			var goal := Text.t("unlock.hours_short", {"hours": _hours(int(p["goal"]) / 3600.0)})
 			return Text.t("unlock.progress_hours", {"have": Stats.format_duration(int(p["have"])), "goal": goal})
+		"holiday":
+			return Text.t("unlock.progress_hours", {"have": Stats.format_duration(int(p["have"])), "goal": Stats.format_duration(int(p["goal"]))})
 		"table", "all_tables":
 			return Text.t("unlock.progress_gifts", {"have": p["have"], "goal": p["goal"]})
 	return ""

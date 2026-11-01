@@ -1,5 +1,5 @@
 {
-	"_doc": "One gift per rarity per gift table. Animals point at a table in animals.json ('table'), so animals of a kind share one (every dog brings dog gifts). 'animal' on a table is the one shown for it (on its achievement, say). Epic and legendary gifts are wearable: 'slot' says where and 'style' how the placeholder drawing shows it. 'trade_in' on a rarity is how many of one gift swap for the next rarity up from the same table (legendaries can't be traded). Legendary gifts are placeholders for Joe to rename.",
+	"_doc": "One gift per rarity per gift table. Animals point at a table in animals.json ('table'), so animals of a kind share one (every dog brings dog gifts). 'animal' on a table is the one shown for it (on its achievement, say). Epic and legendary gifts are wearable: 'slot' says where and 'style' how the placeholder drawing shows it. 'trade_in' on a rarity is how many of one gift swap for the next rarity up from the same table (legendaries can't be traded). Legendary gifts are placeholders for Joe to rename. A table with 'holiday' belongs to a holiday (data/holidays.json): its pet's table, or 'any' for the 'Holiday' table of presents for opening the app on the day (all legendary, so it breaks the one-per-rarity rule on purpose). Holiday tables don't count towards finding every gift for the Moon. 'icon' shows on a table's achievement when it has no 'animal'.",
 	"rarities": [
 		{"id": "common", "name": "Common", "colour": "#3ba55c", "text_colour": "#25713d", "trade_in": 10},
 		{"id": "rare", "name": "Rare", "colour": "#2f7bc2", "text_colour": "#1f5e99", "trade_in": 5},
@@ -32,7 +32,12 @@
 		{"id": "leopard", "name": "Leopard", "animal": "leopard"},
 		{"id": "lion", "name": "Lion", "animal": "lion"},
 		{"id": "eagle", "name": "Eagle", "animal": "eagle"},
-		{"id": "red_panda", "name": "Red Panda", "animal": "red_panda"}
+		{"id": "red_panda", "name": "Red Panda", "animal": "red_panda"},
+		{"id": "skeleton_dog", "name": "Skeleton Dog", "animal": "skeleton_dog", "holiday": "halloween"},
+		{"id": "reindeer", "name": "Reindeer", "animal": "reindeer", "holiday": "christmas"},
+		{"id": "easter_egg", "name": "Easter Egg", "animal": "easter_egg", "holiday": "easter"},
+		{"id": "birthday_cake", "name": "Birthday Cake", "animal": "birthday_cake", "holiday": "birthday"},
+		{"id": "holiday", "name": "Holiday", "animal": "", "icon": "gift", "holiday": "any"}
 	],
 	"gifts": [
 		{"id": "dog_common", "table": "dog", "rarity": "common", "name": "Tennis Ball", "description": "Used for fetch. It's a bit slobbery..."},
@@ -163,6 +168,28 @@
 		{"id": "red_panda_common", "table": "red_panda", "rarity": "common", "name": "Cherry", "description": "A little sour. Still tasty."},
 		{"id": "red_panda_rare", "table": "red_panda", "rarity": "rare", "name": "Blossom", "description": "A pink petal from the tree."},
 		{"id": "red_panda_epic", "table": "red_panda", "rarity": "epic", "name": "Bamboo Stick", "description": "Can be equipped to walk with. Light and strong.", "slot": "walking_stick", "style": "stick"},
-		{"id": "red_panda_legendary", "table": "red_panda", "rarity": "legendary", "name": "Blossom Crown", "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "crown"}
+		{"id": "red_panda_legendary", "table": "red_panda", "rarity": "legendary", "name": "Blossom Crown", "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "crown"},
+
+		{"id": "skeleton_dog_common", "table": "skeleton_dog", "rarity": "common", "name": "Spare Rib", "description": "Not his. He found it. Placeholder."},
+		{"id": "skeleton_dog_rare", "table": "skeleton_dog", "rarity": "rare", "name": "Glow Lantern", "description": "Lights the way home. Placeholder."},
+		{"id": "skeleton_dog_epic", "table": "skeleton_dog", "rarity": "epic", "name": "Bone Scarf", "description": "Can be worn. Rattles a bit. Placeholder.", "slot": "neckwear", "style": "scarf", "colour": "#efe8d8"},
+		{"id": "skeleton_dog_legendary", "table": "skeleton_dog", "rarity": "legendary", "name": "Witch's Hat", "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "witch", "colour": "#3b2f4a"},
+		{"id": "reindeer_common", "table": "reindeer", "rarity": "common", "name": "Carrot", "description": "Saved from a snowman. Placeholder."},
+		{"id": "reindeer_rare", "table": "reindeer", "rarity": "rare", "name": "Sleigh Bell", "description": "Jingles when you shake it. Placeholder."},
+		{"id": "reindeer_epic", "table": "reindeer", "rarity": "epic", "name": "Festive Jumper", "description": "Can be worn. Itchy but worth it. Placeholder.", "slot": "top", "style": "jumper", "colour": "#b8322e"},
+		{"id": "reindeer_legendary", "table": "reindeer", "rarity": "legendary", "name": "Antler Headband", "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "antlers", "colour": "#8a5a3a"},
+		{"id": "easter_egg_common", "table": "easter_egg", "rarity": "common", "name": "Chocolate Coin", "description": "Melts if you hold it too long. Placeholder."},
+		{"id": "easter_egg_rare", "table": "easter_egg", "rarity": "rare", "name": "Painted Shell", "description": "Someone took their time on this. Placeholder."},
+		{"id": "easter_egg_epic", "table": "easter_egg", "rarity": "epic", "name": "Spring Scarf", "description": "Can be worn. Pastel and light. Placeholder.", "slot": "neckwear", "style": "scarf", "colour": "#a8d8b0"},
+		{"id": "easter_egg_legendary", "table": "easter_egg", "rarity": "legendary", "name": "Nest Bonnet", "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "nest"},
+		{"id": "birthday_cake_common", "table": "birthday_cake", "rarity": "common", "name": "Candle", "description": "Make a wish. Placeholder."},
+		{"id": "birthday_cake_rare", "table": "birthday_cake", "rarity": "rare", "name": "Party Popper", "description": "Pop! Placeholder."},
+		{"id": "birthday_cake_epic", "table": "birthday_cake", "rarity": "epic", "name": "Party Bow Tie", "description": "Can be worn. Very dapper. Placeholder.", "slot": "neckwear", "style": "bowtie", "colour": "#e0559a"},
+		{"id": "birthday_cake_legendary", "table": "birthday_cake", "rarity": "legendary", "name": "Birthday Crown", "description": "Can be worn. Placeholder legendary.", "slot": "hat", "style": "crown"},
+
+		{"id": "pumpkin_head", "table": "holiday", "rarity": "legendary", "name": "Pumpkin Head", "description": "Can be worn. A present for opening the app on Halloween.", "slot": "hat", "style": "pumpkin", "colour": "#e8812c"},
+		{"id": "tree_costume", "table": "holiday", "rarity": "legendary", "name": "Christmas Tree Costume", "description": "Can be worn. A present for opening the app at Christmas.", "slot": "top", "style": "tree", "colour": "#3f7d45"},
+		{"id": "bunny_ears", "table": "holiday", "rarity": "legendary", "name": "Bunny Ears", "description": "Can be worn. A present for opening the app at Easter.", "slot": "hat", "style": "bunny_ears", "colour": "#f3e6ea"},
+		{"id": "party_hat", "table": "holiday", "rarity": "legendary", "name": "Party Hat", "description": "Can be worn. A present for opening the app on your birthday.", "slot": "hat", "style": "party", "colour": "#e0559a"}
 	]
 }
