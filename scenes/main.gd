@@ -9,6 +9,8 @@ extends Control
 ## walk) open over everything through a growing circle.
 ## Screens ask to move with App.go(). A new save slot stays on the profile
 ## screen, with no map or arrows, until its profile is filled in.
+## On a holiday its decorations hang over the screens (lights, bunting), and
+## opening the app that day brings its present.
 
 const PANES := {
 	"focus": [Vector2i(0, 0), "res://scenes/panes/focus.gd"],
@@ -83,6 +85,10 @@ var _account: CreateAccount
 ## (rounded corners, the camera's island and the home bar) drawn over it.
 var _phone_view := false
 var _phone_frame := PhoneFrame.new()
+## Holds a holiday's decorations over the screens (its look's menu_scene),
+## and the holiday they're for.
+var _decor_layer := Control.new()
+var _decor_for := ""
 
 var _press := false
 var _press_pos := Vector2.ZERO
@@ -126,6 +132,9 @@ func _ready() -> void:
 
 	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_world)
+	_decor_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_decor_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_decor_layer)
 	for pane_name in PANES:
 		var cell: Vector2i = PANES[pane_name][0]
 		var pane: Pane = load(PANES[pane_name][1]).new()
@@ -170,6 +179,8 @@ func _ready() -> void:
 	_panes[_at].show_pane()
 	_minimap.show_cell(_at, true)
 	_sync_lock(true)
+	_dress_screens()
+	_give_holiday_present.call_deferred()
 
 	# Closing the app ends a walk; say so the next time it opens.
 	if not App.ended_walk.is_empty():
@@ -270,6 +281,8 @@ func _layout() -> void:
 	if not _moving and not _swiping:
 		_world.position = -Vector2(_at) * size
 	var insets := UI.safe_insets(self)
+	# A holiday's decorations hang below the phone's notch and clock.
+	_decor_layer.offset_top = insets["top"]
 	var floor_y: float = size.y - MAP_INSET - insets["bottom"]
 	if App.phone_layout():
 		# Phones: in the middle (of the part clear of the notch), for either thumb.
@@ -316,12 +329,42 @@ func _on_state_changed() -> void:
 
 ## Looks at the time of day again: the backdrop's sky, and dark colours
 ## from sunset to sunrise. A new debug style changes the look the same way.
+## And whether it's a holiday: its decorations, and its present.
 func _on_sky_tick() -> void:
 	var want := App.wants_dark()
 	if want != UI.dark:
 		_switch_palette(want)
 	if is_instance_valid(_backdrop):
 		_backdrop.refresh()
+	_dress_screens()
+	_give_holiday_present.call_deferred()
+
+
+## Hangs the holiday's decorations over the screens, or takes them down.
+func _dress_screens() -> void:
+	var id := App.holiday()
+	if id == _decor_for:
+		return
+	_decor_for = id
+	var focus: Node = _panes.get(Vector2i.ZERO)
+	if focus and focus.has_method("holiday_changed"):
+		focus.holiday_changed()
+	for c in _decor_layer.get_children():
+		c.queue_free()
+	var look := Holidays.look(id)
+	if look and look.menu_scene:
+		_decor_layer.add_child(look.menu_scene.instantiate())
+
+
+## Opening the app on a holiday brings a present, once a year: it pops up
+## once you're on the screens (not mid-walk, or over another popup).
+func _give_holiday_present() -> void:
+	if _locked or not _flows.is_empty() or Modal.is_open():
+		return
+	var gift_id := App.claim_holiday_gift()
+	if gift_id == "":
+		return
+	GiftDetails.open(gift_id, true, true, true, Text.t("holiday.present." + App.holiday()))
 
 
 ## Swaps light and dark without anything moving: the screen on show is

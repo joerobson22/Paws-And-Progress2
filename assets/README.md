@@ -14,16 +14,17 @@ app makes for itself, so you can swap things in one at a time.
 5. [Your character and its clothes](#your-character-and-its-clothes)
 6. [Gifts](#gifts)
 7. [The home view behind every screen](#the-home-view-behind-every-screen)
-8. [The bush your pet dives into](#the-bush-your-pet-dives-into)
-9. [Sounds](#sounds)
-10. [Animations and timings](#animations-and-timings)
-11. [Icons](#icons)
-12. [Place buttons](#place-buttons)
-13. [App icon and launch screen](#app-icon-and-launch-screen)
-14. [Fonts](#fonts)
-15. [Words](#words)
-16. [Painting in red, green and blue](#painting-in-red-green-and-blue)
-17. [When something doesn't show up](#when-something-doesnt-show-up)
+8. [Holidays](#holidays)
+9. [The bush your pet dives into](#the-bush-your-pet-dives-into)
+10. [Sounds](#sounds)
+11. [Animations and timings](#animations-and-timings)
+12. [Icons](#icons)
+13. [Place buttons](#place-buttons)
+14. [App icon and launch screen](#app-icon-and-launch-screen)
+15. [Fonts](#fonts)
+16. [Words](#words)
+17. [Painting in red, green and blue](#painting-in-red-green-and-blue)
+18. [When something doesn't show up](#when-something-doesnt-show-up)
 
 ---
 
@@ -50,6 +51,8 @@ While the app runs from the editor, the focus screen has a small debug bar:
 - **Phone size** shows the app exactly as on a phone (an iPhone's screen,
   with its rounded corners, camera and home bar). Turn it off to go back.
 - **Time** (top right) moves the time of day, for checking art by night.
+- **Theme** (under Time) shows a holiday's look whatever the date. Today's
+  date follows the calendar; No holiday turns them off.
 
 ---
 
@@ -64,6 +67,7 @@ While the app runs from the editor, the focus screen has a small debug bar:
 | Clothes and hats | `art/cosmetics/<item>/<limb>.png` | One image per limb the item covers. |
 | A gift | `art/gifts/<gift>.png` | Save a square image with the gift's id as its name. |
 | The home view | `art/home/backdrop.tscn` | Open the scene; change the layers' pictures and colours. |
+| A holiday's look | `art/holidays/<holiday>/look.tres` | Double-click it; change it in the Inspector (see [Holidays](#holidays)). |
 | The dive bush | `art/walk/bush.tscn` | Open the scene; put your sprites inside it. |
 | Every sound | `assets/sounds/sounds.tres` | Double-click it; pick a recording, loudness and pitch per sound. |
 | Timings and curves | `ui/motion.tres` | Double-click it; change any timing in the Inspector. |
@@ -260,6 +264,55 @@ descriptions and rarities are in `data/gifts.json`.
 
 The create account screen looks down at the hilltop; making an account
 tilts the view up to the forest and sky.
+
+---
+
+## Holidays
+
+The app dresses up on Halloween, at Christmas, at New Year, at Easter and
+on your birthday. **When** each one is, and its present, are in
+`data/holidays.json`. **How it looks** is `art/holidays/<holiday>/look.tres`
+(`halloween`, `christmas`, `new_year`, `easter`, `birthday`). Double-click
+it and change it in the Inspector:
+
+| Setting | What it does |
+| --- | --- |
+| **Hour** | Pins the time of day (0 is midnight, so Halloween is always dark). -1 follows the clock. |
+| **Weather** | Pins every walk's weather (`snowy` at Christmas). Empty follows the real weather. |
+| **Dead Trees** | Every tree on a walk is bare. |
+| **Snow** | Snow on the trees and ground, on walks and on the home view, snow falling behind the screens, and snow piling up along the bottom as you walk. **Snow Pile Minutes** is how long it takes to pile up; **Snow Pile Height** how high it gets (a share of the screen). |
+| **Ground Props** | Pictures dotted in the grass beside the path (pumpkins, eggs), picked at random. Drag in as many as you like. **Prop Spacing** and **Prop Height** are in pixels on a screen 720 tall. |
+| **Lit Trees** | The share of trees on a walk hung with lights, in the **Light Colours**. |
+| **Fireworks** | Fireworks in the sky, behind the screens and on walks, in the **Firework Colours**. |
+| **Home Scene** | Decorations on the home view. Open it: a group named after each layer (`Hilltop`, `ForestNear`...) holds sprites laid out on that layer's picture (1600 × 1000), so they move with it. Drag the pumpkins or eggs about, or add your own. |
+| **Menu Scene** | Decorations hung over the screens (under popups and walks): the Christmas lights and the birthday bunting along the top. |
+| **Backdrop Swaps** | Pictures that replace home view layers while it's on, by layer name (Halloween's dead forests in `art/holidays/halloween/home/`). |
+| **Hat** | A hat you wear all day whatever you picked (a gift id: `party_hat` on your birthday). |
+
+The lights and bunting are **Festoon** nodes: set **Kind** (lights or
+bunting), **Swag Width**, **Spacing**, **Bulb** (a bulb's size, or a
+flag's width) and **Colours**. Make the node as tall as you want the string
+to dip. The fireworks are **Fireworks** nodes (**Bursts**, **Life**,
+**Reach**, **Colours**).
+
+The pictures (`pumpkin.svg`, `egg_pink.svg`...) sit beside each look.
+Replace one with your own and it shows everywhere it's used.
+
+**Presents and pets.** Opening the app on a holiday gives you its present
+(a legendary gift: `gift` in `data/holidays.json`), once a year. Each
+holiday also has a pet, unlocked by focusing for 30 minutes on the day:
+the animal's `unlock` rule in `data/animals.json`
+(`{"holiday": "halloween", "minutes": 30}`). The pets' gifts and the
+presents are in `data/gifts.json` (tables `skeleton_dog`, `reindeer`,
+`easter_egg`, `birthday_cake` and `holiday`).
+
+**Dates.** `from` and `to` are `"MM-DD"` for whole days or
+`"MM-DD HH:MM"` for exact minutes (New Year is `01-01 00:00` to
+`01-01 00:05`). Easter moves each year, so it's days either side of Easter
+Sunday (`[-2, 1]` is Good Friday to Easter Monday). Your birthday comes
+from the date of birth you give when you create your account. If two land
+on the same day, the first in the file wins (your birthday beats
+Halloween).
 
 ---
 

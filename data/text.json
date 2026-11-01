@@ -16,7 +16,7 @@
 		"reset": "Your save was from an older version, so this is a fresh start. The old one is kept beside it as save.old."
 	},
 	"greetings": {
-		"_doc": "The line above the focus orb on the home screen. One is picked each time you come home: half the time a greeting for the time of day (morning 5am to noon, afternoon to 5pm, evening to 10pm, then night), otherwise a line from 'anytime'. '{name}' becomes the player's name; lines with it are skipped until they've set one. 'fallback' shows if a list is ever empty.",
+		"_doc": "The line above the focus orb on the home screen. One is picked each time you come home: half the time a greeting for the time of day (morning 5am to noon, afternoon to 5pm, evening to 10pm, then night), otherwise a line from 'anytime'. On a holiday, it's always a line from that holiday's list in 'holidays' (add or change them freely). '{name}' becomes the player's name; lines with it are skipped until they've set one. 'fallback' shows if a list is ever empty.",
 		"morning": [
 			"Good morning, {name}",
 			"Morning, {name}. Fresh start.",
@@ -99,6 +99,44 @@
 			"Clear the noise. Find the path.",
 			"Your companion believes in you."
 		],
+		"holidays": {
+			"halloween": [
+				"Happy Halloween, {name}",
+				"Happy Halloween!",
+				"Spooky focus, anyone?",
+				"The pumpkins are watching. Better get to work.",
+				"Not even the skeletons skip focus time.",
+				"Trick or treat? Treat yourself to an hour of focus."
+			],
+			"christmas": [
+				"Merry Christmas, {name}",
+				"Merry Christmas!",
+				"Snow's settling. Stay cosy and focused.",
+				"A little focus, then back to the mince pies.",
+				"Season's greetings from the hilltop.",
+				"Even the reindeer put in the hours."
+			],
+			"new_year": [
+				"Happy New Year, {name}!",
+				"Happy New Year!",
+				"A brand new year. Start it well.",
+				"Fireworks first. Resolutions after."
+			],
+			"easter": [
+				"Happy Easter, {name}",
+				"Happy Easter!",
+				"Eggs hidden everywhere. Focus first, hunt later.",
+				"Hop to it.",
+				"A sweet day for a little focus."
+			],
+			"birthday": [
+				"Happy birthday, {name}!",
+				"Happy birthday!",
+				"It's your day. Do something you're proud of.",
+				"Another year older, another step up the hill.",
+				"Party hat on. Let's go."
+			]
+		},
 		"fallback": "Ready when you are"
 	},
 	"quotes": [
@@ -362,6 +400,7 @@
 	},
 	"unlock": {
 		"start": "Yours from the start",
+		"holiday": "Focus for {minutes} minutes {when}",
 		"level": "Reach level {level}",
 		"hours": "Focus for {hours} hours",
 		"hours_in": "Focus for {hours} hours {where}",
@@ -522,7 +561,20 @@
 		"add_minutes": "+{minutes}",
 		"time": "Time",
 		"time_now": "Now",
-		"time_note": "Try the sky at another time of day (debug builds only)"
+		"time_note": "Try the sky at another time of day (debug builds only)",
+		"holiday": "Theme",
+		"holiday_note": "Try out a holiday's look (debug builds only)",
+		"holiday_real": "Today's date",
+		"holiday_none": "No holiday"
+	},
+	"holiday": {
+		"present": {
+			"halloween": "Happy Halloween! Here's a present.",
+			"christmas": "Merry Christmas! Here's a present.",
+			"easter": "Happy Easter! Here's a present.",
+			"birthday": "Happy birthday! Here's a present."
+		},
+		"hat_locked": "Your {hat} stays on all day"
 	},
 	"create": {
 		"title": "Create account",

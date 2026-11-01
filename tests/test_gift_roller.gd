@@ -106,6 +106,9 @@ func test_pity_counter() -> void:
 
 func test_every_table_has_a_gift_per_rarity() -> void:
 	for t in load_json("res://data/gifts.json")["tables"]:
+		# The holiday presents are all legendary, and no animal brings them.
+		if t.get("holiday", "") == "any":
+			continue
 		for rarity in GiftRoller.RARITIES:
 			var n := gifts.filter(func(g): return g["table"] == t["id"] and g["rarity"] == rarity).size()
 			eq(n, 1, "%s %s" % [t["id"], rarity])
@@ -124,6 +127,8 @@ func test_animals_of_a_kind_share_a_table() -> void:
 	for t in ["lion", "tiger", "leopard"]:
 		eq(by_table[t], [t], "the %s has its own" % t)
 	for t in load_json("res://data/gifts.json")["tables"]:
+		if t.get("holiday", "") == "any":
+			continue
 		check(by_table.has(t["id"]), "some animal brings %s gifts" % t["id"])
 		check(by_table.get(t["id"], []).has(t["animal"]), "%s is shown by one of its own animals" % t["id"])
 

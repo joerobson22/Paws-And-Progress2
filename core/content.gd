@@ -26,6 +26,8 @@ var skin_tones: Array[Color] = []
 var hair_tones: Array[Color] = []
 ## The customise popup's tabs: [{id, name, rows: [slot or "skin_tone"/"hair_tone"]}].
 var cosmetic_sections: Array = []
+## Days the app dresses up (data/holidays.json; see Holidays).
+var holidays: Array = []
 
 var _animals_by_id: Dictionary = {}
 var _gifts_by_id: Dictionary = {}
@@ -56,6 +58,7 @@ func _init() -> void:
 	cosmetic_slots = c.get("slots", [])
 	cosmetic_items = c.get("items", [])
 	cosmetic_sections = c.get("sections", [])
+	holidays = _load("res://data/holidays.json").get("holidays", [])
 	for hex in c.get("skin_tones", []):
 		skin_tones.append(Color.from_string(hex, Color.WHITE))
 	for hex in c.get("hair_tones", []):
@@ -172,6 +175,14 @@ func _read_place_scenes() -> void:
 		place.free()
 
 
+## A holiday by id (data/holidays.json), or {} for none.
+func holiday(id: String) -> Dictionary:
+	for h in holidays:
+		if h["id"] == id:
+			return h
+	return {}
+
+
 func biome(id: String) -> Dictionary:
 	for b in biomes:
 		if b["id"] == id:
@@ -235,9 +246,10 @@ func quote(key: int) -> String:
 
 
 ## A line for the home screen at this hour: half the time a greeting for the
-## time of day, otherwise an anytime line. Lines needing a name are skipped
-## when there isn't one.
-func greeting(hour: int, username: String, rng: RandomNumberGenerator) -> String:
+## time of day, otherwise an anytime line. On a holiday (an id from
+## data/holidays.json) it's always one of that holiday's lines, if it has
+## any. Lines needing a name are skipped when there isn't one.
+func greeting(hour: int, username: String, rng: RandomNumberGenerator, holiday_id := "") -> String:
 	var part := "night"
 	if hour >= 5 and hour < 12:
 		part = "morning"
@@ -246,6 +258,10 @@ func greeting(hour: int, username: String, rng: RandomNumberGenerator) -> String
 	elif hour >= 17 and hour < 22:
 		part = "evening"
 	var pool: Array = Text.list("greetings." + part) if rng.randf() < 0.5 else Text.list("greetings.anytime")
+	var festive: Array = Text.list("greetings.holidays." + holiday_id) if holiday_id != "" else []
+	festive = festive.filter(func(l): return username != "" or not str(l).contains("{name}"))
+	if not festive.is_empty():
+		pool = festive
 	pool = pool.filter(func(l): return username != "" or not str(l).contains("{name}"))
 	if pool.is_empty():
 		return Text.t("greetings.fallback")

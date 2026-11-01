@@ -6,7 +6,8 @@ extends VBoxContainer
 ## that gives the window a phone's shape and lays the app out as on a phone
 ## (off: the window as it was). In the top right, sky_controls(): a time of
 ## day slider for the sky, which turns the colours dark after sunset (Now
-## follows the clock).
+## follows the clock), and a holiday picker to try each holiday's look
+## (Today's date follows the calendar).
 ## The walk also shows the buttons here that move it on.
 
 ## How far the walk's time buttons move it on, in minutes.
@@ -40,7 +41,22 @@ static func sky_controls() -> VBoxContainer:
 	box.scale = Vector2(SCALE, SCALE)
 	box.add_theme_constant_override("separation", 4)
 	box.add_child(_time_row())
+	box.add_child(_holiday_row())
 	return box
+
+
+## Today's date, no holiday, or any holiday's look, whatever the date.
+static func _holiday_row() -> Control:
+	var row := UI.hbox(6)
+	row.add_child(_caption(Text.t("debug.holiday")))
+	var options := [["", Text.t("debug.holiday_real")], ["none", Text.t("debug.holiday_none")]]
+	for h in Content.holidays:
+		options.append([h["id"], h["name"]])
+	var pick := Dropdown.new(options, str(App.state.settings.get("debug_holiday", "")), false, "", false)
+	pick.accessibility_name = Text.t("debug.holiday_note")
+	pick.chosen.connect(func(option: String, _reversed: bool): App.set_setting("debug_holiday", option))
+	row.add_child(pick)
+	return row
 
 
 ## A slider through the day, and Now to follow the clock again.

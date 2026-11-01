@@ -19,6 +19,9 @@ extends Control
 ## shows too, the way this place shows it (Weather): clouds, rain and
 ## lightning, snow, a blizzard. A layer with "art" repeats that scene instead
 ## of drawing its kind (see art/README.md).
+## A holiday (App.holiday_look()) dresses it up: dead trees and midnight at
+## Halloween, snow everywhere at Christmas (piling up at the bottom as you
+## walk), fireworks at New Year, eggs in the grass at Easter.
 
 const CHUNK := SceneryPainter.CHUNK
 ## The screen height (in pixels) that layer art scenes are drawn for.
@@ -73,6 +76,11 @@ var _layers: Array = []
 var _sky: _Sky
 var _clouds: _Clouds
 var _fx: _Fx
+## The holiday's look the chunks were drawn with (null for none), its
+## fireworks, and the snow piling up at the bottom.
+var _holiday: HolidayLook
+var _fireworks: Fireworks
+var _pile: _Pile
 ## The growth in front of everything else. It's the scenery's own top child
 ## until a host moves it with front_into(); it then keeps following the
 ## scenery's place, size and fade.
@@ -102,6 +110,9 @@ func _ready() -> void:
 	_clouds.scenery = self
 	_clouds.set_meta("foot", -INF)
 	add_child(_clouds)
+	_fireworks = Fireworks.new()
+	_fireworks.set_meta("foot", -INF)
+	add_child(_fireworks)
 	front = Control.new()
 	front.name = "SceneryFront"
 	front.add_to_group(FRONT_GROUP)
@@ -121,7 +132,11 @@ func _ready() -> void:
 	_fx = _Fx.new()
 	_fx.scenery = self
 	add_child(_fx)
+	_pile = _Pile.new()
+	_pile.scenery = self
+	front.add_child(_pile)
 	add_child(front)
+	_holiday = App.holiday_look()
 	resized.connect(_rebuild)
 	Outdoors.changed.connect(_update_light)
 	_update_light()
@@ -173,6 +188,14 @@ func _process(delta: float) -> void:
 		_flash = 0.0
 		_bolt = -1
 	_fx.queue_redraw()
+	_fireworks.visible = _holiday != null and _holiday.fireworks
+	if _fireworks.visible:
+		_fireworks.size = Vector2(size.x, horizon_y())
+		if not _holiday.firework_colours.is_empty():
+			_fireworks.colours = _holiday.firework_colours
+	_pile.visible = _holiday != null and _holiday.snow
+	if _pile.visible:
+		_pile.queue_redraw()
 	if not is_instance_valid(front):
 		return
 	if front.get_parent() != self:
@@ -185,14 +208,28 @@ func _process(delta: float) -> void:
 		front.modulate = front_tint * shade
 
 
-## The hour of the day shown.
+## The hour of the day shown: the clock's, unless a holiday pins it
+## (midnight all Halloween).
 func hour() -> float:
-	return clock if clock >= 0.0 else DayCycle.hour_now()
+	if clock >= 0.0:
+		return clock
+	var look := App.holiday_look()
+	return look.hour if look and look.hour >= 0.0 else DayCycle.hour_now()
 
 
 func _update_light() -> void:
 	_light_check = LIGHT_EVERY
-	_weather_kind = Weather.for_place(weather if weather != "" else Outdoors.weather(), biome)
+	# A new holiday (or the end of one) draws everything again.
+	var look := App.holiday_look()
+	if look != _holiday:
+		_holiday = look
+		if is_inside_tree():
+			_rebuild()
+	# A holiday's weather shows the same everywhere (snow even in the desert).
+	if weather == "" and look and look.weather in Weather.KINDS:
+		_weather_kind = look.weather
+	else:
+		_weather_kind = Weather.for_place(weather if weather != "" else Outdoors.weather(), biome)
 	_look = Weather.look(_weather_kind, Content.weathers)
 	var sun := Outdoors.sun_hours()
 	_light = DayCycle.at(DayCycle.solar_hour(hour(), sun.x, sun.y, Content.day_cycle), Content.day_cycle)
@@ -419,6 +456,35 @@ static func _noise(t: float, sd: float) -> float:
 ## Stable pseudo-random 0..1 for an integer slot.
 static func _hash(i: int, sd: float) -> float:
 	return SceneryPainter._hash(i, sd)
+
+
+## Snow piling up along the bottom of the screen as you walk at Christmas:
+## nothing at first, as high as the look's snow_pile_height once you've
+## walked its snow_pile_minutes. It moves with the ground as you go.
+class _Pile extends Node2D:
+	var scenery: Scenery
+
+	func _draw() -> void:
+		var look := scenery._holiday
+		if look == null:
+			return
+		var size := scenery.size
+		var walked := float(App.state.active.elapsed(App.now())) if App.state.active else scenery.time()
+		var depth := clampf(walked / maxf(60.0, look.snow_pile_minutes * 60.0), 0.0, 1.0)
+		var high := size.y * look.snow_pile_height * (0.15 + 0.85 * depth)
+		var g := scenery.ground_layer()
+		var moved := scenery.scroll * float(g.get("parallax", 1.0))
+		var pts := PackedVector2Array()
+		var x := -16.0
+		while x <= size.x + 16.0:
+			pts.append(Vector2(x, size.y - high * (0.7 + 0.3 * Scenery._noise((x + moved) / 260.0, 5.0))))
+			x += 16.0
+		var top := pts.duplicate()
+		pts.append(Vector2(size.x + 16.0, size.y + 2.0))
+		pts.append(Vector2(-16.0, size.y + 2.0))
+		var light := scenery.tint().lightened(0.25)
+		draw_colored_polygon(pts, Color(0.93, 0.95, 1.0) * Color(light, 1.0))
+		draw_polyline(top, Color(1, 1, 1) * Color(light, 1.0), 3.0, true)
 
 
 ## The sky behind everything, with the sun or moon on its way across:
