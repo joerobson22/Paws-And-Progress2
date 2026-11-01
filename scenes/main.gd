@@ -72,6 +72,8 @@ const BACKDROP := "res://art/home/backdrop.tscn"
 const SKY_EVERY := 20.0
 ## The window settings last put in place, so only a change to them moves it.
 var _window_applied := ""
+## How long the hills take to rise into view after creating an account.
+const ACCOUNT_RISE := 1.6
 ## True while the create account screen is up (App.needs_account()).
 var _locked := false
 ## Holds the create account screen, over flows and under popups.
@@ -98,7 +100,7 @@ var _wheel_free := false
 func _ready() -> void:
 	_apply_window()
 	_fit_design_size()
-	UI.set_look(App.ui_style(), App.wants_dark())
+	UI.set_dark(App.wants_dark())
 	theme = UI.build_theme()
 	# Before the panes connect, so a palette change lands before they rebuild.
 	App.state_changed.connect(_on_state_changed)
@@ -284,7 +286,7 @@ func _on_state_changed() -> void:
 ## from sunset to sunrise. A new debug style changes the look the same way.
 func _on_sky_tick() -> void:
 	var want := App.wants_dark()
-	if want != UI.dark or App.ui_style() != UI.style:
+	if want != UI.dark:
 		_switch_palette(want)
 	if is_instance_valid(_backdrop):
 		_backdrop.refresh()
@@ -300,7 +302,7 @@ func _switch_palette(dark: bool) -> void:
 	var snapshot: Image = null
 	if DisplayServer.get_name() != "headless":
 		snapshot = get_viewport().get_texture().get_image()
-	UI.set_look(App.ui_style(), dark)
+	UI.set_dark(dark)
 	theme = UI.build_theme()
 	UI.dress_backdrop(_bg)
 	_minimap.queue_redraw()
@@ -391,6 +393,14 @@ func _show_home(on: bool, instant: bool) -> void:
 			item.modulate.a = 1.0 if on else 0.0
 		else:
 			Motion.fade(item, 1.0 if on else 0.0, Motion.NORMAL)
+	# The create account screen shows mostly sky; the hills rise into view
+	# once it's done.
+	if is_instance_valid(_backdrop):
+		var sunk := 0.0 if on else 1.0
+		if instant:
+			_backdrop.sunk = sunk
+		else:
+			Motion.to(_backdrop, "sunk", sunk, ACCOUNT_RISE if on else Motion.SLOW)
 
 
 func _show_account(instant: bool, typed: Array = ["", ""]) -> void:
@@ -607,7 +617,9 @@ func _input(e: InputEvent) -> void:
 		return
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		if e.pressed:
-			_press = true
+			# A press on something you drag (a slider, a scroll bar, a text
+			# box) is for that, never the start of a swipe.
+			_press = not _drags_something(e.position)
 			_swiping = false
 			_press_pos = e.position
 			_press_time = Time.get_ticks_usec()
@@ -639,6 +651,22 @@ func _input(e: InputEvent) -> void:
 		if step != Vector2i.ZERO and _can_go(_at + step):
 			get_viewport().set_input_as_handled()
 			_go_cell(_at + step)
+
+
+## True if `pos` is on a control that a drag works by itself: a slider or
+## scroll bar, or a text box (dragging selects text).
+func _drags_something(pos: Vector2) -> bool:
+	var stack: Array[Node] = [self]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		var c := n as Control
+		if c and not c.is_visible_in_tree():
+			continue
+		stack.append_array(n.get_children())
+		if (n is Range and not n is ProgressBar) or n is LineEdit or n is TextEdit:
+			if c.mouse_filter != Control.MOUSE_FILTER_IGNORE and c.get_global_rect().has_point(pos):
+				return true
+	return false
 
 
 func _typing() -> bool:

@@ -402,7 +402,7 @@
 		"weather": "Local sunrise and weather",
 		"weather_note": "Walks follow the real sky where you are, from your rough location (worked out from your internet connection).",
 		"weather_now": "Now: {place}, {weather}.",
-		"about": "Paws & Progress {version}  ·  Fonts: Fredoka and Nunito (SIL Open Font License)"
+		"about": "Paws & Progress {version}  ·  Fonts: Fraunces and Quicksand (SIL Open Font License)"
 	},
 	"window": {
 		"title": "Window",
@@ -530,15 +530,6 @@
 		"phone_size": "Phone size",
 		"phone_size_note": "Show the app at a phone's proportions (debug builds only)",
 		"add_minutes": "+{minutes}",
-		"style": "Style",
-		"style_classic": "Classic",
-		"style_glass": "Glass",
-		"style_storybook": "Storybook",
-		"style_pixel": "Pixel",
-		"theme": "Theme",
-		"theme_auto": "Auto",
-		"theme_light": "Light",
-		"theme_dark": "Dark",
 		"time": "Time",
 		"time_now": "Now",
 		"time_note": "Try the sky at another time of day (debug builds only)"

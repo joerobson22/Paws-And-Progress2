@@ -45,10 +45,10 @@ func _init(options: Array, selected: String, is_reversed: bool = false, label_pr
 ## the option and `key`_reversed the direction. Saving tells the whole app
 ## the state changed; with `quiet` it only saves, for a screen that re-sorts
 ## its own list from `chosen` rather than rebuilding everything.
-## See-through with white words, for over the scenery, as tall as the round
-## buttons beside it.
-func on_dark(height: int = 40) -> Dropdown:
-	_style(UI.GLASS, Color.WHITE)
+## For over the scenery: a paper pill with a soft shadow so it stands off
+## the picture, as tall as the round buttons beside it.
+func on_scenery(height: int = 40) -> Dropdown:
+	_style(UI.SURFACE, UI.INK, true)
 	custom_minimum_size.y = height
 	if height > 44:
 		add_theme_font_size_override("font_size", 15)
@@ -59,8 +59,8 @@ func on_dark(height: int = 40) -> Dropdown:
 	return self
 
 
-func _style(fill: Color, ink: Color) -> void:
-	UI.style_button(self, fill, ink, 999)
+func _style(fill: Color, ink: Color, shadow: bool = false) -> void:
+	UI.style_button(self, fill, ink, 999, shadow)
 	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 		var sb: StyleBoxFlat = get_theme_stylebox(state)
 		sb.content_margin_left = 14

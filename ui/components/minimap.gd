@@ -22,6 +22,8 @@ const ICONS := {"focus": "home", "gifts": "gift", "projects": "clipboard", "prof
 const ICON_PX := 24
 ## With a mouse: how long it stays big after the pointer leaves it.
 const LINGER := 0.3
+## How opaque the paper back is.
+const BACK_ALPHA := 0.2
 
 ## True: grows under the pointer (computers). False: grows when tapped.
 var hover_grow := true
@@ -157,7 +159,8 @@ func _cell_rect(cell: Vector2) -> Rect2:
 
 
 func _draw() -> void:
-	var bg := UI.with_shadow(UI.box(Color(UI.SURFACE, maxf(UI.SURFACE.a, 0.3 if UI.dark else 0.75) * (0.92 + 0.08 * _grow)), Color.TRANSPARENT, int(lerpf(16.0, 26.0, _grow))), 0.7 + 0.3 * _grow)
+	# A faint paper back (a fifth opaque) with its rim, so the view shows through.
+	var bg := UI.box(Color(UI.SURFACE, BACK_ALPHA), Color.TRANSPARENT, int(lerpf(16.0, 26.0, _grow)))
 	draw_style_box(bg, Rect2(Vector2.ZERO, size))
 	var radius := int(lerpf(3.0, 14.0, _grow))
 	var tile := UI.LINE.lerp(UI.SURFACE_SOFT, _grow)

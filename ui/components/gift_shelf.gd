@@ -73,10 +73,7 @@ class Plank extends Control:
 
 	func _draw() -> void:
 		var b := UI.box(UI.SHELF, Color.TRANSPARENT, 7)
-		if UI.look("hard_shadow"):
-			UI.shadow(b, 6, Vector2(0, 3))
-		else:
-			b.shadow_color = Color(0, 0, 0, 0.08)
-			b.shadow_size = 6
-			b.shadow_offset = Vector2(0, 3)
+		b.shadow_color = Color(0, 0, 0, 0.08)
+		b.shadow_size = 6
+		b.shadow_offset = Vector2(0, 3)
 		draw_style_box(b, Rect2(Vector2(0, 2), Vector2(size.x, 10)))

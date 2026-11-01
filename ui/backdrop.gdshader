@@ -1,7 +1,6 @@
 shader_type canvas_item;
-// The picture behind every screen in the styles that have one (see
-// UI.backdrop()): a gradient from top through middle to bottom, up to three
-// soft colour washes, paper grain, and a faint square grid.
+// The paper behind screens (see UI.backdrop()): a gradient from top through
+// middle to bottom, up to three soft watercolour washes and paper grain.
 
 uniform vec4 top : source_color;
 uniform vec4 middle : source_color;
@@ -14,9 +13,7 @@ uniform vec3 at_b = vec3(0.8, 0.85, 0.35);
 uniform vec4 wash_c : source_color = vec4(0.0);
 uniform vec3 at_c = vec3(0.5, 0.1, 0.3);
 uniform float grain = 0.0;
-uniform vec4 grid : source_color = vec4(0.0);
-uniform float cell = 16.0;
-// The rect's size, for the grid and to keep washes round.
+// The rect's size, for the grain and to keep washes round.
 uniform vec2 rect_size = vec2(720.0, 720.0);
 
 float hash(vec2 p) {
@@ -49,11 +46,6 @@ void fragment() {
 		vec2 p = uv * rect_size;
 		float n = noise(p * 0.9) * 0.5 + noise(p * 0.23) * 0.3 + noise(p * 0.05) * 0.2;
 		c *= 1.0 - grain * (n - 0.5);
-	}
-	if (grid.a > 0.0) {
-		vec2 p = uv * rect_size;
-		vec2 g = step(fract(p / cell), vec2(1.0 / cell));
-		c = mix(c, grid.rgb, grid.a * max(g.x, g.y));
 	}
 	COLOR = vec4(c, COLOR.a);
 }

@@ -55,13 +55,8 @@ static func _spot(row: Dictionary, rank: int, side: float) -> VBoxContainer:
 	var medal: Color = MEDALS[rank]
 	var glow := PanelContainer.new()
 	var sb := UI.box(Color(medal, 0.0), Color.TRANSPARENT, roundi(side * 0.3))
-	if UI.look("hard_shadow"):
-		# Square styles: a medal-coloured frame instead of a glow.
-		sb.set_border_width_all(3)
-		sb.border_color = medal
-	else:
-		sb.shadow_color = Color(medal, 0.75)
-		sb.shadow_size = 7 if rank == 0 else 5
+	sb.shadow_color = Color(medal, 0.75)
+	sb.shadow_size = 7 if rank == 0 else 5
 	# (Room for the frame, so the picture doesn't cover it.)
 	sb.set_content_margin_all(sb.border_width_left)
 	glow.add_theme_stylebox_override("panel", sb)

@@ -2,14 +2,28 @@ class_name FocusOrb
 extends Control
 ## The living centre of the focus screen: soft, see-through circles of
 ## slightly different greens, each drifting round the middle at its own speed
-## and direction, while the whole cluster slowly breathes in and out. It
-## grows a little under the pointer and dips when pressed.
-## Tapping it is how a focus session starts.
+## and direction, while the whole cluster slowly breathes in and out and its
+## colours drift between greens and blues and back (about a minute round).
+## Under the pointer it eases a little bigger and a shade deeper, and it dips
+## when pressed. Tapping it is how a focus session starts: it swells to fill
+## the screen alongside the choose focus screen's opening circle.
 
 signal tapped
 
 const HOVER_GROW := HoverGrow.GROW
 const PRESS_GROW := 0.95
+## How long the hover takes to ease in and out, in seconds.
+const HOVER_TIME := 0.35
+## How much darker it gets under the pointer.
+const HOVER_SHADE := 0.14
+## How much more solid the blobs are drawn than their listed opacity, so the
+## orb reads clearly on the paper behind it.
+const DEPTH := 1.5
+## In the light colours: how much more saturated and how much darker.
+const LIGHT_SATURATE := 1.9
+const LIGHT_DEPTH := 0.1
+## Seconds for the colours to go from green to blue and back.
+const TINT_PERIOD := 60.0
 
 ## [colour, opacity, radius, orbit, speed (radians/s), phase]; radius and
 ## orbit are fractions of the orb's radius.
@@ -22,6 +36,8 @@ const BLOBS := [
 	["#b5dfe0", 0.36, 0.44, 0.24, 0.47, 0.9],
 	["#d3ecdf", 0.55, 0.34, 0.16, -0.38, 2.2],
 ]
+## Each blob's colour at the blue end of the drift, in the same order.
+const BLUES := ["#4f7fa8", "#7fa6cf", "#5f8fbd", "#8cb4d6", "#a7c6e3", "#b5d3ec", "#d3e3f1"]
 
 ## Paused while the focus screen is off to one side, to save battery.
 var running := true:
@@ -34,6 +50,10 @@ var _pressing := false
 var _hovered := false
 ## How big it's drawn, from the hover and press: 1 at rest.
 var _grow := 1.0
+## How shaded it is: 0 at rest, 1 hovered.
+var _shade := 0.0
+## Swelling to fill the screen after a tap.
+var _filling := false
 
 
 func _init() -> void:
@@ -55,14 +75,28 @@ func _draw() -> void:
 	var c := size * 0.5
 	var base := radius() * _grow
 	var breathe := 1.0 + 0.045 * sin(_time * 0.55) + 0.02 * sin(_time * 1.27 + 1.0)
+	var tint := tint_at(_time)
 	# A faint halo so the orb sits softly on the page.
+	var halo := Color(0.38, 0.65, 0.52).lerp(Color(0.36, 0.55, 0.74), tint)
 	for i in 6:
-		draw_circle(c, base * breathe * (1.02 + i * 0.035), Color(0.38, 0.65, 0.52, 0.035), true, -1.0, true)
-	for b in BLOBS:
+		draw_circle(c, base * breathe * (1.02 + i * 0.035), Color(halo, 0.035), true, -1.0, true)
+	for k in BLOBS.size():
+		var b: Array = BLOBS[k]
 		var angle: float = b[5] + _time * b[4]
 		var wobble := 1.0 + 0.035 * sin(_time * 0.9 + b[5] * 2.0)
 		var p: Vector2 = c + Vector2(cos(angle), sin(angle)) * base * b[3] * breathe
-		draw_circle(p, base * b[2] * breathe * wobble, Color(Color.from_string(b[0], Color.WHITE), b[1]), true, -1.0, true)
+		var colour := Color.from_string(b[0], Color.WHITE).lerp(Color.from_string(BLUES[k], Color.WHITE), tint)
+		if not UI.dark:
+			# Richer on light paper, so it doesn't wash out at midday.
+			colour = Color.from_hsv(colour.h, minf(1.0, colour.s * LIGHT_SATURATE), colour.v * (1.0 - LIGHT_DEPTH))
+		colour = colour.darkened(HOVER_SHADE * _shade)
+		draw_circle(p, base * b[2] * breathe * wobble, Color(colour, minf(1.0, b[1] * DEPTH)), true, -1.0, true)
+
+
+## How far towards blue the colours are at `time` seconds: 0 green, 1 blue,
+## easing to and fro.
+static func tint_at(time: float) -> float:
+	return 0.5 - 0.5 * cos(time * TAU / TINT_PERIOD)
 
 
 func _has_point(point: Vector2) -> bool:
@@ -79,8 +113,13 @@ func _notification(what: int) -> void:
 			_grow_to(1.0)
 
 
-func _grow_to(v: float) -> void:
-	Motion.method(self, "grow", _set_grow, _grow, v, HoverGrow.TIME)
+## Eases the size towards `v`, and the shade with it (deeper while hovered
+## or pressed).
+func _grow_to(v: float, seconds: float = HOVER_TIME) -> void:
+	if _filling:
+		return
+	Motion.method(self, "grow", _set_grow, _grow, v, seconds)
+	Motion.method(self, "shade", _set_shade, _shade, 1.0 if (_hovered or _pressing) else 0.0, seconds)
 
 
 func _set_grow(v: float) -> void:
@@ -88,15 +127,45 @@ func _set_grow(v: float) -> void:
 	queue_redraw()
 
 
+func _set_shade(v: float) -> void:
+	_shade = v
+	queue_redraw()
+
+
+## Swells until it covers the whole screen, as fast as the choose focus
+## screen's circle opens (CircleReveal.open), keeping a ring of it ahead of
+## that circle's edge.
+func fill_screen() -> void:
+	var centre := get_global_rect().get_center()
+	var view := get_viewport_rect().size
+	var far := 0.0
+	for corner in [Vector2.ZERO, Vector2(view.x, 0), view, Vector2(0, view.y)]:
+		far = maxf(far, centre.distance_to(corner))
+	var r := maxf(radius() * get_global_transform().get_scale().x, 1.0)
+	_filling = true
+	# Its biggest blobs reach about 0.86 of its radius: grown by far / 0.8
+	# more, their edge stays ahead of the circle all the way.
+	Motion.method(self, "grow", _set_grow, _grow, _grow + (far / 0.8 + 2.0) / r, Motion.SLOW)
+
+
+## Back to its resting size at once (it's off screen).
+func settle() -> void:
+	_filling = false
+	_pressing = false
+	_hovered = false
+	Motion.method(self, "grow", _set_grow, _grow, 1.0, 0.0)
+	Motion.method(self, "shade", _set_shade, _shade, 0.0, 0.0)
+
+
 func _gui_input(e: InputEvent) -> void:
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		if e.pressed:
 			_pressing = true
 			_press_at = e.position
-			_grow_to(PRESS_GROW)
+			_grow_to(PRESS_GROW, HoverGrow.TIME)
 		elif _pressing:
 			_pressing = false
-			_grow_to(HOVER_GROW if _hovered else 1.0)
+			_grow_to(HOVER_GROW if _hovered else 1.0, HoverGrow.TIME)
 			if e.position.distance_to(_press_at) < Gestures.TAP_SLOP and _has_point(e.position):
 				tapped.emit()
 		accept_event()

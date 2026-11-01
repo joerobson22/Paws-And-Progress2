@@ -275,12 +275,9 @@ func _build(padding: int) -> void:
 	card = PanelContainer.new()
 	var b := UI.box(UI.SURFACE, Color.TRANSPARENT, 28)
 	b.set_content_margin_all(padding)
-	if UI.look("hard_shadow"):
-		UI.shadow(b, 24, Vector2(0, 10))
-	else:
-		b.shadow_color = Color(0, 0, 0, 0.18)
-		b.shadow_size = 30
-		b.shadow_offset = Vector2(0, 10)
+	b.shadow_color = Color(0, 0, 0, 0.18)
+	b.shadow_size = 30
+	b.shadow_offset = Vector2(0, 10)
 	card.add_theme_stylebox_override("panel", b)
 	centre.add_child(card)
 	var column := UI.vbox(16)

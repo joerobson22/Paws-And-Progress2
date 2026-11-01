@@ -98,10 +98,10 @@ func _ready() -> void:
 	var row := UI.hbox()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	top.add_child(row)
-	_close = UI.round_button("close", Text.t("common.back"), _on_close, Color.TRANSPARENT, UI.ON_DARK, 48, false)
+	_close = UI.round_button("close", Text.t("common.back"), _on_close, UI.SURFACE, UI.INK, 48)
 	row.add_child(_close)
 	row.add_child(UI.spacer())
-	_new = UI.round_button("paw_add", Text.t("choose_focus.new_pet"), _on_new, Color.TRANSPARENT, UI.ON_DARK, 48, false)
+	_new = UI.round_button("paw_add", Text.t("choose_focus.new_pet"), _on_new, UI.SURFACE, UI.INK, 48)
 	row.add_child(_new)
 
 	var bottom := MarginContainer.new()
@@ -119,7 +119,7 @@ func _ready() -> void:
 	_left = UI.round_button("bin", Text.t("choose_focus.rehome_pet"), _on_left, UI.DANGER, Color.WHITE, 56)
 	buttons.add_child(_left)
 	buttons.add_child(UI.spacer())
-	_sort = Dropdown.for_setting(sorts(), SORT_KEY, sorts()[0][0], true).on_dark(56)
+	_sort = Dropdown.for_setting(sorts(), SORT_KEY, sorts()[0][0], true).on_scenery(56)
 	_sort.opens_up = true
 	_sort.chosen.connect(func(_by, _reversed): _build_pick(_current_pet_id()))
 	buttons.add_child(_sort)
@@ -234,7 +234,10 @@ func _pick_place(id: String) -> void:
 
 
 func _place_buttons() -> Control:
-	var panel := UI.panel(UI.GLASS, 22, PLACE_PAD)
+	var panel := UI.panel(UI.SURFACE, 22, PLACE_PAD)
+	(panel.get_theme_stylebox("panel") as StyleBoxFlat).shadow_color = UI.SHADOW
+	(panel.get_theme_stylebox("panel") as StyleBoxFlat).shadow_size = 10
+	(panel.get_theme_stylebox("panel") as StyleBoxFlat).shadow_offset = Vector2(0, 3)
 	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_place_grid = GridContainer.new()
 	_place_grid.add_theme_constant_override("h_separation", PLACE_GAP)
@@ -251,10 +254,10 @@ func _place_buttons() -> Control:
 		_places[id] = button
 		# While it's locked the place's icon fades back under a padlock
 		# badge in the corner (see _refresh_places).
-		var lock := UI.panel(Color(0.06, 0.1, 0.08, 0.72), 999, 3)
+		var lock := UI.panel(UI.INK_SOFT, 999, 3)
 		lock.name = "Lock"
 		lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		lock.add_child(UI.icon_rect("lock", 11, Color.WHITE))
+		lock.add_child(UI.icon_rect("lock", 11, UI.SURFACE))
 		button.add_child(lock)
 		lock.position = Vector2(PLACE_BUTTON - 19, PLACE_BUTTON - 19)
 	_fit_place_grid()
@@ -281,8 +284,8 @@ func _refresh_places() -> void:
 		var button: Button = _places[id]
 		var unlocked := App.is_unlocked("place", id)
 		var on: bool = id == current
-		var fill := Color.WHITE if on else Color(1, 1, 1, 0.0)
-		var ink := UI.ACCENT.darkened(0.2) if on else Color(1, 1, 1, 0.92 if unlocked else 0.42)
+		var fill := UI.ACCENT_SOFT if on else Color.TRANSPARENT
+		var ink := UI.ACCENT if on else Color(UI.INK_SOFT, 1.0 if unlocked else 0.45)
 		button.get_node("Lock").visible = not unlocked
 		button.accessibility_name = _place_title(id) if unlocked else Text.t("choose_focus.place_locked_name", {"place": _place_title(id), "rule": Unlocks.describe(Content.unlock_rule("place", id))})
 		UI.style_button(button, fill, ink, 14)
@@ -400,6 +403,9 @@ func _build_pick(select_id: String = "") -> void:
 	_pick.add_child(_under)
 
 	_pets = Carousel.new()
+	# As wide as the screen, so nothing spills sideways; unclipped, so a
+	# tall pet shows in full above the band.
+	_pets.clip_contents = false
 	_pets.spacing = clampf(size.x * 0.44, 170.0, 300.0)
 	_pick.add_child(_pets)
 	var items: Array[Control] = []
@@ -506,11 +512,11 @@ func _neighbour_id(id: String) -> String:
 
 # --- The project ---------------------------------------------------------------
 
-## A see-through pill with the project's name and a little arrow, so it
-## reads as something to open.
+## A paper pill with the project's name and a little arrow, so it reads as
+## something to open.
 func _make_project_pill() -> Button:
 	var b := Button.new()
-	UI.style_button(b, UI.GLASS, Color.WHITE, 999)
+	UI.style_button(b, UI.SURFACE, UI.INK, 999, true)
 	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
 		var sb: StyleBoxFlat = b.get_theme_stylebox(state)
 		sb.content_margin_left = 16
@@ -570,10 +576,10 @@ func _open_projects() -> void:
 	m.header.add_child(m.heading_row(Text.t("choose_focus.projects_title")))
 	var list := UI.vbox(PROJECT_GAP)
 	var scroll := UI.scroll_area()
+	# Exactly three rows tall, with a scroll bar beside them when there are
+	# more (the list glides, as every list does: SmoothScroll).
 	scroll.custom_minimum_size.y = PROJECT_ROW * PROJECTS_SHOWN + PROJECT_GAP * (PROJECTS_SHOWN - 1)
-	# No scrollbar eating into the rows (they line up with New project); a
-	# soft fade at the bottom says there's more below instead.
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 	var empty := UI.label(Text.t("choose_focus.no_projects"), 15, UI.INK_FAINT, false, 700)
@@ -586,7 +592,6 @@ func _open_projects() -> void:
 	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	area.add_child(scroll)
 	area.add_child(empty)
-	area.add_child(UI.scroll_fade(scroll))
 	m.body.add_child(area)
 	# Swipes play out before the list refills; refills from elsewhere (an
 	# undo) wait for them too.
@@ -878,34 +883,20 @@ func _adopt() -> void:
 
 # --- Pieces ------------------------------------------------------------------
 
-## The × is just an icon: white over scenery and ink over the adopt form.
-## The paw is a ghost button over the scenery (a thin ring, see-through
-## inside) and a solid green tick on the form.
+## The × and the paw are round paper buttons; on the adopt form the paw
+## turns into a solid green tick.
 func _style_top(on_form: bool) -> void:
-	var ink := UI.INK if on_form else UI.ON_DARK
-	# Just the icon: no disc under it, hovered or not.
-	UI.style_button(_close, Color.TRANSPARENT, ink, 999)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
-		_close.add_theme_stylebox_override(state, StyleBoxEmpty.new())
-	_close.icon = Icons.texture("close", 24, Color.WHITE, 3.0)
+	UI.style_button(_close, UI.SURFACE, UI.INK, 999, true)
+	_close.icon = Icons.texture("close", 22, Color.WHITE, 3.0)
 	if on_form:
-		UI.style_button(_new, UI.SUCCESS, Color.WHITE, 999)
+		UI.style_button(_new, UI.SUCCESS, Color.WHITE, 999, true)
 		_new.icon = Icons.texture("check", 22, Color.WHITE, 3.0)
 	else:
-		UI.style_button(_new, Color.TRANSPARENT, UI.ON_DARK, 999)
-		_new.icon = Icons.texture("paw_add", 24, Color.WHITE, 2.4)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
-		var sb: StyleBoxFlat = _new.get_theme_stylebox(state)
-		sb.set_content_margin_all(0)
-		if on_form:
-			continue
-		sb.set_border_width_all(2)
-		sb.border_color = Color(UI.ON_DARK, 0.75)
-		match state:
-			"hover":
-				sb.bg_color = Color(UI.ON_DARK, 0.12)
-			"pressed", "hover_pressed":
-				sb.bg_color = Color(UI.ON_DARK, 0.2)
+		UI.style_button(_new, UI.SURFACE, UI.INK, 999, true)
+		_new.icon = Icons.texture("paw_add", 22, Color.WHITE, 2.4)
+	for b: Button in [_close, _new]:
+		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled", "focus"]:
+			(b.get_theme_stylebox(state) as StyleBoxFlat).set_content_margin_all(0)
 
 
 ## Light text with a soft shadow, centred, so it reads over any scenery.

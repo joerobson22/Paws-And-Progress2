@@ -119,7 +119,7 @@ func _build_hud(clock: SessionClock) -> void:
 
 	var bottom := UI.hbox()
 	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_pause = UI.round_button("pause", Text.t("walk.pause"), _toggle_pause, UI.GLASS, Color.WHITE, 52, false)
+	_pause = UI.round_button("pause", Text.t("walk.pause"), _toggle_pause, UI.SURFACE, UI.INK, 52, true)
 	_pause.size_flags_vertical = Control.SIZE_SHRINK_END
 	bottom.add_child(_pause)
 	bottom.add_child(UI.spacer())
@@ -151,7 +151,7 @@ func _build_hud(clock: SessionClock) -> void:
 	top.add_child(row)
 	row.add_child(_weather_picker())
 	row.add_child(UI.spacer())
-	_sound = UI.round_button("sound", Text.t("walk.sound"), _toggle_sound, UI.GLASS, Color.WHITE, 40, false)
+	_sound = UI.round_button("sound", Text.t("walk.sound"), _toggle_sound, UI.SURFACE, UI.INK, 40, true)
 	row.add_child(_sound)
 	_show_sound()
 
@@ -167,7 +167,7 @@ func _weather_picker() -> Dropdown:
 	var now := Outdoors.choice()
 	if now == "":
 		now = "real" if Outdoors.enabled() else "sunny"
-	var pick := Dropdown.new(options, now, false, Text.t("walk.weather"), false).on_dark()
+	var pick := Dropdown.new(options, now, false, Text.t("walk.weather"), false).on_scenery()
 	pick.chosen.connect(func(option: String, _reversed: bool):
 		Outdoors.set_choice("" if option == "real" else option)
 		_update_ambience())

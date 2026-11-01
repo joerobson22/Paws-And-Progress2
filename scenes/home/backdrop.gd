@@ -30,8 +30,16 @@ extends Control
 var pan := Vector2.ZERO
 ## True while a full-screen flow hides it, so it needn't draw.
 var covered := false
+## How far the layers have sunk below their places, 0 to 1: the create
+## account screen shows mostly sky, and creating an account raises them into
+## view. Near layers sink further than far ones.
+var sunk := 0.0
 ## For tests and the debug bar: 0 day to 1 night. Below 0 works it out.
 var night_override := -1.0
+
+## How far a layer sinks when `sunk` is 1, in screen heights, on top of its
+## parallax.
+const SINK_BASE := 0.3
 
 var _layers: Array[BackdropLayer] = []
 var _colours: Array[Color] = []
@@ -106,7 +114,8 @@ func _layout() -> void:
 	for i in _layers.size():
 		var l := _layers[i]
 		var sway := sin(_age * 0.12 + l.get_index() * 1.7) * l.drift
-		_cover(l, view, pan * l.parallax * travel + Vector2(sway, 0))
+		var sink := sunk * view.y * (SINK_BASE + l.parallax)
+		_cover(l, view, pan * l.parallax * travel + Vector2(sway, sink))
 		# Ground in the layer's colour below its bottom edge, down to the
 		# screen's, for when looking down lifts it.
 		var gap := view.y - (l.position.y + l.size.y)

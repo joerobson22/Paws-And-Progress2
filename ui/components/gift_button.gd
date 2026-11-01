@@ -37,7 +37,7 @@ func _init() -> void:
 	custom_minimum_size.y = HEIGHT
 	focus_mode = Control.FOCUS_ALL
 	mouse_default_cursor_shape = Cursor.HOVER
-	UI.style_button(self, UI.GLASS, Color.WHITE, 999)
+	UI.style_button(self, UI.SURFACE, UI.INK, 999, true)
 	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
 		var sb := get_theme_stylebox(state)
 		if sb is StyleBoxFlat:
@@ -154,9 +154,9 @@ func _draw() -> void:
 		for rarity in SLICES:
 			var share := float(shares.get(rarity, 0.0))
 			if share > 0.002 and share < 0.998:
-				draw_line(c, c + Vector2(cos(at), sin(at)) * r, Color(1, 1, 1, 0.45), 1.0, true)
+				draw_line(c, c + Vector2(cos(at), sin(at)) * r, Color(UI.SURFACE, 0.6), 1.0, true)
 			at += TAU * share
-	draw_arc(c, r - 1.0, 0, TAU, 40, Color(1, 1, 1, 0.35), 2.0, true)
+	draw_arc(c, r - 1.0, 0, TAU, 40, Color(UI.EDGE, 0.8), 2.0, true)
 
 
 ## A slice of the pie from `from` (radians, clockwise) round `sweep`.

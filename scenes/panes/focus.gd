@@ -1,6 +1,9 @@
 extends Pane
-## The middle of the app: a greeting, and under it the focus orb. Tap the orb
-## (a soft bong) and the choose focus screen grows out of it. A home icon
+## The middle of the app: a greeting, and under it the focus orb on a
+## see-through paper panel (so it stands out from the view even on a bright
+## midday),
+## with "Tap to focus" under it. Tap the orb (a soft bong) and it swells to
+## fill the screen as the choose focus screen grows out of it. A home icon
 ## in the top left marks it, as each screen's icon does. Behind it all is
 ## the hilltop view (HomeBackdrop, drawn by the app shell). Debug builds
 ## also get small switches beside the home icon (DebugBar).
@@ -10,12 +13,16 @@ const GREETING_BOX := 160.0
 const GREETING_SIZE := 24
 ## The gap between the greeting's last line and the orb.
 const GREETING_GAP := 48.0
+## How opaque the paper behind the orb is, and its margin round the orb
+## and hint.
+const BACKING_ALPHA := 0.6
+const BACKING_PAD := 18.0
 
 var _orb: FocusOrb
 var _greeting: Label
 var _hint: Label
-## A soft pill behind the hint, so it reads over the view.
-var _hint_pill: PanelContainer
+## The see-through paper behind the orb and the hint.
+var _backing: Panel
 var _home: Control
 var _debug: DebugBar
 var _sky_debug: Control
@@ -27,6 +34,11 @@ var _line_walks := -1
 
 func build() -> void:
 	_pick_line()
+	_backing = Panel.new()
+	var paper := UI.box(Color(UI.SURFACE, BACKING_ALPHA), Color.TRANSPARENT, 40)
+	_backing.add_theme_stylebox_override("panel", paper)
+	_backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_backing)
 	_greeting = UI.label(_line, GREETING_SIZE, UI.INK, true, 600)
 	_greeting.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_greeting.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
@@ -37,18 +49,10 @@ func build() -> void:
 		_orb = FocusOrb.new()
 		_orb.tapped.connect(_on_tapped)
 		add_child(_orb)
-	_hint_pill = PanelContainer.new()
-	var pill := UI.box(Color(UI.BG, 0.8), Color.TRANSPARENT, 99)
-	pill.content_margin_left = 16
-	pill.content_margin_right = 16
-	pill.content_margin_top = 4
-	pill.content_margin_bottom = 4
-	_hint_pill.add_theme_stylebox_override("panel", pill)
-	_hint_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_hint_pill)
 	_hint = UI.label("", 15, UI.INK_SOFT, false, 700)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint_pill.add_child(_hint)
+	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_hint)
 	_home = UI.icon_tile(Minimap.ICONS["focus"])
 	add_child(_home)
 	if OS.is_debug_build():
@@ -84,8 +88,10 @@ func _place() -> void:
 	var d := minf(size.x * 0.7, size.y * 0.5)
 	_orb.size = Vector2(d, d)
 	_orb.position = (size - _orb.size) * 0.5 + Vector2(0, size.y * 0.02)
-	_hint_pill.size = _hint_pill.get_combined_minimum_size()
-	_hint_pill.position = Vector2((size.x - _hint_pill.size.x) * 0.5, _orb.position.y + d + 24)
+	_hint.size = Vector2(d, _hint.get_combined_minimum_size().y)
+	_hint.position = Vector2(_orb.position.x, _orb.position.y + d + 14)
+	_backing.position = _orb.position - Vector2(BACKING_PAD, BACKING_PAD)
+	_backing.size = Vector2(d + BACKING_PAD * 2.0, _hint.position.y + _hint.size.y + BACKING_PAD - _backing.position.y)
 	# The home icon sits where the other screens' title icons do.
 	var insets := UI.safe_insets(self)
 	_home.size = _home.custom_minimum_size
@@ -155,9 +161,10 @@ func _on_shown() -> void:
 func _on_hidden() -> void:
 	if is_instance_valid(_orb):
 		_orb.running = false
+		_orb.settle()
 
 
 func _on_tapped() -> void:
 	Audio.play("orb_tap", 1.0, -4.0, "bong")
-	Motion.pop(_orb, 0.06, 0.3)
+	_orb.fill_screen()
 	App.go("choose_focus", {"from": _orb.get_global_rect().get_center()})
